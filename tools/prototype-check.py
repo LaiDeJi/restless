@@ -17,6 +17,8 @@ No network and no repository files are touched: the page is served from memory
 on an ephemeral localhost port.
 """
 
+from __future__ import annotations
+
 import argparse
 import http.server
 import os
