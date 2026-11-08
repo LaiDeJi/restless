@@ -53,6 +53,9 @@ SwiftLint runs as a script phase on the `Restless` target; run it on demand with
 That target sets `ENABLE_USER_SCRIPT_SANDBOXING: NO` because the phase reads the
 repository; the other targets keep the sandbox on.
 
+The repository is under git. `git config core.hooksPath .githooks` installs the
+pre-commit gate: SwiftLint plus `openspec validate --all --strict`.
+
 Watch app (`RestlessWatch` is embedded in the iPhone app; no watch simulator is
 installed on this Mac):
 
