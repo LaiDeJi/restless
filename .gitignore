@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+node_modules/
+.openchamber/
+.argent/*
+!.argent/e2e/

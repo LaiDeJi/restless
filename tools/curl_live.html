@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restless · Curl Live</title>
+<style>
+  :root {
+    --bg: #070708;
+    --panel: #101012;
+    --panel-2: #151518;
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #f5f5f3;
+    --muted: rgba(255, 255, 255, 0.54);
+    --faint: rgba(255, 255, 255, 0.28);
+    --lime: #c8ff4d;
+    --orange: #ffb84d;
+    --font: ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+  body { padding: 28px 24px 40px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 800; letter-spacing: 2.4px; color: var(--muted); }
+  .brand b { color: var(--text); font-weight: 800; }
+  .brand .slash { color: var(--faint); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px rgba(200,255,77,.7); }
+  .status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: var(--orange); }
+  .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 9px currentColor; }
+  .status.live { color: var(--lime); }
+  .status.finished { color: #8fd3ff; }
+  .stats { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; }
+  .stat .value { font-family: var(--mono); font-size: 30px; font-weight: 700; line-height: 1; color: var(--text); }
+  .stat.big .value { font-size: 64px; color: var(--lime); letter-spacing: -3px; }
+  .stat .label { font-size: 10px; font-weight: 700; letter-spacing: 1.8px; color: var(--faint); margin-top: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px 0; flex-wrap: wrap; }
+  .legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 10px; font-weight: 600; letter-spacing: .8px; color: var(--muted); }
+  .legend i { display: inline-block; width: 18px; height: 2px; margin-right: 6px; vertical-align: middle; border-radius: 2px; background: currentColor; }
+  .legend .angle { color: var(--lime); }
+  .legend .up { color: var(--lime); opacity: .55; }
+  .legend .down { color: var(--orange); opacity: .75; }
+  .legend .rep { color: var(--orange); }
+  .legend .rep i { width: 2px; height: 12px; }
+  .toggle { display: flex; gap: 4px; padding: 3px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); }
+  .toggle button { appearance: none; border: 0; background: transparent; color: var(--faint); font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .toggle button.active { background: rgba(255,255,255,.09); color: var(--text); }
+  .chart-wrap { position: relative; height: 390px; padding: 6px 8px 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+  footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; font-size: 11px; color: var(--faint); flex-wrap: wrap; }
+  footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  footer a:hover { color: var(--lime); border-color: var(--lime); }
+  .empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none; color: var(--faint); font-size: 12px; letter-spacing: 1.6px; }
+  .empty strong { display: block; color: var(--muted); font-size: 13px; letter-spacing: 2px; margin-bottom: 6px; }
+  @media (max-width: 720px) {
+    body { padding: 18px 12px 28px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat.big { grid-column: auto; }
+    .stat.big .value { font-size: 56px; }
+    .chart-wrap { height: 300px; }
+    header { align-items: flex-start; }
+    .brand { font-size: 10px; letter-spacing: 1.6px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><span class="dot"></span><span><b>RESTLESS</b> <span class="slash">/</span> CURL LIVE</span></div>
+      <div id="status" class="status">WAITING</div>
+    </header>
+
+    <section class="stats">
+      <div class="stat big"><div id="reps" class="value">0</div><div class="label">REPS</div></div>
+      <div class="stat"><div id="swing" class="value">0°</div><div class="label">SWING</div></div>
+      <div class="stat"><div id="elapsed" class="value">0:00</div><div class="label">ELAPSED</div></div>
+      <div class="stat"><div id="phase" class="value">IDLE</div><div class="label">PHASE</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="chart-head">
+        <div class="legend">
+          <span class="angle"><i></i>forearm swing</span>
+          <span class="up"><i></i>up: low + 50°</span>
+          <span class="down"><i></i>down: peak − 40°</span>
+          <span class="rep"><i></i>rep counted</span>
+        </div>
+        <div class="toggle">
+          <button type="button" data-window="20" class="active">20s</button>
+          <button type="button" data-window="all">FULL SET</button>
+        </div>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart"></canvas>
+        <div class="empty" id="empty"><div><strong>WAITING FOR WATCH</strong>Start a set on the watch</div></div>
+      </div>
+    </section>
+
+    <footer>
+      <span id="range">low — &middot; peak — &middot; +50° up / −40° down</span>
+      <span>Watch arm only &middot; keep the watch screen on &middot; CSV writes on the watch</span>
+      <a href="/csv">Download CSV</a>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  const state = {
+    samples: [],
+    lastId: 0,
+    lastPhase: null,
+    lastT: -1,
+    windowMode: "20",
+    stale: true,
+    lastSampleAt: 0,
+    generation: null,
+  };
+
+  const els = {
+    reps: document.getElementById("reps"),
+    swing: document.getElementById("swing"),
+    elapsed: document.getElementById("elapsed"),
+    phase: document.getElementById("phase"),
+    range: document.getElementById("range"),
+    status: document.getElementById("status"),
+    empty: document.getElementById("empty"),
+    chart: document.getElementById("chart"),
+    wrap: document.getElementById("chartWrap"),
+  };
+
+  function formatTime(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+
+  function setStatus(text, klass) {
+    els.status.textContent = text;
+    els.status.className = "status" + (klass ? " " + klass : "");
+  }
+
+  function render() {
+    const latest = state.samples.length ? state.samples[state.samples.length - 1] : null;
+    const waiting = !latest || state.stale || (Date.now() - state.lastSampleAt > 2200);
+
+    els.reps.textContent = latest ? latest.reps : "0";
+    els.swing.textContent = latest ? `${Math.round(latest.swing)}°` : "0°";
+    els.elapsed.textContent = latest ? formatTime(latest.t) : "0:00";
+    els.phase.textContent = latest ? latest.phase.toUpperCase() : "IDLE";
+    els.range.textContent = latest
+      ? `low ${Math.round(latest.bottom ?? 0)}° · peak ${Math.round(latest.peak ?? 0)}° · +50° up / −40° down`
+      : "low — · peak — · +50° up / −40° down";
+    els.empty.style.display = waiting ? "grid" : "none";
+
+    if (!latest) setStatus("WAITING", "");
+    else if (latest.phase === "finished") setStatus("FINISHED", "finished");
+    else if (waiting) setStatus("WAITING", "");
+    else setStatus("LIVE", "live");
+
+    draw(latest, waiting);
+  }
+
+  function draw(latest, waiting) {
+    const canvas = els.chart;
+    const rect = els.wrap.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.floor(rect.width - 16));
+    const height = Math.max(1, Math.floor(rect.height - 6));
+    if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const m = { left: 42, right: 14, top: 12, bottom: 26 };
+    const cw = width - m.left - m.right;
+    const ch = height - m.top - m.bottom;
+    const maxT = latest ? latest.t : 0;
+    const all = state.windowMode === "all";
+    const windowSeconds = 20;
+    const x1 = all ? Math.max(20, maxT + 1) : Math.max(windowSeconds, maxT + 0.5);
+    const x0 = all ? 0 : Math.max(0, x1 - windowSeconds);
+    const yMax = 180;
+
+    const x = (t) => m.left + ((t - x0) / (x1 - x0)) * cw;
+    const y = (v) => m.top + (1 - Math.max(0, Math.min(yMax, v)) / yMax) * ch;
+
+    // grid
+    ctx.lineWidth = 1;
+    ctx.font = "10px ui-monospace, SF Mono, Menlo, monospace";
+    ctx.textBaseline = "middle";
+    for (const v of [0, 45, 90, 135, 180]) {
+      const yy = y(v);
+      ctx.strokeStyle = "rgba(255,255,255,.055)";
+      ctx.beginPath();
+      ctx.moveTo(m.left, yy);
+      ctx.lineTo(m.left + cw, yy);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.28)";
+      ctx.textAlign = "right";
+      ctx.fillText(String(v), m.left - 8, yy);
+    }
+
+    const step = x1 - x0 <= 25 ? 5 : 10;
+    for (let t = Math.ceil(x0 / step) * step; t <= x1 + 0.001; t += step) {
+      const xx = x(t);
+      ctx.strokeStyle = "rgba(255,255,255,.04)";
+      ctx.beginPath();
+      ctx.moveTo(xx, m.top);
+      ctx.lineTo(xx, m.top + ch);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.24)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(`${Math.round(t)}s`, xx, m.top + ch + 8);
+    }
+
+    // adaptive triggers: the current low + 50° arms a rep, the current peak
+    // − 40° completes it. They move with the detector, unlike fixed gates.
+    if (latest) {
+      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 1;
+      const up = (latest.bottom ?? 0) + 50;
+      const down = (latest.peak ?? 0) - 40;
+      if (up > 0 && up < 180) {
+        ctx.strokeStyle = "rgba(200,255,77,.38)";
+        ctx.beginPath();
+        ctx.moveTo(m.left, y(up));
+        ctx.lineTo(m.left + cw, y(up));
+        ctx.stroke();
+      }
+      if ((latest.peak ?? 0) > 0 && down > 0 && down < 180) {
+        ctx.strokeStyle = "rgba(255,184,77,.45)";
+        ctx.beginPath();
+        ctx.moveTo(m.left, y(down));
+        ctx.lineTo(m.left + cw, y(down));
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    const visible = state.samples.filter((s) => s.t >= x0 - 0.5);
+    if (visible.length > 1) {
+      // soft fill under the line
+      const grad = ctx.createLinearGradient(0, m.top, 0, m.top + ch);
+      grad.addColorStop(0, "rgba(200,255,77,.13)");
+      grad.addColorStop(1, "rgba(200,255,77,0)");
+      ctx.beginPath();
+      ctx.moveTo(x(visible[0].t), m.top + ch);
+      for (const s of visible) ctx.lineTo(x(s.t), y(s.swing));
+      ctx.lineTo(x(visible[visible.length - 1].t), m.top + ch);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.beginPath();
+      visible.forEach((s, i) => {
+        const xx = x(s.t);
+        const yy = y(s.swing);
+        if (i === 0) ctx.moveTo(xx, yy);
+        else ctx.lineTo(xx, yy);
+      });
+      ctx.strokeStyle = "#c8ff4d";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(200,255,77,.45)";
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // rep markers
+      let prevReps = null;
+      for (const s of state.samples) {
+        if (prevReps !== null && s.reps > prevReps && s.t >= x0 - 0.5) {
+          const xx = x(s.t);
+          ctx.setLineDash([3, 5]);
+          ctx.strokeStyle = "rgba(255,184,77,.38)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(xx, m.top);
+          ctx.lineTo(xx, m.top + ch);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = "#ffb84d";
+          ctx.beginPath();
+          ctx.arc(xx, y(s.swing), 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        prevReps = s.reps;
+      }
+
+      // current point
+      const last = visible[visible.length - 1];
+      const lx = x(last.t);
+      const ly = y(last.swing);
+      ctx.fillStyle = "#f5f5f3";
+      ctx.beginPath();
+      ctx.arc(lx, ly, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(200,255,77,.5)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (waiting) {
+      ctx.fillStyle = "rgba(255,255,255,.18)";
+      ctx.font = "10px ui-monospace, SF Mono, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("NO DATA YET", m.left + cw / 2, m.top + ch / 2);
+    }
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(`/samples?since=${state.lastId}`, { cache: "no-store" });
+      const data = await res.json();
+      if (state.generation === null) state.generation = data.generation;
+      else if (data.generation !== state.generation) {
+        state.generation = data.generation;
+        state.samples = [];
+        state.lastId = 0;
+        state.lastPhase = null;
+        state.lastT = -1;
+        state.lastSampleAt = 0;
+        state.stale = true;
+        render();
+        setTimeout(poll, 100);
+        return;
+      }
+      for (const s of data.samples) {
+        const newSet = state.samples.length > 0 && (
+          (s.phase === "calibrating" && state.lastPhase !== "calibrating") ||
+          s.t < state.lastT - 0.5
+        );
+        if (newSet) state.samples = [];
+        state.samples.push(s);
+        state.lastId = s.id;
+        state.lastPhase = s.phase;
+        state.lastT = s.t;
+        state.lastSampleAt = Date.now();
+      }
+      if (state.samples.length > 3000) state.samples = state.samples.slice(-3000);
+      state.stale = !data.samples.length && data.stale;
+      render();
+    } catch (err) {
+      state.stale = true;
+      render();
+    }
+    setTimeout(poll, 100);
+  }
+
+  document.querySelectorAll(".toggle button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.windowMode = button.dataset.window;
+      document.querySelectorAll(".toggle button").forEach((b) => b.classList.toggle("active", b === button));
+      render();
+    });
+  });
+
+  new ResizeObserver(() => render()).observe(els.wrap);
+  render();
+  poll();
+})();
+</script>
+</body>
+</html>

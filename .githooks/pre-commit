@@ -1,0 +1,8 @@
+#!/bin/sh
+# The two gates AGENTS.md asks for at the end of a task. Install once with
+#   git config core.hooksPath .githooks
+# SwiftLint warnings do not fail (that matches the build phase); the OpenSpec
+# check does, so a spec left mid-edit cannot be committed.
+
+swiftlint lint --quiet --reporter summary || exit 1
+openspec validate --all --strict || exit 1

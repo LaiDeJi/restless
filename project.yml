@@ -1,0 +1,162 @@
+name: Restless
+
+options:
+  bundleIdPrefix: com.whc
+  deploymentTarget:
+    iOS: "18.0"
+    watchOS: "11.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: VMZG879ZU8
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  Restless:
+    type: application
+    platform: iOS
+    sources:
+      - path: Restless
+      - path: Shared
+    entitlements:
+      path: Restless/Restless.entitlements
+    info:
+      path: Restless/Info.plist
+      properties:
+        CFBundleDisplayName: Restless
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSSupportsLiveActivities: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        CFBundleURLTypes:
+          - CFBundleURLName: com.whc.restless
+            CFBundleURLSchemes:
+              - restless
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # SwiftLint reads the repository config and sources from the run script
+        # phase; script sandboxing denies that read.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    dependencies:
+      - target: RestlessWidgetExtension
+        embed: true
+      - target: RestlessWatch
+        embed: true
+    postCompileScripts:
+      - name: SwiftLint
+        basedOnDependencyAnalysis: false
+        showEnvVars: false
+        script: |
+          if [[ "$(uname -m)" == arm64 ]]; then
+            export PATH="/opt/homebrew/bin:$PATH"
+          fi
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint lint --config "${SRCROOT}/.swiftlint.yml" --quiet
+          else
+            echo "warning: swiftlint is not installed — run: brew install swiftlint"
+          fi
+
+  RestlessWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: RestlessWatch
+        excludes:
+          - README.md
+      - path: Shared/WorkoutPreset.swift
+      - path: Shared/WorkoutBlock.swift
+      - path: Shared/MovementProfileDerivation.swift
+      - path: Shared/ProfileRepCounter.swift
+      - path: Shared/WatchMessage.swift
+      - path: Shared/SessionSnapshot.swift
+      - path: Shared/Theme.swift
+    entitlements:
+      path: RestlessWatch/RestlessWatch.entitlements
+    info:
+      path: RestlessWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Restless
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.whc.restless
+        WKBackgroundModes:
+          - workout-processing
+        NSMotionUsageDescription: Restless reads wrist motion to count reps.
+        NSHealthShareUsageDescription: Restless reads workout data to keep a set running while your wrist is down.
+        NSHealthUpdateUsageDescription: Restless starts a workout session while a set is counting.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.watchkitapp
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+
+  RestlessWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RestlessWidget
+      - path: Shared
+    entitlements:
+      path: RestlessWidget/RestlessWidget.entitlements
+    info:
+      path: RestlessWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Restless
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.widget
+        SKIP_INSTALL: YES
+
+  RestlessTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RestlessTests
+    dependencies:
+      - target: Restless
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Restless:
+    build:
+      targets:
+        Restless: all
+        RestlessWidgetExtension: all
+        RestlessWatch: all
+        RestlessTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - RestlessTests
+  RestlessWatch:
+    build:
+      targets:
+        RestlessWatch: all
+    run:
+      config: Debug

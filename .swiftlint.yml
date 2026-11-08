@@ -1,0 +1,50 @@
+# SwiftLint — run from the repository root (`swiftlint`) or by the XcodeGen
+# build phase on the Restless target.
+
+included:
+  - Shared
+  - Restless
+  - RestlessWidget
+  - RestlessWatch
+  - RestlessTests
+
+excluded:
+  - build
+  - node_modules
+
+# Build phases should not make network calls.
+check_for_updates: false
+
+line_length:
+  warning: 120
+  error: 160
+  ignores_interpolated_strings: true
+
+# SwiftUI screens carry a lot of view code in one type.
+file_length:
+  warning: 600
+  error: 1200
+
+type_body_length:
+  warning: 450
+  error: 600
+
+function_body_length:
+  warning: 80
+  error: 150
+
+cyclomatic_complexity:
+  warning: 12
+  error: 20
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - to
+    - up
+    - a
+    - b
+    - x
+    - y
+    - z

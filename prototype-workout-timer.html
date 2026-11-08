@@ -1,0 +1,5502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Restless — session rest timer</title>
+<!--
+  PROTOTYPE — a session rest timer built around the Dynamic Island.
+
+  Model:
+    A session is an ordered list of blocks. A block holds movements from the
+    reusable library, a number of rounds, a number of sets per round, a set
+    rest, and a round rest. Every set ends on one of three conditions: a rep
+    target counted on the watch, a timed hold on the phone, or a manual tap.
+
+    Each round runs every movement in order for its sets-per-round sets. A set
+    rest follows every set except the last of its round; a round rest follows
+    the last set of a round. A block with one movement is that movement
+    repeated; two or more movements repeat the group. A sequential pair is two
+    blocks.
+
+    A timed set runs a work countdown in the performing phase, then starts the
+    same rest as any other set. The final set of the final block has no rest.
+
+  The key interaction: tap the Dynamic Island → Set done. That starts the right rest
+  without reopening the app. The phone screen is the detailed view of the same state.
+
+  Navigation: TIMER and SESSIONS bottom tabs. SESSIONS lists saved sessions and the
+  MOVEMENTS library. A session opens its ordered blocks; a block edits its rounds,
+  sets per round, rests, and movements. A movement opens its end condition and target.
+  Values persist in localStorage. Rounds and sets per round are unbounded; rests stay
+  15–600 seconds in 15s steps, except a block's set rest may be 0.
+
+  The add-movement picker can also create a library movement from a typed name: it
+  is appended with the selected set end and target, carries no watch profile, and is
+  reused when a matching name already exists. Dragging a block or movement by its
+  grip floats an opaque card under the pointer while the source slot dims and the row
+  under the pointer is outlined.
+
+  The watch buttons in the timer and recording screens are a prototype stand-in for a
+  real watch. They let you walk the armed, unavailable, counting, received, and failed
+  states without a device.
+
+  The timer's ↺ restart arms on the first tap (TAP AGAIN, amber) and applies the
+  restart on the second; it appears once a set is done and stays available through a
+  set or rest. The block editor appends an unused library movement in one tap under
+  ADD FROM LIBRARY. The footer toggle previews the iOS 26 Liquid Glass chrome and the
+  flat iOS 18–25 fallback on EDIT, restart, and the SESSIONS add control.
+
+  Not production code. Double-click to open.
+-->
+<style>
+  :root { --danger: #FF5C4D; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  button:focus, button:focus-visible { outline: none; }
+
+  body {
+    background: radial-gradient(120% 70% at 50% -12%, #1d1d23 0%, #0c0c0f 48%, #070708 100%);
+    color: #ececef;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ---------------------------------------------------------------- page chrome */
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 16px 26px;
+  }
+  .page-head {
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 10px;
+    letter-spacing: .16em;
+    font-weight: 600;
+    color: rgba(255,255,255,.42);
+    text-transform: uppercase;
+    padding: 0 2px;
+    flex: 0 0 auto;
+  }
+  .ph-left { display: flex; align-items: center; gap: 9px; }
+  .ph-mark {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #C8FF4D;
+    box-shadow: 0 0 10px rgba(200,255,77,.7);
+  }
+  .ph-left em {
+    font-style: normal;
+    color: rgba(255,255,255,.26);
+    letter-spacing: .12em;
+  }
+  .ph-right {
+    color: rgba(255,255,255,.3);
+    letter-spacing: .08em;
+    text-transform: none;
+    font-weight: 500;
+  }
+
+  .stage {
+    position: relative;
+    flex: 0 0 auto;
+    margin: auto 0 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .phone-frame { width: 430px; height: 880px; transform-origin: top center; }
+
+  /* ---------------------------------------------------------------- phone hardware */
+  .phone {
+    position: relative;
+    width: 430px;
+    height: 880px;
+    padding: 14px;
+    border-radius: 72px;
+    background:
+      linear-gradient(148deg, #5a5a60 0%, #1b1b1f 22%, #26262b 46%, #101013 72%, #3b3b41 100%);
+    box-shadow:
+      0 70px 110px -40px rgba(0,0,0,.95),
+      0 20px 40px -20px rgba(0,0,0,.8),
+      0 0 0 1px rgba(255,255,255,.10),
+      inset 0 0 0 2px rgba(255,255,255,.06),
+      inset 0 1px 1px rgba(255,255,255,.25);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .side-btn {
+    position: absolute;
+    width: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #1a1a1d, #3a3a3f 55%, #141416);
+    box-shadow: 0 0 0 .5px rgba(255,255,255,.08);
+  }
+  .side-btn.vol-up   { left: -3px; top: 176px; height: 58px; }
+  .side-btn.vol-down { left: -3px; top: 246px; height: 58px; }
+  .side-btn.mute     { left: -3px; top: 118px; height: 32px; }
+  .side-btn.power    { right: -3px; top: 200px; height: 92px; }
+
+  .screen {
+    position: relative;
+    width: 402px;
+    height: 852px;
+    border-radius: 58px;
+    overflow: hidden;
+    background: #070708;
+    isolation: isolate;
+  }
+  .app { position: absolute; inset: 0; z-index: 10; }
+
+  /* status bar */
+  .statusbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    color: #fff;
+    pointer-events: none;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    transition: opacity .18s ease;
+  }
+  .screen.island-open .statusbar { opacity: 0; }
+  .sb-icons { display: flex; align-items: center; gap: 6px; margin-top: -2px; }
+  .sb-icons svg { display: block; }
+
+  .home-indicator {
+    position: absolute;
+    bottom: 9px; left: 50%;
+    transform: translateX(-50%);
+    width: 140px; height: 5px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.88);
+    z-index: 35;
+    pointer-events: none;
+  }
+
+  /* ---------------------------------------------------------------- dynamic island */
+  .island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 37px;
+    border-radius: 22px;
+    background: #000;
+    border: 1px solid rgba(255,255,255,.06);
+    z-index: 50;
+    overflow: hidden;
+    cursor: pointer;
+    color: #fff;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow:
+      0 3px 12px rgba(0,0,0,.55),
+      inset 0 0 0 1px rgba(255,255,255,.02);
+    transition:
+      width .52s cubic-bezier(.32,.72,0,1),
+      height .52s cubic-bezier(.32,.72,0,1),
+      border-radius .42s cubic-bezier(.32,.72,0,1);
+    --phase: #C8FF4D;
+  }
+  #island:focus, #island:focus-visible { outline: none !important; }
+  .island.dormant { cursor: default; }
+  .island.dormant .ic,
+  .island.dormant .ie { opacity: 0; }
+
+  .ic {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    opacity: 1;
+    transition: opacity .18s ease;
+  }
+  .island.expanded .ic { opacity: 0; pointer-events: none; transition-duration: .08s; }
+  .ic-left { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .ic-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--phase);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--phase) 60%, transparent);
+    flex: 0 0 auto;
+  }
+  .ic-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    white-space: nowrap;
+  }
+  .ic-time {
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: .01em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ie {
+    position: absolute;
+    inset: 0;
+    padding: 15px 20px 16px;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .16s ease, visibility 0s linear .2s;
+    color: #fff;
+  }
+  .island.expanded .ie {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity .24s ease .1s, visibility 0s;
+  }
+  .ie-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .ie-phase { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: .16em; white-space: nowrap; }
+  .ie-phase i { width: 7px; height: 7px; border-radius: 50%; background: var(--phase); box-shadow: 0 0 7px color-mix(in srgb, var(--phase) 55%, transparent); flex: 0 0 auto; }
+  .ie-sub {
+    font-size: 11px;
+    letter-spacing: .07em;
+    color: rgba(255,255,255,.44);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ie-time {
+    font-size: 50px;
+    font-weight: 600;
+    letter-spacing: -.05em;
+    line-height: 1;
+    margin-top: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ie-time.small { font-size: 34px; letter-spacing: .01em; }
+  .ie-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); margin-top: 10px; overflow: hidden; }
+  .ie-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--phase); }
+  .ie-next { margin-top: 9px; font-size: 11px; letter-spacing: .1em; color: rgba(255,255,255,.44); white-space: nowrap; }
+  .ie-actions { display: flex; gap: 8px; margin-top: auto; }
+  .ie-actions button {
+    flex: 1;
+    height: 34px;
+    border-radius: 17px;
+    border: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ie-actions .primary { background: #fff; color: #000; }
+  .ie-actions .primary:active { background: rgba(255,255,255,.85); }
+  .ie-actions .ghost { background: rgba(255,255,255,.13); color: #fff; }
+  .ie-actions .ghost:active { background: rgba(255,255,255,.22); }
+  .island.pulse { animation: islandPulse .42s ease; }
+  @keyframes islandPulse {
+    0% { transform: translateX(-50%) scale(1); }
+    38% { transform: translateX(-50%) scale(1.035); }
+    100% { transform: translateX(-50%) scale(1); }
+  }
+
+  /* ---------------------------------------------------------------- rest timer screen */
+  .app-screen {
+    --accent: #C8FF4D;
+    --glow: rgba(200,255,77,.26);
+    --glow-soft: rgba(200,255,77,.07);
+    position: relative;
+    height: 100%;
+    padding: 64px 22px 92px;
+    display: flex;
+    flex-direction: column;
+    background: #070708;
+    color: #fff;
+    overflow: hidden;
+    transition: background .5s ease;
+  }
+  .app-screen[data-phase="round"] {
+    --accent: #FFB84D;
+    --glow: rgba(255,184,77,.24);
+    --glow-soft: rgba(255,184,77,.08);
+    background: #0a0805;
+  }
+  .app-screen::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 160px;
+    width: 420px;
+    height: 420px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, var(--glow-soft) 0%, transparent 66%);
+    pointer-events: none;
+    transition: background .5s;
+  }
+
+  .app-head {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    flex: 0 0 auto;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 240px;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    color: #fff;
+  }
+  .brand-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 9px var(--glow);
+    transition: background .4s;
+    flex: 0 0 auto;
+  }
+  .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .edit-pill {
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.035);
+    color: rgba(255,255,255,.58);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    cursor: pointer;
+  }
+  .edit-pill:active { background: rgba(255,255,255,.1); }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+  }
+  .restart-pill {
+    width: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: rgba(255,255,255,.72);
+  }
+  .restart-pill svg { width: 18px; height: 18px; }
+  .edit-pill.chrome-glass { color: rgba(255,255,255,.86); }
+  .add-pill.chrome-glass { color: rgba(255,255,255,.86); }
+  .restart-pill.armed {
+    width: auto;
+    padding: 0 14px;
+    border-radius: 999px;
+    border-color: rgba(255,184,77,.36);
+    background: rgba(255,184,77,.13);
+    color: #FFB84D;
+    font-size: 12px;
+    letter-spacing: .08em;
+  }
+
+  .pos {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px 10px;
+    min-height: 24px;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .067em;
+    text-align: center;
+    color: rgba(255,255,255,.38);
+    flex: 0 0 auto;
+  }
+  .pos b {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: .01em;
+    margin: 0 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pos em { font-style: normal; color: rgba(255,255,255,.26); }
+  .pos-sep { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.16); }
+  .pos-up {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: .067em;
+    margin-right: 2px;
+    transition: color .35s;
+  }
+  .pos-done {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: .133em;
+    font-weight: 700;
+  }
+
+  .center-stack {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  /* The timer stage pins the ring's centre to its own vertical middle. The
+     top chrome and the lower content are positioned against that fixed centre,
+     so neither a wrapping position strip nor a taller set map moves the ring.
+     Tall content makes the stage scroll. */
+  .timer-screen { padding-bottom: 92px; }
+  .timer-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-top: calc(var(--stage-h, 696px) / 2 + 170px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  .timer-stage::-webkit-scrollbar { display: none; }
+  .timer-chrome {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+  }
+  .timer-stage > .hero {
+    position: absolute;
+    top: calc(var(--stage-h, 696px) / 2);
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+  }
+  .timer-lower {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .timer-lower .actions {
+    margin-top: auto;
+    width: 100%;
+  }
+  .hero {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+  }
+  .rt-ring {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    transform: rotate(-90deg);
+  }
+  .rt-track { fill: none; stroke: rgba(255,255,255,.065); stroke-width: 13; }
+  .rt-prog {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 13;
+    stroke-linecap: round;
+    stroke-dasharray: 1005.31;
+    stroke-dashoffset: 1005.31;
+    filter: drop-shadow(0 0 9px var(--glow));
+    transition: stroke .45s ease;
+  }
+  .rt-center { position: relative; text-align: center; z-index: 2; }
+  .rt-kicker {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .133em;
+    color: var(--accent);
+    transition: color .35s;
+  }
+  .rt-time {
+    margin-top: 8px;
+    font-size: 78px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -.05em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rt-time.small { font-size: 52px; letter-spacing: .01em; }
+  .rt-sub {
+    margin-top: 12px;
+    max-width: 232px;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: .03em;
+    color: rgba(255,255,255,.38);
+  }
+
+  .map-wrap { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .map {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px 11px;
+    max-width: 310px;
+  }
+  .map-group { display: flex; align-items: center; gap: 7px; }
+  .map-r {
+    width: 19px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: rgba(255,255,255,.22);
+    transition: color .3s;
+  }
+  .map-group.active .map-r { color: rgba(255,255,255,.72); }
+  .map-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.11);
+    transition: background .3s, box-shadow .3s, transform .3s;
+  }
+  .map-dot.done { background: rgba(255,255,255,.7); }
+  .map-dot.current {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 8px var(--glow);
+    transform: scale(1.18);
+  }
+  .map-caption {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .109em;
+    color: rgba(255,255,255,.3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .actions {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 9px;
+    margin-top: 10px;
+    flex: 0 0 auto;
+  }
+  .actions .primary {
+    flex: 1;
+    min-height: 62px;
+    border-radius: 31px;
+    border: none;
+    background: var(--accent);
+    color: #070708;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0 16px;
+    transition: background .4s, transform .12s;
+    min-width: 0;
+  }
+  .actions .primary:active { transform: scale(.987); }
+  .btn-main { font-size: 17px; font-weight: 700; letter-spacing: .035em; line-height: 1.1; }
+  .btn-sub {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .015em;
+    color: rgba(0,0,0,.52);
+    line-height: 1.1;
+  }
+  .icon-btn {
+    width: 62px;
+    height: 62px;
+    border-radius: 31px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.055);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .icon-btn:active { background: rgba(255,255,255,.12); }
+  .icon-btn svg { width: 22px; height: 22px; }
+
+  /* ---------------------------------------------------------------- block strip */
+  .block-strip {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 6px;
+    flex: 0 0 auto;
+    margin-top: 6px;
+    padding: 2px 1px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .block-strip::-webkit-scrollbar { display: none; }
+  .block-chip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 150px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.03);
+    color: rgba(255,255,255,.4);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .067em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .block-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .block-chip.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #070708;
+  }
+  .block-chip.done {
+    background: rgba(255,255,255,.065);
+    border-color: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.62);
+  }
+  .block-chip .pc-check { font-size: 12px; line-height: 1; opacity: .72; }
+  .pos-block { color: rgba(255,255,255,.5); }
+
+  /* ---------------------------------------------------------------- adaptive map */
+  .map-bar-wrap {
+    width: 252px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+  }
+  .map-bar {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.09);
+    overflow: hidden;
+  }
+  .map-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--glow);
+    transition: width .3s ease;
+  }
+  .map-bar-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .109em;
+    color: rgba(255,255,255,.34);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------------------------------------------------------------- bottom tabs */
+  .tabbar {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 12;
+    height: 76px;
+    padding: 7px 28px 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 64px;
+    background: linear-gradient(to top, #0b0b0e 56%, rgba(7,7,8,.9) 82%, rgba(7,7,8,0));
+    border-top: 1px solid rgba(255,255,255,.055);
+  }
+  .tabbar button {
+    width: 72px;
+    border: none;
+    background: none;
+    color: rgba(255,255,255,.3);
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    cursor: pointer;
+    padding: 0;
+  }
+  .tabbar button.on { color: #fff; }
+  .tabbar button.on svg { color: var(--accent); filter: drop-shadow(0 0 6px var(--glow)); }
+  .tabbar svg { width: 19px; height: 19px; display: block; }
+  .tabbar button:active { opacity: .7; }
+
+  /* ---------------------------------------------------------------- sessions */
+  .sessions-screen { padding-bottom: 92px; }
+  .sessions-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .sessions-scroll::-webkit-scrollbar { display: none; }
+  .sessions-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 3px;
+  }
+  .sessions-kicker {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    color: rgba(255,255,255,.36);
+  }
+  .sessions-title {
+    margin-top: 4px;
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .add-pill {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.72);
+    font-family: inherit;
+    font-size: 20px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0 0 2px;
+  }
+  .add-pill:active { background: rgba(255,255,255,.1); }
+  .lock-banner {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,184,77,.24);
+    background: rgba(255,184,77,.065);
+    color: #FFB84D;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .046em;
+    line-height: 1.4;
+  }
+  .session-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 15px 15px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .session-card:active { background: rgba(255,255,255,.07); }
+  .session-card.on {
+    border-color: rgba(200,255,77,.24);
+    background: rgba(200,255,77,.055);
+  }
+  .sc-main { flex: 1 1 auto; min-width: 0; }
+  .sc-name {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: .012em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sc-meta {
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: .015em;
+    color: rgba(255,255,255,.36);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sc-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .active-badge {
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: rgba(200,255,77,.12);
+    color: #C8FF4D;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .055em;
+  }
+  .chev { color: rgba(255,255,255,.24); font-size: 20px; line-height: 1; }
+  .sessions-foot {
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.55;
+    letter-spacing: 0;
+    color: rgba(255,255,255,.28);
+  }
+
+  /* ---------------------------------------------------------------- session editor */
+  .editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: 0 0 auto;
+  }
+  .back-pill {
+    border: none;
+    background: none;
+    color: rgba(255,255,255,.46);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    padding: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  .back-pill:active { color: #fff; }
+  .editor-kicker {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    color: rgba(255,255,255,.38);
+  }
+  .preset-name:disabled { opacity: .55; border-bottom-color: transparent; }
+  .section-k {
+    margin-top: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    color: rgba(255,255,255,.34);
+  }
+  .block-row {
+    display: flex;
+    align-items: stretch;
+    gap: 7px;
+    margin-top: 8px;
+  }
+  .block-open {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 13px 13px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .block-open:active { background: rgba(255,255,255,.07); }
+  .br-index {
+    width: 24px;
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: rgba(255,255,255,.26);
+    font-variant-numeric: tabular-nums;
+  }
+  .br-main { flex: 1 1 auto; min-width: 0; }
+  .br-name {
+    display: block;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: .012em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .br-meta {
+    display: -webkit-box;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: .015em;
+    color: rgba(255,255,255,.33);
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .br-chev { color: rgba(255,255,255,.24); font-size: 18px; line-height: 1; flex: 0 0 auto; }
+  .row-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+  .row-grip,
+  .row-trash {
+    width: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.45);
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: grab;
+    padding: 0;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .row-grip:active { background: rgba(255,255,255,.1); cursor: grabbing; }
+  .row-grip svg,
+  .row-trash svg { width: 18px; height: 18px; }
+  .row-trash {
+    border: none;
+    background: none;
+    color: rgba(255,92,77,.62);
+    cursor: pointer;
+  }
+  .row-trash:active { background: rgba(255,92,77,.12); }
+  .row-trash.armed {
+    color: var(--danger);
+    background: rgba(255,92,77,.12);
+    border: 1px solid rgba(255,92,77,.34);
+  }
+  .row-trash:disabled { opacity: .2; cursor: default; }
+  .br-meta.danger { color: var(--danger); font-weight: 600; }
+  .block-row.dragging .block-open { opacity: .35; }
+  .block-row.drop-target .block-open {
+    border-color: rgba(200,255,77,.45);
+    box-shadow: 0 0 0 1px rgba(200,255,77,.45), 0 0 22px rgba(200,255,77,.1);
+  }
+  .drag-ghost {
+    position: fixed;
+    z-index: 60;
+    margin: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 13px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.16);
+    background: #1a1a1f;
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    box-shadow: 0 26px 60px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06);
+    transform: scale(1.02);
+  }
+  .add-block {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 9px;
+    border-radius: 14px;
+    border: 1px dashed rgba(255,255,255,.14);
+    background: transparent;
+    color: rgba(255,255,255,.48);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    cursor: pointer;
+  }
+  .add-block:active { background: rgba(255,255,255,.04); }
+  .editor-foot {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .use-btn {
+    min-height: 52px;
+    border: none;
+    border-radius: 26px;
+    background: var(--accent);
+    color: #070708;
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: .035em;
+    cursor: pointer;
+  }
+  .use-btn:active { transform: scale(.99); }
+  .active-state {
+    min-height: 52px;
+    border-radius: 26px;
+    border: 1px solid rgba(200,255,77,.24);
+    color: #C8FF4D;
+    display: grid;
+    place-items: center;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: .05em;
+  }
+  .danger-link {
+    align-self: center;
+    border: none;
+    background: none;
+    padding: 0 10px;
+    border-radius: 999px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    color: rgba(255,92,77,.62);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .046em;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .danger-link.armed {
+    color: var(--danger);
+    background: rgba(255,92,77,.12);
+    text-decoration: none;
+  }
+
+  /* ---------------------------------------------------------------- editable numbers */
+  .sv { min-width: 54px; text-align: right; }
+  .sv-btn {
+    border: none;
+    background: none;
+    padding: 0 0 2px;
+    border-bottom: 1px dashed rgba(255,255,255,.2);
+    color: #fff;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+    cursor: pointer;
+  }
+  .sv-btn:active { color: var(--accent); border-bottom-color: var(--accent); }
+  .num-input {
+    width: 86px;
+    min-width: 54px;
+    margin-right: 14px;
+    padding: 0 0 2px;
+    border: none;
+    border-bottom: 1px solid var(--accent);
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+    text-align: right;
+    outline: none;
+  }
+  .num-input::selection { background: var(--accent); color: #070708; }
+
+  .sstep button:disabled,
+  .row-grip:disabled,
+  .row-trash:disabled,
+  .add-pill:disabled,
+  .add-block:disabled,
+  .use-btn:disabled,
+  .sheet-done:disabled,
+  .danger-link:disabled,
+  .back-pill:disabled {
+    opacity: .24;
+    cursor: default;
+  }
+  .sstep button:disabled:active,
+  .row-grip:disabled:active,
+  .add-pill:disabled:active,
+  .add-block:disabled:active,
+  .use-btn:disabled:active { background: rgba(255,255,255,.04); transform: none; }
+
+  /* ---------------------------------------------------------------- setup sheet */
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0,0,0,.48);
+    animation: fadeIn .2s ease both;
+  }
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 21;
+    max-height: 90%;
+    overflow-y: auto;
+    background: #111113;
+    border-radius: 34px 34px 0 0;
+    padding: 9px 22px 28px;
+    box-shadow: 0 -24px 60px rgba(0,0,0,.55);
+    animation: sheetUp .4s cubic-bezier(.22,1,.28,1) both;
+    color: #fff;
+  }
+  .sheet.no-anim { animation: none; }
+  .grab {
+    width: 38px; height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,.16);
+    margin: 0 auto 16px;
+  }
+  .sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .sheet-title { flex: 1 1 auto; min-width: 0; }
+  .sheet-k { font-size: 8px; font-weight: 650; letter-spacing: .18em; color: rgba(255,255,255,.4); }
+  .preset-name {
+    display: block;
+    width: 100%;
+    margin-top: 5px;
+    padding: 0 0 3px;
+    border: none;
+    border-bottom: 1px dashed rgba(255,255,255,.14);
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+    font-family: inherit;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    outline: none;
+    caret-color: var(--accent);
+  }
+  .preset-name:focus { border-bottom-color: var(--accent); }
+  .preset-name::selection { background: var(--accent); color: #070708; }
+  .preset-bar { display: flex; align-items: center; gap: 6px; margin-top: 13px; }
+  .preset-row {
+    display: flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 6px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .preset-row::-webkit-scrollbar { display: none; }
+  .preset-chip {
+    flex: 0 0 auto;
+    height: 28px;
+    max-width: 132px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.11);
+    background: transparent;
+    color: rgba(255,255,255,.55);
+    font-family: inherit;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .preset-chip.on { background: var(--accent); border-color: var(--accent); color: #070708; }
+  .preset-chip.add {
+    width: 28px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-style: dashed;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: rgba(255,255,255,.6);
+  }
+  .preset-chip:active { opacity: .75; }
+  .sheet-done {
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent);
+    color: #070708;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .sheet-note {
+    margin-top: 14px;
+    font-size: 15px;
+    line-height: 1.45;
+    letter-spacing: .015em;
+    color: rgba(255,255,255,.38);
+  }
+  .sheet-warn {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .046em;
+    color: #FFB84D;
+  }
+  .rows { margin-top: 10px; }
+  .srow {
+    display: flex;
+    align-items: center;
+    min-height: 56px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .sk { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: .013em; color: rgba(255,255,255,.45); }
+  .sv {
+    font-size: 20px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+    margin-right: 14px;
+  }
+  .sstep { display: flex; gap: 4px; }
+  .sstep button {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    border: none;
+    background: rgba(255,255,255,.075);
+    color: #fff;
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .sstep button:active { background: rgba(255,255,255,.14); }
+  .sheet-foot {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+  }
+  .reset-link {
+    border: none;
+    background: none;
+    color: rgba(255,255,255,.36);
+    font-family: inherit;
+    font-size: 8.5px;
+    font-weight: 650;
+    letter-spacing: .14em;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .reset-link.delete.armed { color: #FFB84D; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheetUp { from { transform: translateY(102%); } to { transform: translateY(0); } }
+
+  .screen-in { animation: screenIn .32s cubic-bezier(.22,1,.28,1) both; }
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------------------------------------------------------------- footer */
+  .debug {
+    margin-top: 14px;
+    margin-bottom: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 9px;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.26);
+    text-align: center;
+    min-height: 14px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .debug b { color: rgba(255,255,255,.5); font-weight: 500; }
+
+  /* ---------------------------------------------------------------- blocks and movements */
+  .pos-block {
+    color: rgba(255,255,255,.52);
+    text-transform: uppercase;
+  }
+  .pos-move {
+    color: #fff;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .map-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .map-label {
+    width: 27px;
+    flex: 0 0 auto;
+    text-align: right;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.22);
+    transition: color .3s;
+  }
+  .map-row.active .map-label { color: rgba(255,255,255,.72); }
+  .map-dots { display: flex; align-items: center; gap: 5px; }
+  .map-gap { width: 5px; flex: 0 0 auto; }
+
+  .watch-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 9px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(200,255,77,.24);
+    background: rgba(200,255,77,.055);
+    font-size: 11px;
+    letter-spacing: .07em;
+    line-height: 1.2;
+  }
+  .watch-strip.off {
+    border-color: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.035);
+  }
+  .watch-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #C8FF4D;
+    box-shadow: 0 0 7px rgba(200,255,77,.55);
+  }
+  .watch-strip.off .watch-dot {
+    background: rgba(255,255,255,.22);
+    box-shadow: none;
+  }
+  .watch-label {
+    font-weight: 700;
+    color: #C8FF4D;
+    letter-spacing: .1em;
+  }
+  .watch-strip.off .watch-label { color: rgba(255,255,255,.5); }
+  .watch-count {
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .03em;
+  }
+  .watch-sim {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .watch-sim button {
+    height: 29px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.72);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .watch-sim button:active { background: rgba(255,255,255,.14); }
+
+  /* ---------------------------------------------------------------- segmented controls and chips */
+  .seg {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    margin-top: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.05);
+  }
+  .seg button {
+    flex: 1 1 0;
+    min-height: 40px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: rgba(255,255,255,.5);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .seg button.on {
+    background: var(--accent);
+    color: #070708;
+  }
+  .seg button:disabled { opacity: .3; }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .chip {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.11);
+    background: transparent;
+    color: rgba(255,255,255,.58);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #070708;
+  }
+  .chip:disabled { opacity: .3; }
+
+  /* ---------------------------------------------------------------- section heads */
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .section-head .section-k { margin-top: 0; }
+  .section-count {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.28);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------------------------------------------------------------- library */
+  .lib-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .lib-head .sessions-kicker { margin: 0; }
+  .lib-count {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.3);
+  }
+  .lib-group { margin-top: 16px; }
+  .lib-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.38);
+  }
+  .lib-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 13px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .lib-row:active { background: rgba(255,255,255,.07); }
+  .lib-row.on {
+    border-color: rgba(200,255,77,.5);
+    background: rgba(200,255,77,.08);
+  }
+  .lib-row.on .chev { color: #C8FF4D; }
+  .lib-row .sc-name { font-size: 16px; }
+  .lib-row .sc-meta { margin-top: 4px; }
+  .record-row {
+    width: 100%;
+    min-height: 50px;
+    margin-top: 9px;
+    border-radius: 14px;
+    border: 1px dashed rgba(255,255,255,.14);
+    background: transparent;
+    color: rgba(255,255,255,.48);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    cursor: pointer;
+  }
+  .record-row:active { background: rgba(255,255,255,.04); }
+  .record-row:disabled { opacity: .28; }
+  .new-movement-name {
+    margin-top: 8px;
+    font-size: 22px;
+  }
+  .new-movement-add {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 12px;
+    border-radius: 24px;
+    font-size: 15px;
+  }
+
+  /* ---------------------------------------------------------------- watch recording */
+  .record-box {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.035);
+  }
+  .record-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: #C8FF4D;
+  }
+  .record-state.bad { color: #FFB84D; }
+  .record-dots {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .record-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .record-dot.on {
+    background: #C8FF4D;
+    border-color: #C8FF4D;
+  }
+  .trace-svg {
+    display: block;
+    width: 100%;
+    height: 86px;
+    margin-top: 12px;
+  }
+  .trace-grid { stroke: rgba(255,255,255,.08); }
+  .trace-line {
+    fill: none;
+    stroke: #C8FF4D;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    margin-top: 12px;
+  }
+  .profile-cell {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+  }
+  .profile-k {
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: .1em;
+    color: rgba(255,255,255,.34);
+  }
+  .profile-v {
+    margin-top: 3px;
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+  }
+  .sim-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .mini-btn {
+    min-height: 38px;
+    padding: 0 12px;
+    border-radius: 11px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.7);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .mini-btn.primary {
+    background: #C8FF4D;
+    border-color: #C8FF4D;
+    color: #070708;
+  }
+  .mini-btn:disabled { opacity: .3; }
+  .mini-btn:active:not(:disabled) { transform: scale(.99); }
+  .link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    color: rgba(255,255,255,.42);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .link-btn:active { color: #fff; }
+  .danger-note {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: .02em;
+    color: #FFB84D;
+  }
+  .empty-note {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px dashed rgba(255,255,255,.12);
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255,255,255,.38);
+  }
+  .row-pair { display: flex; gap: 8px; align-items: stretch; }
+  .row-pair > * { flex: 1 1 0; min-width: 0; }
+  .detail-name {
+    margin-top: 6px;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    color: #fff;
+  }
+  .record-state.bad .watch-dot {
+    background: #FFB84D;
+    box-shadow: none;
+  }
+  .lib-row:disabled { opacity: .35; cursor: default; }
+
+  /* ---------------------------------------------------------------- liquid glass chrome */
+  /* iOS 26 draws the floating header controls with Liquid Glass. The prototype
+     simulates it with a blur, a specular top edge, and a translucent fill; the
+     FLAT state keeps the iOS 18–25 capsule so both can be checked. */
+  .chrome-glass {
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    background: linear-gradient(148deg, rgba(255,255,255,.17), rgba(255,255,255,.045) 46%, rgba(255,255,255,.1));
+    border-color: rgba(255,255,255,.24);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 8px 22px rgba(0,0,0,.3);
+  }
+  .restart-pill.armed.chrome-glass {
+    background: rgba(255,184,77,.15);
+    border-color: rgba(255,184,77,.4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 8px 22px rgba(0,0,0,.3);
+  }
+  .flat-chrome .chrome-glass,
+  .flat-chrome .restart-pill.armed.chrome-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(255,255,255,.035);
+    border-color: rgba(255,255,255,.12);
+    box-shadow: none;
+  }
+  .flat-chrome .restart-pill.armed.chrome-glass {
+    background: rgba(255,184,77,.13);
+    border-color: rgba(255,184,77,.36);
+  }
+  .chrome-toggle {
+    margin-top: 12px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: transparent;
+    color: rgba(255,255,255,.4);
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .chrome-toggle:active { color: rgba(255,255,255,.7); }
+
+  @media (max-width: 720px) {
+    .page { padding: 12px 8px 18px; }
+    .page-head { flex-direction: column; gap: 6px; text-align: center; }
+    .ph-right {
+      display: block;
+      font-size: 9px;
+      letter-spacing: .06em;
+      line-height: 1.4;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <div class="ph-left"><span class="ph-mark"></span>Restless <em>session rest timer</em></div>
+      <div class="ph-right">TIMER / SESSIONS · blocks, movements, and a watch that counts · watch buttons are a prototype stand-in</div>
+    </header>
+
+    <div class="stage" id="stage">
+      <div class="phone-frame" id="phoneFrame">
+        <div class="phone">
+          <span class="side-btn mute"></span>
+          <span class="side-btn vol-up"></span>
+          <span class="side-btn vol-down"></span>
+          <span class="side-btn power"></span>
+
+          <div class="screen" id="screen">
+            <div class="app" id="app"></div>
+
+            <div class="statusbar">
+              <span>9:41</span>
+              <span class="sb-icons">
+                <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true">
+                  <rect x="0" y="7.5" width="3" height="4.5" rx="1"/>
+                  <rect x="4.6" y="5.2" width="3" height="6.8" rx="1"/>
+                  <rect x="9.2" y="2.8" width="3" height="9.2" rx="1"/>
+                  <rect x="13.8" y="0.5" width="3" height="11.5" rx="1"/>
+                </svg>
+                <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor" aria-hidden="true">
+                  <path d="M8 11.2a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                  <path d="M8 5.4c1.4 0 2.7.55 3.65 1.5l-1.3 1.3A3.5 3.5 0 0 0 8 7.25a3.5 3.5 0 0 0-2.35.95l-1.3-1.3A5.25 5.25 0 0 1 8 5.4z"/>
+                  <path d="M8 1.6c2.5 0 4.8.98 6.5 2.6l-1.3 1.3A7.4 7.4 0 0 0 8 3.45a7.4 7.4 0 0 0-5.2 2.05L1.5 4.2A9.15 9.15 0 0 1 8 1.6z"/>
+                </svg>
+                <svg width="26" height="13" viewBox="0 0 26 13" aria-hidden="true">
+                  <rect x="0.6" y="0.8" width="21.5" height="11.4" rx="3.4" fill="none" stroke="currentColor" stroke-opacity=".4" stroke-width="1.1"/>
+                  <rect x="2.4" y="2.6" width="16.8" height="7.8" rx="2" fill="currentColor"/>
+                  <path d="M23.6 4.6v3.8c.9-.25 1.4-.95 1.4-1.9s-.5-1.65-1.4-1.9z" fill="currentColor" fill-opacity=".5"/>
+                </svg>
+              </span>
+            </div>
+
+            <div class="island" id="island" role="button" tabindex="0" aria-label="Dynamic Island — tap to expand timer">
+              <div class="ic">
+                <div class="ic-left">
+                  <span class="ic-dot"></span>
+                  <span class="ic-label" data-el="icLabel"></span>
+                </div>
+                <div class="ic-right"><span class="ic-time" data-el="icTime"></span></div>
+              </div>
+
+              <div class="ie">
+                <div class="ie-top">
+                  <div class="ie-phase"><i></i><span data-el="iePhase">READY</span></div>
+                  <div class="ie-sub" data-el="ieSub"></div>
+                </div>
+                <div class="ie-time" data-el="ieTime">1:00</div>
+                <div class="ie-bar"><i data-el="ieBar"></i></div>
+                <div class="ie-next" data-el="ieNext"></div>
+                <div class="ie-actions" data-el="ieActions"></div>
+              </div>
+            </div>
+
+            <div class="home-indicator"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="chrome-toggle" data-act="toggle-chrome" aria-pressed="true">CHROME · LIQUID GLASS</button>
+    <div class="debug" id="debug"></div>
+  </div>
+
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ config */
+  var STORAGE_KEY = "restless.sessions.v4";
+  var V2_KEY = "restless.sessions.v2";
+  var LEGACY_KEY = "rounds.presets.v1";
+  var GROUPS = ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Legs", "Glutes"];
+  var CONDITIONS = ["reps", "time", "manual"];
+  var DEFAULT_ROUNDS = 1;
+  var DEFAULT_SETS_PER_ROUND = 3;
+  var DEFAULT_SET_REST = 60;
+  var DEFAULT_ROUND_REST = 120;
+  var LIMITS = {
+    setRest: [15, 600, 15],
+    roundRest: [15, 600, 15],
+    time: [15, 600, 15]
+  };
+  var MAP_LIMITS = { rounds: 12, perRound: 12, dots: 72 };
+  var PHASE_COLORS = {
+    set: "#C8FF4D",
+    round: "#FFB84D",
+    last: "#C8FF4D",
+    work: "#C8FF4D",
+    done: "#C8FF4D"
+  };
+  var ICON = {
+    skip: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="7" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="17" r="1.6"/><circle cx="15" cy="17" r="1.6"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6.5 7l.8 12.2a1.6 1.6 0 0 0 1.6 1.5h6.2a1.6 1.6 0 0 0 1.6-1.5L17.5 7"/><path d="M10 11v6M14 11v6"/></svg>',
+    restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 9.6a7.6 7.6 0 1 1 1.1 7.2"/><path d="M4.3 4.7v5.2h5.2"/></svg>',
+    timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.6 1.6M9 2.5h6"/></svg>',
+    sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4.5"/></svg>'
+  };
+
+  /* ------------------------------------------------------------------ demo data */
+  var DEMO_LIBRARY = [
+    { id: "m-bench", name: "Bench press", group: "Chest", defaultCondition: "reps", defaultTarget: 10, profile: { axis: "FOREARM", rise: 42, fall: 46, minPeriod: 0.92 } },
+    { id: "m-incline", name: "Incline press", group: "Chest", defaultCondition: "reps", defaultTarget: 10, profile: { axis: "FOREARM", rise: 39, fall: 44, minPeriod: 0.98 } },
+    { id: "m-curl", name: "Curl", group: "Biceps", defaultCondition: "reps", defaultTarget: 12, profile: { axis: "FOREARM", rise: 38, fall: 41, minPeriod: 0.86 } },
+    { id: "m-pushdown", name: "Pushdown", group: "Triceps", defaultCondition: "reps", defaultTarget: 12, profile: { axis: "FOREARM", rise: 36, fall: 43, minPeriod: 0.88 } },
+    { id: "m-plank", name: "Plank", group: "Core", defaultCondition: "time", defaultTarget: 60, profile: { axis: "FOREARM", rise: 21, fall: 24, minPeriod: 1.4 } },
+    { id: "m-deadhang", name: "Dead hang", group: "Back", defaultCondition: "manual", defaultTarget: null, profile: null },
+    { id: "m-lateral", name: "Lateral raise", group: "Shoulders", defaultCondition: "reps", defaultTarget: 15, profile: { axis: "FOREARM", rise: 33, fall: 37, minPeriod: 0.94 } }
+  ];
+  var DEMO_SESSIONS = [
+    {
+      id: "s-chest",
+      name: "Chest",
+      blocks: [{
+        id: "b-chest",
+        name: "Chest",
+        rounds: 4,
+        setsPerRound: 4,
+        setRest: 60,
+        roundRest: 120,
+        movements: [
+          { id: "bm-bench", movementId: "m-bench", endCondition: "reps", target: 10 }
+        ]
+      }]
+    },
+    {
+      id: "s-arms",
+      name: "Arms",
+      blocks: [{
+        id: "b-arms",
+        name: "Arms",
+        rounds: 2,
+        setsPerRound: 1,
+        setRest: 30,
+        roundRest: 120,
+        movements: [
+          { id: "bm-curl", movementId: "m-curl", endCondition: "reps", target: 12 },
+          { id: "bm-pushdown", movementId: "m-pushdown", endCondition: "reps", target: 12 }
+        ]
+      }]
+    },
+    {
+      id: "s-core",
+      name: "Core",
+      blocks: [{
+        id: "b-core",
+        name: "Core",
+        rounds: 1,
+        setsPerRound: 3,
+        setRest: 45,
+        roundRest: 60,
+        movements: [
+          { id: "bm-plank", movementId: "m-plank", endCondition: "time", target: 60 }
+        ]
+      }]
+    }
+  ];
+
+  var sessions, movements, activeSessionId;
+  var state = {
+    doneSets: 0,
+    status: "notStarted",   // notStarted | ready | performing | resting | paused | done
+    restKind: null,        // "set" | "round"
+    duration: 0,
+    remaining: 0,
+    deadline: 0,
+    setDuration: 0,
+    setDeadline: 0,
+    reps: 0,
+    watchReachable: true,
+    rest: null
+  };
+  var ui = {
+    tab: "timer",
+    route: { kind: "list" },
+    expanded: false,
+    deleteArmed: null,
+    editingNumber: null,
+    numberDraft: "",
+    focusName: false,
+    focusNumber: false,
+    commitTimer: 0,
+    pendingEdit: false,
+    pendingReset: false,
+    mapSig: "",
+    islandSig: "",
+    debugSig: "",
+    record: null,
+    draft: null,
+    stagedBlock: null,
+    restartArmed: false,
+    restartStatus: ""
+  };
+
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  var appEl = $("#app");
+  var screenEl = $("#screen");
+  var islandEl = $("#island");
+  var debugEl = $("#debug");
+  var stageEl = $("#stage");
+  var frameEl = $("#phoneFrame");
+
+  var textCache = new WeakMap();
+
+  initData();
+
+  /* ------------------------------------------------------------------ tiny helpers */
+  function uid(prefix) {
+    return (prefix || "id") + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+  function safeMul(a, b) {
+    var v = a * b;
+    if (!isFinite(v) || v > Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER;
+    return v;
+  }
+  function safeAdd(a, b) {
+    var v = a + b;
+    if (!isFinite(v) || v > Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER;
+    return v;
+  }
+  function safeCount(value, fallback) {
+    var v = Number(value);
+    if (!isFinite(v)) return fallback;
+    v = Math.floor(v);
+    if (v < 1) return 1;
+    if (v > Number.MAX_SAFE_INTEGER) return fallback;
+    return v;
+  }
+  function safeRest(value, fallback) {
+    var v = Number(value);
+    if (!isFinite(v)) return fallback;
+    return clamp(Math.round(v / 15) * 15, LIMITS.setRest[0], LIMITS.setRest[1]);
+  }
+  function safeSetRest(value, fallback) {
+    var v = Number(value);
+    if (!isFinite(v)) return fallback;
+    if (v <= 0) return 0;
+    return safeRest(v, fallback);
+  }
+  function safeTime(value, fallback) {
+    var v = Number(value);
+    if (!isFinite(v)) return fallback;
+    return clamp(Math.round(v / 15) * 15, LIMITS.time[0], LIMITS.time[1]);
+  }
+  function safeTarget(condition, value, fallback) {
+    if (condition === "manual") return null;
+    if (condition === "time") return safeTime(value, fallback == null ? 60 : fallback);
+    return Math.max(1, safeCount(value, fallback == null ? 10 : fallback));
+  }
+  function trimName(value, fallback) {
+    var name = String(value == null ? "" : value).trim().slice(0, 18);
+    return name || fallback;
+  }
+  function liveName(value) {
+    return String(value == null ? "" : value).slice(0, 18);
+  }
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function idOk(value, used) {
+    return typeof value === "string" && /^[A-Za-z0-9_-]+$/.test(value) && !used[value];
+  }
+  function isCondition(value) { return CONDITIONS.indexOf(value) >= 0; }
+
+  /* ------------------------------------------------------------------ model lookups */
+  function findSession(id) {
+    if (ui.draft && ui.draft.id === id) return ui.draft;
+    for (var i = 0; i < sessions.length; i++) if (sessions[i].id === id) return sessions[i];
+    return null;
+  }
+  function findBlock(session, id) {
+    if (!session) return null;
+    for (var i = 0; i < session.blocks.length; i++) if (session.blocks[i].id === id) return session.blocks[i];
+    return null;
+  }
+  function findBlockMovement(block, id) {
+    if (!block) return null;
+    for (var i = 0; i < block.movements.length; i++) if (block.movements[i].id === id) return block.movements[i];
+    return null;
+  }
+  /// A staged block lives outside `session.blocks` until DONE. Every block,
+  /// movement, and picker route resolves its block through this one helper so a
+  /// staged edit never touches the session or schedules a save.
+  function routeBlock(route) {
+    if (!route) return null;
+    if (route.staged && ui.stagedBlock && ui.stagedBlock.id === route.blockId) return ui.stagedBlock;
+    var session = findSession(route.sessionId);
+    return findBlock(session, route.blockId);
+  }
+  function discardStagedBlock() {
+    ui.stagedBlock = null;
+  }
+  function findMovement(id) {
+    for (var i = 0; i < movements.length; i++) if (movements[i].id === id) return movements[i];
+    return null;
+  }
+  function movementName(bm) {
+    var m = bm ? findMovement(bm.movementId) : null;
+    return m ? m.name : "Missing movement";
+  }
+  function movementGroup(bm) {
+    var m = bm ? findMovement(bm.movementId) : null;
+    return m ? m.group : "Untitled group";
+  }
+  function movementProfile(bm) {
+    var m = bm ? findMovement(bm.movementId) : null;
+    return m ? m.profile : null;
+  }
+  function activeSession() {
+    return findSession(activeSessionId) || sessions[0] || null;
+  }
+  function conditionLabel(condition) {
+    if (condition === "reps") return "REPS";
+    if (condition === "time") return "TIME";
+    return "MANUAL";
+  }
+  function conditionTargetLabel(condition, target) {
+    if (condition === "manual" || target == null) return "MANUAL";
+    return conditionLabel(condition) + " " + (condition === "time" ? fmt(target) : target);
+  }
+  function movementConditionLabel(bm) {
+    return conditionTargetLabel(bm.endCondition, bm.target);
+  }
+  function profileText(profile) {
+    if (!profile) return "NO PROFILE · MANUAL ONLY";
+    return "FOREARM ANGLE · RISE " + Math.round(profile.rise) + "° · FALL " + Math.round(profile.fall) +
+      "° · MIN PERIOD " + profile.minPeriod.toFixed(2) + " s";
+  }
+
+  /* ------------------------------------------------------------------ totals and position */
+  function blockTotalSets(block) {
+    if (!block.movements.length) return 0;
+    return safeMul(safeMul(Math.max(1, block.rounds), Math.max(1, block.setsPerRound)), block.movements.length);
+  }
+  function blockNumbers(block) {
+    return plural(block.movements.length, "MOVEMENT", "MOVEMENTS") + ' · ' +
+      plural(block.rounds, "ROUND", "ROUNDS") + ' · ' +
+      plural(block.setsPerRound, "SET", "SETS") + ' EACH · ' +
+      plural(blockTotalSets(block), "SET", "SETS");
+  }
+  function positionLabel(block, p) {
+    var bits = [];
+    if (block.rounds > 1) bits.push('ROUND ' + p.round + ' OF ' + block.rounds);
+    if (block.setsPerRound > 1) bits.push('SET ' + p.set + ' OF ' + block.setsPerRound);
+    return bits.join(' · ');
+  }
+  function blockRest(block, hasNext) {
+    if (!block.movements.length) return 0;
+    var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
+    var setRests = safeMul(safeMul(block.rounds, Math.max(0, perRound - 1)), block.setRest);
+    var roundRests = safeAdd(Math.max(0, block.rounds - 1), hasNext ? 1 : 0);
+    return safeAdd(setRests, safeMul(roundRests, block.roundRest));
+  }
+  function sessionTotals(session) {
+    var sets = 0;
+    var rest = 0;
+    var movementSlots = 0;
+    if (!session) return { sets: 0, rest: 0, blocks: 0, movements: 0 };
+    session.blocks.forEach(function (block, index) {
+      sets = safeAdd(sets, blockTotalSets(block));
+      rest = safeAdd(rest, blockRest(block, index < session.blocks.length - 1));
+      movementSlots = safeAdd(movementSlots, block.movements.length);
+    });
+    return { sets: sets, rest: rest, blocks: session.blocks.length, movements: movementSlots };
+  }
+  function blockOffset(session, blockIndex) {
+    var offset = 0;
+    for (var i = 0; i < blockIndex; i++) offset = safeAdd(offset, blockTotalSets(session.blocks[i]));
+    return offset;
+  }
+  function posAt(session, index) {
+    var total = sessionTotals(session).sets;
+    if (!total || !session.blocks.length) return null;
+    var i = clamp(index, 0, Math.max(0, total - 1));
+    var offset = 0;
+    for (var b = 0; b < session.blocks.length; b++) {
+      var block = session.blocks[b];
+      var count = blockTotalSets(block);
+      if (i < count) {
+        var p = {
+          blockIndex: b,
+          block: block,
+          blockStart: offset,
+          indexInBlock: i,
+          movementIndex: 0,
+          movement: null,
+          set: 0,
+          round: 0
+        };
+        var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
+        var withinRound = i % perRound;
+        p.round = Math.floor(i / perRound) + 1;
+        p.movementIndex = Math.min(Math.floor(withinRound / Math.max(1, block.setsPerRound)), block.movements.length - 1);
+        p.set = (withinRound % Math.max(1, block.setsPerRound)) + 1;
+        p.movement = block.movements[Math.min(p.movementIndex, block.movements.length - 1)];
+        return p;
+      }
+      offset = safeAdd(offset, count);
+      i -= count;
+    }
+    var lastBlock = session.blocks[session.blocks.length - 1];
+    var lastMovement = lastBlock.movements[lastBlock.movements.length - 1];
+    return {
+      blockIndex: session.blocks.length - 1,
+      block: lastBlock,
+      blockStart: blockOffset(session, session.blocks.length - 1),
+      indexInBlock: Math.max(0, blockTotalSets(lastBlock) - 1),
+      movementIndex: Math.max(0, lastBlock.movements.length - 1),
+      movement: lastMovement,
+      set: Math.max(1, lastBlock.setsPerRound),
+      round: Math.max(1, lastBlock.rounds)
+    };
+  }
+  function totalSets() { return sessionTotals(activeSession()).sets; }
+  function totalRest() { return sessionTotals(activeSession()).rest; }
+  function currentIndex() { return Math.min(state.doneSets, Math.max(0, totalSets() - 1)); }
+  function currentPos() { return posAt(activeSession(), currentIndex()); }
+  function groupOf() {
+    if (state.status === "notStarted") return "gate";
+    if (state.status === "performing") return "work";
+    if (state.status === "resting" || state.status === "paused") return "rest";
+    if (state.status === "done") return "done";
+    return "ready";
+  }
+
+  /* ------------------------------------------------------------------ rest choice */
+  function restKindLabel(kind) {
+    return kind === "round" ? "ROUND REST" : "SET REST";
+  }
+  function restLabelFor(rest, p) {
+    if (rest.transition === "set") return "AFTER SET " + p.set;
+    if (rest.transition === "round") return "AFTER ROUND " + p.round;
+    if (rest.transition === "movement") {
+      return "AFTER " + movementName(rest.from).toUpperCase() + " · NEXT " + movementName(rest.to).toUpperCase();
+    }
+    if (rest.transition === "block") {
+      return "AFTER " + rest.fromBlock.name.toUpperCase() + " · NEXT " + rest.toBlock.name.toUpperCase();
+    }
+    return "";
+  }
+  function restAfter(session, doneSets) {
+    var total = sessionTotals(session).sets;
+    if (doneSets >= total) return null;
+    var p = posAt(session, doneSets);
+    if (!p) return null;
+    if (!p.block.movements.length) return null;
+    var block = p.block;
+    var movement = p.movement;
+    var nextBlock = p.blockIndex < session.blocks.length - 1 ? session.blocks[p.blockIndex + 1] : null;
+    var rest = null;
+
+    if (p.set < block.setsPerRound) {
+      rest = { kind: "set", dur: block.setRest, transition: "set", set: p.set };
+    } else if (p.movementIndex < block.movements.length - 1) {
+      rest = { kind: "set", dur: block.setRest, transition: "movement", from: movement, to: block.movements[p.movementIndex + 1] };
+    } else if (p.round < block.rounds) {
+      rest = { kind: "round", dur: block.roundRest, transition: "round", round: p.round };
+    } else if (nextBlock) {
+      rest = { kind: "round", dur: block.roundRest, transition: "block", fromBlock: block, toBlock: nextBlock };
+    }
+
+    if (!rest) return null;
+    rest.accent = rest.transition === "set" ? "set" : "round";
+    rest.label = restLabelFor(rest, p);
+    return rest;
+  }
+  function upcomingRest() {
+    return restAfter(activeSession(), state.doneSets);
+  }
+  function accentKind() {
+    if (state.status === "done") return "done";
+    if (state.status === "notStarted") return "set";
+    if (state.status === "performing") return "work";
+    if (state.status === "resting" || state.status === "paused") {
+      return state.rest ? state.rest.accent : "set";
+    }
+    var rest = upcomingRest();
+    return rest ? rest.accent : "last";
+  }
+
+  /* ------------------------------------------------------------------ time */
+  function remainingNow() {
+    if (state.status === "resting") return Math.max(0, (state.deadline - performance.now()) / 1000);
+    if (state.status === "paused") return state.remaining;
+    return 0;
+  }
+  function remainingSetNow() {
+    if (state.status !== "performing") return 0;
+    return Math.max(0, (state.setDeadline - performance.now()) / 1000);
+  }
+  function restProgress() {
+    if (state.status === "done") return 1;
+    if (state.status !== "resting" && state.status !== "paused") return 0;
+    if (!state.duration) return 1;
+    return clamp(1 - remainingNow() / state.duration, 0, 1);
+  }
+  function setProgress() {
+    if (state.status !== "performing") return 0;
+    if (!state.setDuration) return 1;
+    return clamp(1 - remainingSetNow() / state.setDuration, 0, 1);
+  }
+  function isLocked() {
+    return state.status === "performing" || state.status === "resting" || state.status === "paused";
+  }
+
+  /* ------------------------------------------------------------------ data loading */
+  function readJSON(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function sanitizeProfile(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var axis = String(raw.axis || "").toUpperCase();
+    if (axis !== "X" && axis !== "Y" && axis !== "Z") return null;
+    var rise = Number(raw.rise);
+    var fall = Number(raw.fall);
+    var minPeriod = Number(raw.minPeriod);
+    if (!isFinite(rise) || !isFinite(fall) || !isFinite(minPeriod) || minPeriod <= 0) return null;
+    return { axis: axis, rise: Math.max(0, rise), fall: Math.max(0, fall), minPeriod: minPeriod };
+  }
+  function sanitizeMovement(raw, fallback, usedIds) {
+    var m = raw || {};
+    var f = fallback || {};
+    var id = idOk(m.id, usedIds) ? m.id : uid("m");
+    usedIds[id] = true;
+    var condition = isCondition(m.defaultCondition) ? m.defaultCondition : (f.defaultCondition || "manual");
+    return {
+      id: id,
+      name: trimName(typeof m.name === "string" ? m.name : f.name, "Untitled movement"),
+      group: trimName(typeof m.group === "string" ? m.group : f.group, "Untitled group"),
+      defaultCondition: condition,
+      defaultTarget: safeTarget(condition, m.defaultTarget != null ? m.defaultTarget : f.defaultTarget, null),
+      profile: sanitizeProfile(m.profile)
+    };
+  }
+  function sanitizeBlockMovement(raw, usedIds, libraryById) {
+    var bm = raw || {};
+    var lib = libraryById[bm.movementId];
+    if (!lib) return null;
+    var id = idOk(bm.id, usedIds) ? bm.id : uid("bm");
+    usedIds[id] = true;
+    var condition = isCondition(bm.endCondition) ? bm.endCondition : lib.defaultCondition;
+    return {
+      id: id,
+      movementId: lib.id,
+      endCondition: condition,
+      target: safeTarget(condition, bm.target != null ? bm.target : lib.defaultTarget, null)
+    };
+  }
+  function sanitizeBlock(raw, fallback, usedIds, usedMovementIds, libraryById) {
+    var b = raw || {};
+    var f = fallback || {
+      rounds: DEFAULT_ROUNDS,
+      setsPerRound: DEFAULT_SETS_PER_ROUND,
+      setRest: DEFAULT_SET_REST,
+      roundRest: DEFAULT_ROUND_REST
+    };
+    var id = idOk(b.id, usedIds) ? b.id : uid("b");
+    usedIds[id] = true;
+    var list = Array.isArray(b.movements) ? b.movements : [];
+    var cleanMovements = [];
+    list.forEach(function (bm) {
+      var clean = sanitizeBlockMovement(bm, usedMovementIds, libraryById);
+      if (clean) cleanMovements.push(clean);
+    });
+    if (!cleanMovements.length) return null;
+    return {
+      id: id,
+      name: trimName(typeof b.name === "string" ? b.name : f.name, "Untitled block"),
+      rounds: safeCount(b.rounds, f.rounds || DEFAULT_ROUNDS),
+      setsPerRound: safeCount(b.setsPerRound, f.setsPerRound || DEFAULT_SETS_PER_ROUND),
+      setRest: safeSetRest(b.setRest, f.setRest != null ? f.setRest : DEFAULT_SET_REST),
+      roundRest: safeRest(b.roundRest, f.roundRest != null ? f.roundRest : DEFAULT_ROUND_REST),
+      movements: cleanMovements
+    };
+  }
+  function sanitizeSession(raw, usedIds, usedBlockIds, usedMovementIds, libraryById) {
+    var s = raw || {};
+    var id = idOk(s.id, usedIds) ? s.id : uid("s");
+    usedIds[id] = true;
+    var list = Array.isArray(s.blocks) ? s.blocks : [];
+    var cleanBlocks = [];
+    list.forEach(function (b) {
+      var clean = sanitizeBlock(b, null, usedBlockIds, usedMovementIds, libraryById);
+      if (clean) cleanBlocks.push(clean);
+    });
+    if (!cleanBlocks.length) return null;
+    return {
+      id: id,
+      name: trimName(typeof s.name === "string" ? s.name : "", "Untitled"),
+      blocks: cleanBlocks
+    };
+  }
+  function libraryByIdMap(list) {
+    var map = {};
+    list.forEach(function (m) { map[m.id] = m; });
+    return map;
+  }
+  function defaultData() {
+    return {
+      sessions: clone(DEMO_SESSIONS),
+      movements: clone(DEMO_LIBRARY),
+      activeId: DEMO_SESSIONS[0].id,
+      migrated: false
+    };
+  }
+  function migrateV2(stored) {
+    var library = [];
+    var libraryByName = {};
+    var byName = {};
+    var usedSessions = {};
+    var usedBlocks = {};
+    var usedMovements = {};
+    function movementFor(name) {
+      var clean = trimName(name, "Untitled group");
+      var key = clean.toLowerCase();
+      if (!byName[key]) {
+        var id = uid("m");
+        byName[key] = id;
+        library.push({
+          id: id,
+          name: clean,
+          group: clean,
+          defaultCondition: "manual",
+          defaultTarget: null,
+          profile: null
+        });
+      }
+      return byName[key];
+    }
+    var cleanSessions = [];
+    stored.sessions.forEach(function (raw) {
+      if (!raw) return;
+      var parts = Array.isArray(raw.parts) ? raw.parts : [];
+      if (!parts.length) return;
+      var blocks = [];
+      parts.forEach(function (part) {
+        if (!part) return;
+        var name = trimName(part.name, "Untitled group");
+        var rounds = safeCount(part.rounds, DEFAULT_ROUNDS);
+        var perRound = safeCount(part.setsPerRound, DEFAULT_SETS_PER_ROUND);
+        var movementId = movementFor(name);
+        blocks.push({
+          id: idOk(part.id, usedBlocks) ? part.id : uid("b"),
+          name: name,
+          rounds: rounds,
+          setsPerRound: perRound,
+          setRest: safeSetRest(part.setRest, DEFAULT_SET_REST),
+          roundRest: safeRest(part.roundRest, DEFAULT_ROUND_REST),
+          movements: [{
+            id: uid("bm"),
+            movementId: movementId,
+            endCondition: "manual",
+            target: null
+          }]
+        });
+      });
+      if (!blocks.length) return;
+      var session = sanitizeSession({
+        id: raw.id,
+        name: raw.name,
+        blocks: blocks
+      }, usedSessions, usedBlocks, usedMovements, libraryByIdMap(library));
+      if (session) cleanSessions.push(session);
+    });
+    if (!cleanSessions.length) return defaultData();
+    var active = cleanSessions[0].id;
+    for (var i = 0; i < cleanSessions.length; i++) if (cleanSessions[i].id === stored.activeId) active = cleanSessions[i].id;
+    return { sessions: cleanSessions, movements: library, activeId: active, migrated: true };
+  }
+  function migrateLegacy(stored) {
+    var library = [];
+    var usedSessions = {};
+    var usedBlocks = {};
+    var usedMovements = {};
+    var byName = {};
+    var cleanSessions = [];
+
+    function movementFor(name) {
+      var clean = trimName(name, "Untitled group");
+      var key = clean.toLowerCase();
+      if (!byName[key]) {
+        var id = uid("m");
+        byName[key] = id;
+        library.push({
+          id: id,
+          name: clean,
+          group: clean,
+          defaultCondition: "manual",
+          defaultTarget: null,
+          profile: null
+        });
+      }
+      return byName[key];
+    }
+
+    stored.presets.forEach(function (raw) {
+      if (!raw || typeof raw.name !== "string") return;
+      var name = trimName(raw.name, "Untitled");
+      var rounds = safeCount(raw.rounds, DEFAULT_ROUNDS);
+      var perRound = safeCount(raw.setsPerRound, DEFAULT_SETS_PER_ROUND);
+      var movementId = movementFor(name);
+      var session = sanitizeSession({
+        id: raw.id,
+        name: name,
+        blocks: [{
+          id: uid("b"),
+          name: name,
+          rounds: rounds,
+          setsPerRound: perRound,
+          setRest: safeSetRest(raw.setRest, DEFAULT_SET_REST),
+          roundRest: safeRest(raw.roundRest, DEFAULT_ROUND_REST),
+          movements: [{
+            id: uid("bm"),
+            movementId: movementId,
+            endCondition: "manual",
+            target: null
+          }]
+        }]
+      }, usedSessions, usedBlocks, usedMovements, libraryByIdMap(library));
+      if (session) cleanSessions.push(session);
+    });
+
+    if (!cleanSessions.length) return defaultData();
+    var active = cleanSessions[0].id;
+    for (var i = 0; i < cleanSessions.length; i++) if (cleanSessions[i].id === stored.activeId) active = cleanSessions[i].id;
+    return { sessions: cleanSessions, movements: library, activeId: active, migrated: true };
+  }
+  function loadData() {
+    var stored = readJSON(STORAGE_KEY);
+    if (stored && stored.v === 4 && Array.isArray(stored.sessions)) {
+      var usedM = {};
+      var rawLibrary = Array.isArray(stored.movements) ? stored.movements : [];
+      var library = rawLibrary.map(function (m) { return sanitizeMovement(m, null, usedM); });
+      if (!library.length) {
+        usedM = {};
+        library = clone(DEMO_LIBRARY);
+        library.forEach(function (m) { usedM[m.id] = true; });
+      }
+      var libMap = libraryByIdMap(library);
+      var usedS = {};
+      var usedB = {};
+      var usedBM = {};
+      var clean = [];
+      stored.sessions.forEach(function (s) {
+        var session = sanitizeSession(s, usedS, usedB, usedBM, libMap);
+        if (session) clean.push(session);
+      });
+      if (!clean.length) return defaultData();
+      var active = clean[0].id;
+      for (var i = 0; i < clean.length; i++) if (clean[i].id === stored.activeId) active = clean[i].id;
+      return { sessions: clean, movements: library, activeId: active, migrated: false };
+    }
+
+    var v2 = readJSON(V2_KEY);
+    if (v2 && v2.v === 2 && Array.isArray(v2.sessions) && v2.sessions.length) {
+      return migrateV2(v2);
+    }
+
+    var legacy = readJSON(LEGACY_KEY);
+    if (legacy && Array.isArray(legacy.presets) && legacy.presets.length) {
+      return migrateLegacy(legacy);
+    }
+
+    return defaultData();
+  }
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        v: 4,
+        sessions: sessions,
+        movements: movements,
+        activeId: activeSessionId
+      }));
+    } catch (e) { /* private mode / file:// */ }
+  }
+  function initData() {
+    var loaded = loadData();
+    sessions = loaded.sessions;
+    movements = loaded.movements;
+    activeSessionId = loaded.activeId;
+    if (loaded.migrated) saveData();
+  }
+
+  /* ------------------------------------------------------------------ edits */
+  function markEdited(session) {
+    ui.deleteArmed = null;
+    if (session && ui.draft && session.id === ui.draft.id) return;
+    ui.pendingEdit = true;
+    if (session && session.id === activeSessionId) ui.pendingReset = true;
+    if (ui.commitTimer) clearTimeout(ui.commitTimer);
+    ui.commitTimer = setTimeout(function () {
+      ui.commitTimer = 0;
+      commitEdit();
+    }, 350);
+  }
+  function commitEdit() {
+    if (!ui.pendingEdit) return;
+    ui.pendingEdit = false;
+    saveData();
+    if (ui.pendingReset) {
+      ui.pendingReset = false;
+      resetSession();
+    }
+  }
+  function flushEdit() {
+    commitOpenName();
+    if (ui.commitTimer) {
+      clearTimeout(ui.commitTimer);
+      ui.commitTimer = 0;
+    }
+    commitEdit();
+  }
+  function commitOpenName() {
+    var sessionInput = $('[data-el="sessionName"]', appEl);
+    if (sessionInput && ui.route.kind === "session") commitSessionName(sessionInput);
+    var blockInput = $('[data-el="blockName"]', appEl);
+    if (blockInput && ui.route.kind === "block") commitBlockName(blockInput);
+    var movementInput = $('[data-el="movementName"]', appEl);
+    if (movementInput && ui.route.kind === "movement") commitMovementName(movementInput);
+    var recordInput = $('[data-el="recordName"]', appEl);
+    if (recordInput && ui.route.kind === "record") commitRecordName(recordInput);
+  }
+  function commitSessionName(input) {
+    if (ui.route.kind !== "session") return;
+    var session = findSession(ui.route.id);
+    if (!session) return;
+    var name = trimName(input.value, "Untitled");
+    if (input.value !== name) input.value = name;
+    if (session.name !== name) {
+      session.name = name;
+      markEdited(session);
+    }
+  }
+  function commitBlockName(input) {
+    if (ui.route.kind !== "block") return;
+    var session = findSession(ui.route.sessionId);
+    var block = routeBlock(ui.route);
+    if (!block) return;
+    var name = trimName(input.value, "Untitled block");
+    if (input.value !== name) input.value = name;
+    if (block.name !== name) {
+      block.name = name;
+      if (!ui.route.staged) markEdited(session);
+    }
+  }
+  function commitMovementName(input) {
+    if (ui.route.kind !== "movement") return;
+    var movement = findMovement(ui.route.id);
+    if (!movement) return;
+    var name = trimName(input.value, "Untitled movement");
+    if (input.value !== name) input.value = name;
+    if (movement.name !== name) {
+      movement.name = name;
+      markEdited(null);
+    }
+  }
+  function commitRecordName(input) {
+    if (!ui.record || !ui.record.draft) return;
+    var name = trimName(input.value, "Untitled movement");
+    if (input.value !== name) input.value = name;
+    ui.record.draft.name = name;
+  }
+
+  /* ------------------------------------------------------------------ navigation */
+  function openSession(id) {
+    flushEdit();
+    ui.stagedBlock = null;
+    if (!findSession(id)) return;
+    ui.tab = "sessions";
+    ui.route = { kind: "session", id: id };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function openBlock(sessionId, blockId) {
+    flushEdit();
+    ui.stagedBlock = null;
+    var session = findSession(sessionId);
+    if (!session || !findBlock(session, blockId)) return;
+    ui.tab = "sessions";
+    ui.route = { kind: "block", sessionId: sessionId, blockId: blockId };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function openBlockMovement(sessionId, blockId, movementId) {
+    flushEdit();
+    var block = routeBlock(ui.route);
+    if (!block || !findBlockMovement(block, movementId)) return;
+    ui.tab = "sessions";
+    ui.route = {
+      kind: "blockMovement",
+      sessionId: sessionId,
+      blockId: blockId,
+      movementId: movementId,
+      staged: ui.route.staged === true
+    };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function pickerDefault() {
+    return { condition: "manual", target: 10, name: "", pending: [] };
+  }
+  function openPicker(sessionId, blockId) {
+    flushEdit();
+    var block = routeBlock(ui.route);
+    if (!block) return;
+    ui.tab = "sessions";
+    ui.route = {
+      kind: "picker",
+      sessionId: sessionId,
+      blockId: blockId,
+      staged: ui.route.staged === true
+    };
+    ui.picker = pickerDefault();
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function openLibrary() {
+    flushEdit();
+    ui.tab = "sessions";
+    ui.route = { kind: "library" };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function openMovement(id) {
+    flushEdit();
+    if (!findMovement(id)) return;
+    ui.tab = "sessions";
+    ui.route = { kind: "movement", id: id };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function startRecord(movementId) {
+    flushEdit();
+    if (isLocked()) return;
+    var m = movementId ? findMovement(movementId) : null;
+    ui.tab = "sessions";
+    ui.record = {
+      step: "idle",
+      movementId: m ? m.id : null,
+      draft: {
+        name: m ? m.name : "Untitled movement"
+      },
+      profile: null,
+      reason: ""
+    };
+    ui.route = { kind: "record", movementId: m ? m.id : null };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function recordBack() {
+    var movementId = ui.record ? ui.record.movementId : null;
+    ui.record = null;
+    ui.deleteArmed = null;
+    if (movementId && findMovement(movementId)) {
+      ui.route = { kind: "movement", id: movementId };
+    } else {
+      ui.route = { kind: "library" };
+    }
+    render(false);
+  }
+  function backToList() {
+    flushEdit();
+    ui.stagedBlock = null;
+    ui.route = { kind: "list" };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function backToSession(sessionId) {
+    flushEdit();
+    ui.stagedBlock = null;
+    ui.route = { kind: "session", id: sessionId };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function backToBlock(sessionId, blockId) {
+    var staged = ui.route.staged === true;
+    flushEdit();
+    ui.route = { kind: "block", sessionId: sessionId, blockId: blockId, staged: staged };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function backToLibrary() {
+    flushEdit();
+    ui.route = { kind: "library" };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+
+  /* ------------------------------------------------------------------ session and block actions */
+  function uniqueSessionName(base) {
+    var used = {};
+    sessions.forEach(function (s) { used[s.name.toLowerCase()] = true; });
+    if (!used[base.toLowerCase()]) return base;
+    for (var i = 2; i < 100; i++) {
+      var candidate = (base + " " + i).slice(0, 18);
+      if (!used[candidate.toLowerCase()]) return candidate;
+    }
+    return base;
+  }
+  function cloneBlock(source, name) {
+    var base = source || {
+      name: "Untitled block",
+      rounds: DEFAULT_ROUNDS,
+      setsPerRound: DEFAULT_SETS_PER_ROUND,
+      setRest: DEFAULT_SET_REST,
+      roundRest: DEFAULT_ROUND_REST,
+      movements: []
+    };
+    var list = base.movements.map(function (bm) {
+      return {
+        id: uid("bm"),
+        movementId: bm.movementId,
+        endCondition: bm.endCondition,
+        target: bm.target
+      };
+    });
+    if (!list.length && movements.length) {
+      var m = movements[0];
+      list.push({ id: uid("bm"), movementId: m.id, endCondition: m.defaultCondition, target: m.defaultTarget });
+    }
+    return {
+      id: uid("b"),
+      name: name || base.name,
+      rounds: base.rounds,
+      setsPerRound: base.setsPerRound,
+      setRest: base.setRest,
+      roundRest: base.roundRest,
+      movements: list
+    };
+  }
+  function newSession() {
+    flushEdit();
+    if (isLocked()) return;
+    ui.stagedBlock = null;
+    var source = activeSession();
+    var base = source && source.blocks[0] ? source.blocks[0] : null;
+    var block = cloneBlock(base, "Untitled block");
+    if (!block.movements.length) return;
+    // The draft stays out of `sessions` and localStorage until DONE or USE.
+    ui.draft = { id: uid("s"), name: "New session", blocks: [block] };
+    ui.tab = "sessions";
+    ui.route = { kind: "session", id: ui.draft.id, draft: true };
+    ui.focusName = true;
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function commitDraft() {
+    var draft = ui.draft;
+    if (!draft) return null;
+    flushEdit();
+    draft.name = trimName(draft.name, "Untitled");
+    if (draft.name === "New session") draft.name = uniqueSessionName("New session");
+    ui.draft = null;
+    sessions.push(draft);
+    saveData();
+    return draft;
+  }
+  function addBlock(sessionId) {
+    flushEdit();
+    if (isLocked() || !movements.length || ui.stagedBlock) return;
+    var session = findSession(sessionId);
+    if (!session) return;
+    var base = session.blocks[session.blocks.length - 1];
+    ui.stagedBlock = {
+      id: uid("b"),
+      name: "Untitled block",
+      rounds: DEFAULT_ROUNDS,
+      setsPerRound: DEFAULT_SETS_PER_ROUND,
+      setRest: base ? base.setRest : DEFAULT_SET_REST,
+      roundRest: base ? base.roundRest : DEFAULT_ROUND_REST,
+      movements: []
+    };
+    ui.tab = "sessions";
+    ui.route = {
+      kind: "block",
+      sessionId: sessionId,
+      blockId: ui.stagedBlock.id,
+      staged: true
+    };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  /// DONE on a staged block is the only place a new block reaches the session.
+  function commitStagedBlock(sessionId) {
+    var session = findSession(sessionId);
+    var block = ui.stagedBlock;
+    if (!session || !block || !block.movements.length) return false;
+    var appended = clone(block);
+    appended.rounds = Math.max(1, appended.rounds);
+    appended.setsPerRound = Math.max(1, appended.setsPerRound);
+    if (appended.movements.length > 1) appended.rounds = Math.max(appended.rounds, 2);
+    session.blocks.push(appended);
+    ui.stagedBlock = null;
+    markEdited(session);
+    flushEdit();
+    return true;
+  }
+  function moveBlock(sessionId, blockId, dir) {
+    if (isLocked()) return;
+    var session = findSession(sessionId);
+    if (!session) return;
+    var index = -1;
+    for (var i = 0; i < session.blocks.length; i++) if (session.blocks[i].id === blockId) index = i;
+    var next = index + Number(dir);
+    if (index < 0 || next < 0 || next >= session.blocks.length) return;
+    var block = session.blocks[index];
+    session.blocks[index] = session.blocks[next];
+    session.blocks[next] = block;
+    markEdited(session);
+    render(false);
+  }
+  function reorderRow(kind, fromId, toId) {
+    if (isLocked() || fromId === toId) return;
+    var session, list;
+    if (kind === "block") {
+      session = findSession(ui.route.id);
+      if (!session) return;
+      list = session.blocks;
+    } else {
+      session = findSession(ui.route.sessionId);
+      var block = routeBlock(ui.route);
+      if (!block) return;
+      list = block.movements;
+    }
+    var from = -1, to = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === fromId) from = i;
+      if (list[i].id === toId) to = i;
+    }
+    if (from < 0 || to < 0 || from === to) return;
+    var item = list.splice(from, 1)[0];
+    list.splice(to, 0, item);
+    if (kind === "block" || !ui.route.staged) markEdited(session);
+    flushEdit();
+    ui.deleteArmed = null;
+    render(false);
+  }
+  function deleteBlock(sessionId, blockId) {
+    if (isLocked()) return;
+    var session = findSession(sessionId);
+    if (!session || session.blocks.length <= 1) return;
+    if (!(ui.deleteArmed && ui.deleteArmed.kind === "block" && ui.deleteArmed.id === blockId)) {
+      ui.deleteArmed = { kind: "block", id: blockId };
+      render(false);
+      return;
+    }
+    var index = -1;
+    for (var i = 0; i < session.blocks.length; i++) if (session.blocks[i].id === blockId) index = i;
+    if (index < 0) return;
+    session.blocks.splice(index, 1);
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    markEdited(session);
+    flushEdit();
+    ui.route = { kind: "session", id: session.id };
+    render(false);
+  }
+  function deleteSession(sessionId) {
+    if (isLocked()) return;
+    if (sessions.length <= 1) return;
+    if (!(ui.deleteArmed && ui.deleteArmed.kind === "session" && ui.deleteArmed.id === sessionId)) {
+      ui.deleteArmed = { kind: "session", id: sessionId };
+      render(false);
+      return;
+    }
+    flushEdit();
+    var index = -1;
+    for (var i = 0; i < sessions.length; i++) if (sessions[i].id === sessionId) index = i;
+    if (index < 0) return;
+    sessions.splice(index, 1);
+    ui.deleteArmed = null;
+    if (activeSessionId === sessionId) {
+      activeSessionId = sessions[Math.max(0, index - 1)].id;
+      resetSession();
+    }
+    saveData();
+    ui.route = { kind: "list" };
+    render(false);
+  }
+  function useSession(sessionId) {
+    if (isLocked()) return;
+    flushEdit();
+    ui.stagedBlock = null;
+    var session = findSession(sessionId);
+    if (!session) return;
+    activeSessionId = session.id;
+    saveData();
+    resetSession();
+    ui.tab = "timer";
+    ui.route = { kind: "list" };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(true);
+  }
+  function restartSession() {
+    if (isLocked()) return;
+    flushEdit();
+    resetSession();
+    state.status = "ready";
+    ui.tab = "timer";
+    ui.route = { kind: "list" };
+    render(true);
+  }
+  function blockMin(block, key) {
+    if (key === "rounds" && block.movements.length > 1) return 2;
+    return 1;
+  }
+  function bumpBlock(key, dir) {
+    if (isLocked() || ui.route.kind !== "block") return;
+    var session = findSession(ui.route.sessionId);
+    var block = routeBlock(ui.route);
+    if (!block) return;
+    var current = block[key];
+    var next = current;
+    if (key === "rounds" || key === "setsPerRound") {
+      next = clamp(current + Number(dir), blockMin(block, key), Number.MAX_SAFE_INTEGER);
+    } else if (key === "setRest") {
+      next = clamp(current + Number(dir) * 15, 0, LIMITS.setRest[1]);
+    } else if (key === "roundRest") {
+      next = clamp(current + Number(dir) * 15, LIMITS.roundRest[0], LIMITS.roundRest[1]);
+    }
+    if (next === current) return;
+    block[key] = next;
+    if (!ui.route.staged) markEdited(session);
+    render(false);
+  }
+  function pickerEntryName(entry) {
+    if (entry.movementId) {
+      var movement = findMovement(entry.movementId);
+      return movement ? movement.name : "Missing movement";
+    }
+    return entry.name || "";
+  }
+  function queueMovementToBlock(movementId) {
+    if (isLocked() || ui.route.kind !== "picker") return;
+    var movement = findMovement(movementId);
+    if (!movement) return;
+    var pick = ui.picker || pickerDefault();
+    pick.pending = pick.pending || [];
+    var index = -1;
+    for (var i = 0; i < pick.pending.length; i++) {
+      if (pick.pending[i].movementId === movement.id) index = i;
+    }
+    if (index >= 0) {
+      pick.pending.splice(index, 1);
+    } else {
+      var queuedName = pick.pending.some(function (entry) {
+        return pickerEntryName(entry).toLowerCase() === movement.name.toLowerCase();
+      });
+      if (queuedName) return;
+      pick.pending.push({
+        id: uid("p"),
+        movementId: movement.id,
+        condition: pick.condition,
+        target: pick.condition === "manual" ? null : pick.target
+      });
+    }
+    render(false);
+  }
+  function queueNewMovementToBlock() {
+    if (isLocked() || ui.route.kind !== "picker") return;
+    var pick = ui.picker || pickerDefault();
+    var name = trimName(pick.name, "");
+    if (!name) return;
+    pick.pending = pick.pending || [];
+    var duplicate = pick.pending.some(function (entry) {
+      return pickerEntryName(entry).toLowerCase() === name.toLowerCase();
+    });
+    if (duplicate) return;
+    pick.pending.push({
+      id: uid("p"),
+      name: name,
+      condition: pick.condition,
+      target: pick.condition === "manual" ? null : pick.target
+    });
+    pick.name = "";
+    render(false);
+  }
+  function removePendingPicker(id) {
+    if (isLocked() || ui.route.kind !== "picker" || !ui.picker) return;
+    ui.picker.pending = (ui.picker.pending || []).filter(function (entry) {
+      return entry.id !== id;
+    });
+    render(false);
+  }
+  function resolvePickerEntries(pick) {
+    var resolved = [];
+    (pick.pending || []).forEach(function (entry) {
+      var movement = entry.movementId ? findMovement(entry.movementId) : null;
+      if (!movement && entry.name) {
+        for (var i = 0; i < movements.length; i++) {
+          if (movements[i].name.toLowerCase() === entry.name.toLowerCase()) {
+            movement = movements[i];
+            break;
+          }
+        }
+        if (!movement) {
+          movement = {
+            id: uid("m"),
+            name: entry.name,
+            group: "New",
+            defaultCondition: entry.condition,
+            defaultTarget: entry.condition === "manual" ? null : entry.target,
+            profile: null
+          };
+          movements.push(movement);
+          markEdited(null);
+        }
+      }
+      if (movement) {
+        resolved.push({
+          movementId: movement.id,
+          condition: entry.condition,
+          target: entry.condition === "manual" ? null : entry.target
+        });
+      }
+    });
+    return resolved;
+  }
+  function appendPickerEntries(block, entries) {
+    entries.forEach(function (entry) {
+      block.movements.push({
+        id: uid("bm"),
+        movementId: entry.movementId,
+        endCondition: entry.condition,
+        target: entry.target
+      });
+    });
+  }
+  function commitPicker() {
+    if (isLocked() || ui.route.kind !== "picker") return;
+    var route = ui.route;
+    var session = findSession(route.sessionId);
+    var target = routeBlock(route);
+    if (!session || !target) return;
+    var pick = ui.picker || pickerDefault();
+    var entries = resolvePickerEntries(pick);
+    if (entries.length) {
+      var before = target.movements.length;
+      appendPickerEntries(target, entries);
+      if (before < 2 && target.movements.length >= 2) target.rounds = Math.max(target.rounds, 2);
+      if (!route.staged) {
+        markEdited(session);
+        flushEdit();
+      }
+    }
+    ui.picker = null;
+    ui.route = {
+      kind: "block",
+      sessionId: session.id,
+      blockId: target.id,
+      staged: route.staged === true
+    };
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    render(false);
+  }
+  function cancelPicker() {
+    if (ui.route.kind !== "picker") return;
+    var route = ui.route;
+    ui.picker = null;
+    ui.deleteArmed = null;
+    ui.editingNumber = null;
+    backToBlock(route.sessionId, route.blockId);
+  }
+  /// The block editor's one-tap path: a library row appends a MANUAL movement
+  /// with no target in one edit, keeps the picker closed, and never touches the
+  /// session for a staged block until DONE.
+  function addFromLibrary(movementId) {
+    if (isLocked()) return;
+    var block = routeBlock(ui.route);
+    var movement = findMovement(movementId);
+    if (!block || !movement) return;
+    if (block.movements.some(function (bm) { return bm.movementId === movement.id; })) return;
+    var before = block.movements.length;
+    block.movements.push({
+      id: uid("bm"),
+      movementId: movement.id,
+      endCondition: "manual",
+      target: null
+    });
+    if (before < 2 && block.movements.length >= 2 && block.rounds < 2) block.rounds = 2;
+    if (!ui.route.staged) {
+      markEdited(findSession(ui.route.sessionId));
+      flushEdit();
+    }
+    ui.deleteArmed = null;
+    render(false);
+  }
+  function moveBlockMovement(sessionId, blockId, movementId, dir) {
+    if (isLocked()) return;
+    var session = findSession(sessionId);
+    var block = routeBlock(ui.route);
+    if (!block) return;
+    var index = -1;
+    for (var i = 0; i < block.movements.length; i++) if (block.movements[i].id === movementId) index = i;
+    var next = index + Number(dir);
+    if (index < 0 || next < 0 || next >= block.movements.length) return;
+    var bm = block.movements[index];
+    block.movements[index] = block.movements[next];
+    block.movements[next] = bm;
+    if (!ui.route.staged) markEdited(session);
+    render(false);
+  }
+  function removeBlockMovement(sessionId, blockId, movementId) {
+    if (isLocked()) return;
+    var session = findSession(sessionId);
+    var block = routeBlock(ui.route);
+    if (!block || block.movements.length <= 1 || !findBlockMovement(block, movementId)) return;
+    if (!(ui.deleteArmed && ui.deleteArmed.kind === "blockMovement" && ui.deleteArmed.id === movementId)) {
+      ui.deleteArmed = { kind: "blockMovement", id: movementId };
+      render(false);
+      return;
+    }
+    var index = -1;
+    for (var i = 0; i < block.movements.length; i++) if (block.movements[i].id === movementId) index = i;
+    if (index < 0) return;
+    block.movements.splice(index, 1);
+    ui.deleteArmed = null;
+    if (!ui.route.staged) {
+      markEdited(session);
+      flushEdit();
+    }
+    ui.route = {
+      kind: "block",
+      sessionId: sessionId,
+      blockId: blockId,
+      staged: ui.route.staged === true
+    };
+    render(false);
+  }
+  function setBlockMovementCondition(movementId, condition) {
+    if (isLocked() || !isCondition(condition)) return;
+    var session = findSession(ui.route.sessionId);
+    var block = routeBlock(ui.route);
+    var bm = findBlockMovement(block, movementId);
+    if (!bm || bm.endCondition === condition) return;
+    bm.endCondition = condition;
+    if (condition === "manual") {
+      bm.target = null;
+    } else if (condition === "time") {
+      bm.target = safeTime(bm.target, 60);
+    } else {
+      bm.target = Math.max(1, safeCount(bm.target, 10));
+    }
+    if (!ui.route.staged) markEdited(session);
+    render(false);
+  }
+  function bumpBlockMovementTarget(movementId, dir) {
+    if (isLocked()) return;
+    var session = findSession(ui.route.sessionId);
+    var block = routeBlock(ui.route);
+    var bm = findBlockMovement(block, movementId);
+    if (!bm) return;
+    var next = bm.target;
+    if (bm.endCondition === "reps") next = Math.max(1, (bm.target || 1) + Number(dir));
+    else if (bm.endCondition === "time") next = clamp((bm.target || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
+    else return;
+    if (next === bm.target) return;
+    bm.target = next;
+    if (!ui.route.staged) markEdited(session);
+    render(false);
+  }
+  function useBlockMovementDefault(movementId) {
+    if (isLocked()) return;
+    var session = findSession(ui.route.sessionId);
+    var block = routeBlock(ui.route);
+    var bm = findBlockMovement(block, movementId);
+    var m = bm ? findMovement(bm.movementId) : null;
+    if (!bm || !m) return;
+    bm.endCondition = m.defaultCondition;
+    bm.target = m.defaultTarget;
+    if (!ui.route.staged) markEdited(session);
+    render(false);
+  }
+
+  /* ------------------------------------------------------------------ movement library actions */
+  function setMovementGroup(movementId, group) {
+    if (isLocked()) return;
+    var movement = findMovement(movementId);
+    if (!movement) return;
+    var clean = trimName(group, "Untitled group");
+    if (movement.group === clean) return;
+    movement.group = clean;
+    markEdited(null);
+    render(false);
+  }
+  function setMovementCondition(movementId, condition) {
+    if (isLocked() || !isCondition(condition)) return;
+    var movement = findMovement(movementId);
+    if (!movement || movement.defaultCondition === condition) return;
+    movement.defaultCondition = condition;
+    if (condition === "manual") {
+      movement.defaultTarget = null;
+    } else if (condition === "time") {
+      movement.defaultTarget = safeTime(movement.defaultTarget, 60);
+    } else {
+      movement.defaultTarget = Math.max(1, safeCount(movement.defaultTarget, 10));
+    }
+    markEdited(null);
+    render(false);
+  }
+  function bumpMovementDefaultTarget(movementId, dir) {
+    if (isLocked()) return;
+    var movement = findMovement(movementId);
+    if (!movement) return;
+    var next = movement.defaultTarget;
+    if (movement.defaultCondition === "reps") next = Math.max(1, (movement.defaultTarget || 1) + Number(dir));
+    else if (movement.defaultCondition === "time") next = clamp((movement.defaultTarget || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
+    else return;
+    if (next === movement.defaultTarget) return;
+    movement.defaultTarget = next;
+    markEdited(null);
+    render(false);
+  }
+  function movementUsage(movementId) {
+    var names = [];
+    sessions.forEach(function (session) {
+      var used = false;
+      session.blocks.forEach(function (block) {
+        block.movements.forEach(function (bm) { if (bm.movementId === movementId) used = true; });
+      });
+      if (used && names.indexOf(session.name) < 0) names.push(session.name);
+    });
+    return names;
+  }
+  function deleteMovement(movementId) {
+    if (isLocked()) return;
+    if (movementUsage(movementId).length) return;
+    if (!(ui.deleteArmed && ui.deleteArmed.kind === "libraryMovement" && ui.deleteArmed.id === movementId)) {
+      ui.deleteArmed = { kind: "libraryMovement", id: movementId };
+      render(false);
+      return;
+    }
+    var index = -1;
+    for (var i = 0; i < movements.length; i++) if (movements[i].id === movementId) index = i;
+    if (index < 0) return;
+    movements.splice(index, 1);
+    ui.deleteArmed = null;
+    saveData();
+    ui.route = { kind: "library" };
+    render(false);
+  }
+  function groupedMovements() {
+    var groups = {};
+    movements.forEach(function (m) {
+      if (!groups[m.group]) groups[m.group] = [];
+      groups[m.group].push(m);
+    });
+    var order = [];
+    GROUPS.forEach(function (g) { if (groups[g]) order.push(g); });
+    Object.keys(groups).forEach(function (g) {
+      if (order.indexOf(g) < 0) order.push(g);
+    });
+    return order.map(function (g) { return { group: g, movements: groups[g] }; });
+  }
+
+  /* ------------------------------------------------------------------ watch recording */
+  function startRecordingNow() {
+    if (isLocked() || !ui.record || ui.record.step !== "idle") return;
+    if (!state.watchReachable) return;
+    ui.record.step = "waiting";
+    render(false);
+  }
+  function simulateTrace(cycles) {
+    if (!ui.record || ui.record.step !== "waiting") return;
+    if (cycles < 3) {
+      failRecording("ONLY TWO CYCLES · NEED AT LEAST THREE");
+      return;
+    }
+    ui.record.profile = { axis: "FOREARM", rise: 42, fall: 46, minPeriod: 0.92 };
+    ui.record.step = "received";
+    render(false);
+  }
+  function failRecording(reason) {
+    if (!ui.record) return;
+    ui.record.step = "failed";
+    ui.record.reason = reason;
+    ui.record.profile = null;
+    render(false);
+  }
+  function retryRecording() {
+    if (!ui.record) return;
+    ui.record.step = "idle";
+    ui.record.reason = "";
+    ui.record.profile = null;
+    render(false);
+  }
+  function saveRecordedMovement() {
+    if (isLocked() || !ui.record || ui.record.step !== "received") return;
+    var draft = ui.record.draft;
+    var name = trimName(draft.name, "Untitled movement");
+    var profile = ui.record.profile;
+    var movementId = ui.record.movementId;
+    if (movementId && findMovement(movementId)) {
+      var existing = findMovement(movementId);
+      existing.name = name;
+      existing.profile = profile;
+    } else {
+      movementId = uid("m");
+      movements.push({
+        id: movementId,
+        name: name,
+        profile: profile
+      });
+    }
+    saveData();
+    ui.record = null;
+    ui.tab = "sessions";
+    ui.route = { kind: "movement", id: movementId };
+    render(true);
+  }
+  function discardRecording() {
+    recordBack();
+  }
+  function setRecordGroup(group) {
+    if (!ui.record || isLocked()) return;
+    ui.record.draft.group = trimName(group, "Untitled group");
+    render(false);
+  }
+  function setRecordCondition(condition) {
+    if (!ui.record || isLocked() || !isCondition(condition)) return;
+    ui.record.draft.condition = condition;
+    if (condition === "manual") ui.record.draft.target = null;
+    else if (condition === "time") ui.record.draft.target = safeTime(ui.record.draft.target, 60);
+    else ui.record.draft.target = Math.max(1, safeCount(ui.record.draft.target, 10));
+    render(false);
+  }
+  function bumpRecordTarget(dir) {
+    if (!ui.record || isLocked()) return;
+    var draft = ui.record.draft;
+    var next = draft.target;
+    if (draft.condition === "reps") next = Math.max(1, (draft.target || 1) + Number(dir));
+    else if (draft.condition === "time") next = clamp((draft.target || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
+    else return;
+    if (next === draft.target) return;
+    draft.target = next;
+    render(false);
+  }
+
+  /* ------------------------------------------------------------------ state changes */
+  function resetSession() {
+    state.doneSets = 0;
+    state.status = "notStarted";
+    state.restKind = null;
+    state.duration = 0;
+    state.remaining = 0;
+    state.deadline = 0;
+    state.setDuration = 0;
+    state.setDeadline = 0;
+    state.reps = 0;
+    state.rest = null;
+    ui.restartArmed = false;
+    ui.restartStatus = "";
+  }
+  function startSession() {
+    if (state.status !== "notStarted") return;
+    flushEdit();
+    ui.expanded = false;
+    state.doneSets = 0;
+    state.status = "ready";
+    state.restKind = null;
+    state.duration = 0;
+    state.remaining = 0;
+    state.deadline = 0;
+    state.setDuration = 0;
+    state.setDeadline = 0;
+    state.reps = 0;
+    state.rest = null;
+    render(true);
+  }
+  function setDone() {
+    if (state.status !== "ready" && state.status !== "performing") return;
+    flushEdit();
+    var total = totalSets();
+    if (state.doneSets >= total) return;
+
+    var rest = upcomingRest();
+    ui.expanded = false;
+    ui.editingNumber = null;
+    state.setDuration = 0;
+    state.setDeadline = 0;
+    state.reps = 0;
+
+    if (!rest) {
+      state.doneSets = total;
+      state.status = "done";
+      state.restKind = null;
+      state.remaining = 0;
+      state.duration = 0;
+      state.deadline = 0;
+      state.rest = null;
+      render(true);
+      return;
+    }
+
+    state.doneSets++;
+    state.rest = rest;
+    state.restKind = rest.kind;
+    state.duration = rest.dur;
+    state.remaining = rest.dur;
+    state.deadline = performance.now() + rest.dur * 1000;
+
+    if (rest.dur <= 0) {
+      state.status = "ready";
+      state.rest = null;
+      state.restKind = null;
+      state.remaining = 0;
+      state.duration = 0;
+      state.deadline = 0;
+      render(true);
+      return;
+    }
+
+    state.status = "resting";
+    render(true);
+  }
+  function startSet() {
+    if (state.status !== "ready") return;
+    var p = currentPos();
+    if (!p || !p.movement || p.movement.endCondition !== "time") return;
+    if (!p.movement.target) return;
+    flushEdit();
+    ui.expanded = false;
+    state.status = "performing";
+    state.setDuration = p.movement.target;
+    state.setDeadline = performance.now() + p.movement.target * 1000;
+    state.reps = 0;
+    render(true);
+  }
+  function finishRest(pulse) {
+    if (state.status !== "resting" && state.status !== "paused") return;
+    state.status = "ready";
+    state.remaining = 0;
+    state.duration = 0;
+    state.restKind = null;
+    state.deadline = 0;
+    state.rest = null;
+    state.reps = 0;
+    if (pulse) {
+      islandEl.classList.remove("pulse");
+      void islandEl.offsetWidth;
+      islandEl.classList.add("pulse");
+    }
+    render(true);
+  }
+  function skipRest() {
+    if (state.status !== "resting" && state.status !== "paused") return;
+    flushEdit();
+    finishRest(false);
+  }
+  function pauseRest() {
+    if (state.status !== "resting") return;
+    flushEdit();
+    if (state.status !== "resting") return;
+    state.remaining = remainingNow();
+    state.deadline = 0;
+    state.status = "paused";
+    sync();
+  }
+  function resumeRest() {
+    if (state.status !== "paused") return;
+    flushEdit();
+    if (state.status !== "paused") return;
+    state.status = "resting";
+    state.deadline = performance.now() + state.remaining * 1000;
+    sync();
+  }
+  function again() {
+    flushEdit();
+    resetSession();
+    state.status = "ready";
+    ui.tab = "timer";
+    ui.route = { kind: "list" };
+    ui.expanded = false;
+    render(true);
+  }
+  function watchReady(p) {
+    if (!state.watchReachable) return false;
+    var movement = p && p.movement ? findMovement(p.movement.endCondition === "reps" ? p.movement.movementId : null) : null;
+    return !!(movement && movement.profile);
+  }
+  function watchRep() {
+    if (state.status !== "ready") return;
+    var p = currentPos();
+    if (!p || !p.movement || p.movement.endCondition !== "reps" || !watchReady(p)) return;
+    var target = p.movement.target || 1;
+    state.reps = Math.min(target, state.reps + 1);
+    if (state.reps >= target) {
+      setDone();
+    } else {
+      render(false);
+    }
+  }
+  function watchDrop() {
+    state.watchReachable = false;
+    render(false);
+  }
+  function watchConnect() {
+    state.watchReachable = true;
+    state.reps = 0;
+    render(false);
+  }
+
+  /* ------------------------------------------------------------------ numeric editing */
+  function startEditNumber(key) {
+    if (isLocked()) return;
+    var target = resolveEditTarget(key);
+    if (!target || target.value == null) return;
+    ui.editingNumber = { scope: ui.route.kind, key: key };
+    ui.numberDraft = String(target.value);
+    ui.focusNumber = true;
+    render(false);
+  }
+  function resolveEditTarget(key) {
+    if (ui.route.kind === "block") {
+      var block = routeBlock(ui.route);
+      if (!block) return null;
+      return { object: block, key: key, value: block[key], condition: null };
+    }
+    if (ui.route.kind === "blockMovement") {
+      var b2 = routeBlock(ui.route);
+      var bm = findBlockMovement(b2, ui.route.movementId);
+      if (!bm || key !== "target") return null;
+      return { object: bm, key: "target", value: bm.target, condition: bm.endCondition };
+    }
+    if (ui.route.kind === "movement") {
+      var movement = findMovement(ui.route.id);
+      if (!movement || (key !== "defaultTarget" && key !== "target")) return null;
+      return { object: movement, key: "defaultTarget", value: movement.defaultTarget, condition: movement.defaultCondition };
+    }
+    return null;
+  }
+  function commitNumberInput(input, immediate) {
+    if (!ui.editingNumber) return;
+    var target = resolveEditTarget(ui.editingNumber.key);
+    var editing = ui.editingNumber;
+    ui.editingNumber = null;
+    if (!target) return;
+    var current = target.value;
+    var raw = String(input.value == null ? "" : input.value).trim();
+    var next = current;
+    if (raw) {
+      if (editing.key === "rounds" || editing.key === "setsPerRound") {
+        next = safeCount(raw, current);
+        if (editing.key === "rounds" && target.object.movements && target.object.movements.length > 1) {
+          next = Math.max(2, next);
+        }
+      } else if (editing.key === "target" || editing.key === "defaultTarget") {
+        next = safeTarget(target.condition, raw, current);
+      } else {
+        next = current;
+      }
+    }
+    if (next !== current) {
+      target.object[target.key] = next;
+      if (ui.route.staged) {
+        // Staged edits stay in memory and never schedule a save.
+      } else if (ui.route.kind === "block" || ui.route.kind === "blockMovement") {
+        markEdited(findSession(ui.route.sessionId));
+      } else {
+        markEdited(null);
+      }
+    }
+    if (immediate) render(false);
+    else setTimeout(function () { if (!ui.editingNumber) render(false); }, 0);
+  }
+
+  /* ------------------------------------------------------------------ rendering */
+  function render(animate) {
+    if (ui.tab !== "timer") {
+      ui.restartArmed = false;
+      ui.restartStatus = "";
+    }
+    appEl.innerHTML = appMarkup();
+    ui.mapSig = "";
+    if (animate) {
+      var root = appEl.firstElementChild;
+      if (root) {
+        root.classList.add("screen-in");
+        root.addEventListener("animationend", function () { root.classList.remove("screen-in"); }, { once: true });
+      }
+    }
+    sync();
+    syncIsland(true);
+    if (ui.focusName) {
+      ui.focusName = false;
+      setTimeout(focusNameInput, 0);
+    }
+    if (ui.focusNumber) {
+      ui.focusNumber = false;
+      setTimeout(focusNumberInput, 0);
+    }
+    if (ui.tab === "timer") {
+      requestAnimationFrame(scrollBlockStrip);
+    }
+  }
+
+  function appMarkup() {
+    var sessionsView = ui.tab === "sessions";
+    var body = sessionsView ? sessionsMarkup() : timerMarkup();
+    var phase = sessionsView ? "set" : accentKind();
+    return '<div class="app-screen' + (sessionsView ? " sessions-screen" : " timer-screen") + '" data-phase="' + phase + '">' +
+      body +
+      tabbarMarkup() +
+    '</div>';
+  }
+
+  function timerMarkup() {
+    var session = activeSession();
+    var group = groupOf();
+    var isRest = group === "rest";
+    var isDone = group === "done";
+    var p = currentPos();
+    if (!session || !p) {
+      return '<div class="center-stack"><div class="rt-center"><div class="rt-kicker">NO SESSION</div><div class="rt-sub">Open SESSIONS to build a plan.</div></div></div>';
+    }
+    var block = p.block;
+    var movement = p.movement;
+    var multi = session.blocks.length > 1;
+    var movementText = movementName(movement);
+    var doneInBlock = clamp(state.doneSets - p.blockStart, 0, blockTotalSets(block));
+    var stageHeight = Math.max(320, (screenEl.clientHeight || 852) - 64 - 92);
+    var posHtml;
+
+    // Arming a restart lasts only for the phase it was armed in.
+    if (ui.restartStatus !== state.status) {
+      ui.restartStatus = state.status;
+      ui.restartArmed = false;
+    }
+
+    if (isDone) {
+      posHtml = '<div class="pos"><span class="pos-done">SESSION COMPLETE</span></div>';
+    } else {
+      var bits = [];
+      if (isRest) bits.push('<span class="pos-up">UP NEXT</span>');
+      // The block strip already names the active block in a multi-block
+      // session; a single block names itself only when it adds something the
+      // movement name does not.
+      if (!multi && block.name.trim().toLowerCase() !== movementText.trim().toLowerCase()) {
+        bits.push('<span class="pos-block">' + esc(block.name) + '</span>');
+        bits.push('<span class="pos-sep"></span>');
+      }
+      bits.push('<span class="pos-move">' + esc(movementText) + '</span>');
+      var posText = positionLabel(block, p);
+      if (posText) {
+        bits.push('<span class="pos-sep"></span>');
+        bits.push('<span>' + posText + '</span>');
+      }
+      posHtml = '<div class="pos">' + bits.join('') + '</div>';
+    }
+
+    // The ring's centre is pinned to half the stage height. The chrome sits
+    // above it in the same stage, and the lower content starts one fixed gap
+    // below the ring, so neither wrapping copy nor map height can move it.
+    return '' +
+      '<div class="timer-stage" style="--stage-h:' + stageHeight + 'px">' +
+        '<div class="timer-chrome">' +
+          '<header class="app-head">' +
+            '<div class="brand"><span class="brand-dot"></span><span class="brand-name" data-el="brandName">' +
+              esc(session.name) + '</span></div>' +
+            '<div class="head-actions">' +
+              (isRest || group === "work" ? '' : '<button class="edit-pill chrome-glass" data-act="edit-session">EDIT</button>') +
+              restartMarkup() +
+            '</div>' +
+          '</header>' +
+          (multi ? blockStripMarkup(session, p.blockIndex) : '') +
+          posHtml +
+        '</div>' +
+        '<div class="hero">' +
+          '<svg class="rt-ring" viewBox="0 0 340 340" aria-hidden="true">' +
+            '<circle class="rt-track" cx="170" cy="170" r="160"></circle>' +
+            '<circle class="rt-prog" cx="170" cy="170" r="160" data-el="ring"></circle>' +
+          '</svg>' +
+          '<div class="rt-center">' +
+            '<div class="rt-kicker" data-el="kicker"></div>' +
+            '<div class="rt-time" data-el="time"></div>' +
+            '<div class="rt-sub" data-el="sub"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="timer-lower">' +
+          mapMarkup(session, block, doneInBlock) +
+          watchMarkup(p, group) +
+          '<div class="actions">' +
+            '<button class="primary" data-act="primary">' +
+              '<span class="btn-main" data-el="btnMain"></span>' +
+              '<span class="btn-sub" data-el="btnSub"></span>' +
+            '</button>' +
+            (isRest ? '<button class="icon-btn" data-act="skip" aria-label="Skip rest">' + ICON.skip + '</button>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /// A two-tap restart: the first tap arms, the second applies. Hidden before
+  /// the first set and in done, where START AGAIN is the primary action.
+  function restartMarkup() {
+    if (state.doneSets <= 0 || state.status === "done" || state.status === "notStarted") return "";
+    if (ui.restartArmed) {
+      return '<button class="edit-pill restart-pill armed chrome-glass" data-act="restart" ' +
+        'aria-label="Tap again to restart session">TAP AGAIN</button>';
+    }
+    return '<button class="edit-pill restart-pill chrome-glass" data-act="restart" ' +
+      'aria-label="Restart session">' + ICON.restart + '</button>';
+  }
+
+  function blockStripMarkup(session, activeIndex) {
+    var out = '<div class="block-strip" data-el="blockStrip">';
+    var offset = 0;
+    session.blocks.forEach(function (block, index) {
+      var total = blockTotalSets(block);
+      var complete = state.status === "done" || state.doneSets >= offset + total;
+      var active = index === activeIndex;
+      out += '<span class="block-chip ' + (complete ? "done" : active ? "on" : "") + '"' +
+        ' aria-label="' + esc(block.name) + (complete ? ", complete" : active ? ", active" : "") + '">' +
+        (complete ? '<span class="pc-check">✓</span>' : '') +
+        '<span>' + esc(block.name) + '</span>' +
+      '</span>';
+      offset = safeAdd(offset, total);
+    });
+    return out + '</div>';
+  }
+
+  function mapMarkup(session, block, doneInBlock) {
+    var total = blockTotalSets(block);
+    var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
+    var inner;
+    var dots = MAP_LIMITS.dots;
+    if (block.rounds <= MAP_LIMITS.rounds && perRound <= MAP_LIMITS.perRound && total <= dots) {
+      var rows = "";
+      for (var r = 1; r <= block.rounds; r++) {
+        rows += '<div class="map-row" data-r="' + r + '">' +
+          '<span class="map-label">R' + r + '</span>' +
+          '<span class="map-dots">';
+        block.movements.forEach(function (bm, m) {
+          if (m > 0) rows += '<span class="map-gap"></span>';
+          for (var k = 1; k <= block.setsPerRound; k++) {
+            rows += '<i class="map-dot" data-r="' + r + '" data-m="' + m + '" data-k="' + k + '"></i>';
+          }
+        });
+        rows += '</span></div>';
+      }
+      inner = '<div class="map-grid">' + rows + '</div>';
+    } else {
+      var pct = total ? (doneInBlock / total) * 100 : 0;
+      inner = '<div class="map-bar-wrap">' +
+        '<div class="map-bar"><i data-el="mapBar" style="width:' + pct + '%"></i></div>' +
+        '<div class="map-bar-label">' + doneInBlock + ' OF ' + total + ' SETS IN THIS BLOCK</div>' +
+      '</div>';
+    }
+    return '<div class="map-wrap">' + inner + '<div class="map-caption" data-el="mapCap"></div></div>';
+  }
+
+  function watchMarkup(p, group) {
+    if (group !== "ready" || !p.movement || p.movement.endCondition !== "reps") return "";
+    var lib = findMovement(p.movement.movementId);
+    var target = p.movement.target || 1;
+    if (!state.watchReachable) {
+      return '<div class="watch-strip off">' +
+        '<span class="watch-dot"></span>' +
+        '<span class="watch-label">WATCH UNAVAILABLE</span>' +
+        '<span class="watch-count">SET DONE STILL WORKS</span>' +
+        '<span class="watch-sim"><button data-act="watch-connect">CONNECT</button></span>' +
+      '</div>';
+    }
+    if (!lib || !lib.profile) {
+      return '<div class="watch-strip off">' +
+        '<span class="watch-dot"></span>' +
+        '<span class="watch-label">WATCH UNAVAILABLE</span>' +
+        '<span class="watch-count">NO PROFILE · SET DONE STILL WORKS</span>' +
+        '<span class="watch-sim"><button data-act="watch-drop">DISCONNECT</button></span>' +
+      '</div>';
+    }
+    return '<div class="watch-strip">' +
+      '<span class="watch-dot"></span>' +
+      '<span class="watch-label">WATCH ARMED</span>' +
+      '<span class="watch-count" data-el="watchCount">' + state.reps + ' OF ' + target + ' REPS</span>' +
+      '<span class="watch-sim"><button data-act="watch-rep">+ REP</button><button data-act="watch-drop">DISCONNECT</button></span>' +
+    '</div>';
+  }
+
+  function tabbarMarkup() {
+    return '<nav class="tabbar" aria-label="Main tabs">' +
+      '<button class="' + (ui.tab === "timer" ? "on" : "") + '" data-act="tab-timer" aria-label="Timer">' +
+        ICON.timer + '<span>TIMER</span></button>' +
+      '<button class="' + (ui.tab === "sessions" ? "on" : "") + '" data-act="tab-sessions" aria-label="Sessions">' +
+        ICON.sessions + '<span>SESSIONS</span></button>' +
+    '</nav>';
+  }
+
+  function sessionsMarkup() {
+    if (ui.route.kind === "session") return sessionEditorMarkup(ui.route.id);
+    if (ui.route.kind === "block") return blockEditorMarkup(ui.route.sessionId, ui.route.blockId, ui.route.staged === true);
+    if (ui.route.kind === "blockMovement") return blockMovementMarkup(ui.route.sessionId, ui.route.blockId, ui.route.movementId);
+    if (ui.route.kind === "picker") return pickerMarkup(ui.route.sessionId, ui.route.blockId);
+    if (ui.route.kind === "library") return libraryMarkup();
+    if (ui.route.kind === "movement") return movementDetailMarkup(ui.route.id);
+    if (ui.route.kind === "record") return recordMarkup();
+    return sessionsListMarkup();
+  }
+
+  function sessionsListMarkup() {
+    var locked = isLocked();
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="sessions-head">' +
+      '<div><div class="sessions-kicker">WORKOUTS</div><div class="sessions-title">SESSIONS</div></div>' +
+      '<button class="add-pill chrome-glass" data-act="add-session" aria-label="Add session"' + (locked ? " disabled" : "") + '>+</button>' +
+    '</div>';
+    html += lockBannerMarkup(locked);
+    sessions.forEach(function (session) {
+      var t = sessionTotals(session);
+      var active = session.id === activeSessionId;
+      html += '<button class="session-card' + (active ? " on" : "") + '" data-act="open-session" data-id="' + esc(session.id) + '">' +
+        '<div class="sc-main">' +
+          '<div class="sc-name">' + esc(session.name) + '</div>' +
+          '<div class="sc-meta">' + plural(session.blocks.length, "BLOCK", "BLOCKS") + ' · ' +
+            plural(t.sets, "SET", "SETS") + ' · ' + fmtLong(t.rest) + ' REST</div>' +
+        '</div>' +
+        '<div class="sc-right">' + (active ? '<span class="active-badge">ACTIVE</span>' : '') +
+          '<span class="chev">›</span></div>' +
+      '</button>';
+    });
+    html += '<div class="lib-head"><div class="sessions-kicker">LIBRARY</div>' +
+      '<div class="lib-count">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
+    html += '<button class="session-card" data-act="open-library">' +
+      '<div class="sc-main"><div class="sc-name">MOVEMENTS</div>' +
+        '<div class="sc-meta">Recorded on the watch · reusable in any block</div></div>' +
+      '<div class="sc-right"><span class="chev">›</span></div>' +
+    '</button>';
+    html += '<div class="sessions-foot">Each round runs every movement in order for its sets-per-round sets. A set rest follows each set; a round rest follows each round.</div>';
+    return html + '</div>';
+  }
+
+  function sessionEditorMarkup(sessionId) {
+    var session = findSession(sessionId);
+    if (!session) {
+      ui.route = { kind: "list" };
+      return sessionsListMarkup();
+    }
+    var locked = isLocked();
+    var total = sessionTotals(session);
+    var isActive = session.id === activeSessionId;
+    var isDraft = ui.route.draft === true;
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="back-list">‹ SESSIONS</button>' +
+      '<button class="sheet-done" data-act="done-session">DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">SESSION</div>';
+    html += '<input class="preset-name" data-el="sessionName" value="' + esc(session.name) +
+      '" maxlength="18" spellcheck="false" autocomplete="off" aria-label="Session name"' + (locked ? " disabled" : "") + '>';
+    html += '<div class="sheet-note">' + plural(session.blocks.length, "BLOCK", "BLOCKS") + ' · ' +
+      plural(total.sets, "SET", "SETS") + ' · ' + fmtLong(total.rest) + ' TOTAL REST</div>';
+    if (isActive && state.doneSets > 0 && !locked) {
+      html += '<div class="sheet-warn">EDITING THIS SESSION RESTARTS IT.</div>';
+    }
+    html += lockBannerMarkup(locked);
+    html += '<div class="section-head"><div class="section-k">BLOCKS</div>' +
+      '<div class="section-count">' + plural(session.blocks.length, "BLOCK", "BLOCKS") + '</div></div>';
+    session.blocks.forEach(function (block, index) {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "block" && ui.deleteArmed.id === block.id;
+      html += '<div class="block-row" data-drag-row="block" data-id="' + esc(block.id) + '">' +
+        '<button class="block-open" data-act="open-block" data-id="' + esc(block.id) + '">' +
+          '<span class="br-index">' + pad2(index + 1) + '</span>' +
+          '<span class="br-main"><span class="br-name">' + esc(block.name) + '</span>' +
+            '<span class="br-meta' + (armed ? " danger" : "") + '">' +
+              (armed ? "TAP AGAIN TO DELETE" : blockMeta(block)) + '</span></span>' +
+          '<span class="br-chev">›</span>' +
+        '</button>' +
+        '<div class="row-actions">' +
+          '<span class="row-grip" draggable="' + (locked ? "false" : "true") + '" data-drag-handle="block" data-id="' +
+            esc(block.id) + '" role="button" aria-label="Reorder block">' + ICON.grip + '</span>' +
+          (session.blocks.length > 1
+            ? '<button class="row-trash' + (armed ? " armed" : "") + '" data-act="delete-block-row" data-id="' +
+                esc(block.id) + '" aria-label="Delete block"' + (locked ? " disabled" : "") + '>' + ICON.trash + '</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+    });
+    html += '<button class="add-block" data-act="add-block"' + (locked || !movements.length ? " disabled" : "") + '>+ ADD BLOCK</button>';
+    html += '<div class="editor-foot">';
+    if (isDraft) {
+      html += '<button class="use-btn" data-act="use-session"' +
+        (locked ? " disabled" : "") + '>USE THIS SESSION</button>';
+    } else if (isActive) {
+      if (state.doneSets > 0) {
+        html += '<button class="use-btn" data-act="restart-session"' + (locked ? " disabled" : "") + '>RESTART SESSION</button>';
+      } else {
+        html += '<div class="active-state">ACTIVE SESSION</div>';
+      }
+    } else {
+      html += '<button class="use-btn" data-act="use-session" data-id="' + esc(session.id) + '"' +
+        (locked ? " disabled" : "") + '>USE THIS SESSION</button>';
+    }
+    if (!isDraft && sessions.length > 1) {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "session" && ui.deleteArmed.id === session.id;
+      html += '<button class="danger-link' + (armed ? " armed" : "") + '" data-act="delete-session" data-id="' +
+        esc(session.id) + '"' + (locked ? " disabled" : "") + '>' +
+        (armed ? "TAP AGAIN TO DELETE" : "DELETE SESSION") + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function blockMeta(block) {
+    return blockNumbers(block) + ' · SET ' + fmt(block.setRest) + ' · ROUND ' + fmt(block.roundRest);
+  }
+  function blockSummary(block) {
+    return blockNumbers(block) + ' · ' + fmtLong(blockRest(block, false)) + ' REST';
+  }
+
+  function blockEditorMarkup(sessionId, blockId, staged) {
+    var session = findSession(sessionId);
+    var block = staged ? routeBlock({ sessionId: sessionId, blockId: blockId, staged: true }) : findBlock(session, blockId);
+    if (!session || !block) {
+      ui.route = { kind: "list" };
+      return sessionsListMarkup();
+    }
+    var locked = isLocked();
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="back-session">‹ SESSION</button>' +
+      '<button class="sheet-done" data-act="done-block"' +
+        (staged && !block.movements.length ? " disabled" : "") + '>DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">BLOCK</div>';
+    html += '<input class="preset-name" data-el="blockName" value="' + esc(block.name) +
+      '" maxlength="18" spellcheck="false" autocomplete="off" aria-label="Block name"' + (locked ? " disabled" : "") + '>';
+    html += '<div class="sheet-note">' + blockSummary(block) + '</div>';
+    html += lockBannerMarkup(locked);
+    html += '<div class="rows">' +
+      blockRow(block, "rounds", "ROUNDS", true, locked) +
+      blockRow(block, "setsPerRound", "SETS PER ROUND", true, locked) +
+      blockRow(block, "setRest", "SET REST", false, locked) +
+      blockRow(block, "roundRest", "ROUND REST", false, locked) +
+    '</div>';
+    html += '<div class="section-head"><div class="section-k">MOVEMENTS</div><div class="section-count">' +
+      plural(block.movements.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
+    block.movements.forEach(function (bm, index) {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "blockMovement" && ui.deleteArmed.id === bm.id;
+      html += '<div class="block-row" data-drag-row="movement" data-id="' + esc(bm.id) + '">' +
+        '<button class="block-open" data-act="open-block-movement" data-id="' + esc(bm.id) + '">' +
+          '<span class="br-index">' + pad2(index + 1) + '</span>' +
+          '<span class="br-main"><span class="br-name">' + esc(movementName(bm)) + '</span>' +
+            '<span class="br-meta' + (armed ? " danger" : "") + '">' +
+              (armed ? "TAP AGAIN TO DELETE" : esc(movementGroup(bm)) + ' · ' + movementConditionLabel(bm)) + '</span></span>' +
+          '<span class="br-chev">›</span>' +
+        '</button>' +
+        '<div class="row-actions">' +
+          '<span class="row-grip" draggable="' + (locked ? "false" : "true") + '" data-drag-handle="movement" data-id="' +
+            esc(bm.id) + '" role="button" aria-label="Reorder movement">' + ICON.grip + '</span>' +
+          (block.movements.length > 1
+            ? '<button class="row-trash' + (armed ? " armed" : "") + '" data-act="delete-block-movement-row" data-id="' +
+                esc(bm.id) + '" aria-label="Delete movement"' + (locked ? " disabled" : "") + '>' + ICON.trash + '</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+    });
+    var usedMovements = {};
+    block.movements.forEach(function (bm) { usedMovements[bm.movementId] = true; });
+    var unusedMovements = movements.filter(function (m) { return !usedMovements[m.id]; });
+    if (!locked && unusedMovements.length) {
+      html += '<div class="section-head"><div class="section-k">ADD FROM LIBRARY</div>' +
+        '<div class="section-count">' + plural(unusedMovements.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
+      unusedMovements.forEach(function (m) {
+        html += '<button class="lib-row" data-act="add-from-library" data-id="' + esc(m.id) + '">' +
+          '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
+            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + ' · MANUAL</div></div>' +
+          '<span class="chev">+</span></button>';
+      });
+    }
+    html += '<button class="add-block" data-act="open-picker"' + (locked || !movements.length ? " disabled" : "") + '>+ ADD MOVEMENT</button>';
+    html += '<div class="editor-foot">';
+    if (!staged && session.blocks.length > 1) {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "block" && ui.deleteArmed.id === block.id;
+      html += '<button class="danger-link' + (armed ? " armed" : "") + '" data-act="delete-block" data-id="' +
+        esc(block.id) + '"' + (locked ? " disabled" : "") + '>' +
+        (armed ? "TAP AGAIN TO DELETE" : "DELETE BLOCK") + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function blockRow(block, key, label, typed, locked) {
+    var isEditing = typed && ui.editingNumber && ui.editingNumber.scope === "block" && ui.editingNumber.key === key;
+    var valueText = typed ? String(block[key]) : fmt(block[key]);
+    var valueHtml;
+    if (isEditing) {
+      valueHtml = '<input class="num-input" data-el="numberInput" type="text" inputmode="numeric" value="' +
+        esc(ui.numberDraft) + '" aria-label="' + label + '">';
+    } else if (typed) {
+      valueHtml = '<button class="sv sv-btn" data-act="edit-number" data-key="' + key +
+        '" aria-label="Edit ' + label + '"' + (locked ? " disabled" : "") + '>' + valueText + '</button>';
+    } else {
+      valueHtml = '<span class="sv">' + valueText + '</span>';
+    }
+    var min = key === "setRest" ? 0 : key === "rounds" ? blockMin(block, key) : LIMITS[key] ? LIMITS[key][0] : 1;
+    var max = key === "setRest" ? 600 : key === "roundRest" ? 600 : Number.MAX_SAFE_INTEGER;
+    var canDec = block[key] > min;
+    var canInc = block[key] < max;
+    return '<div class="srow">' +
+      '<span class="sk">' + label + '</span>' +
+      valueHtml +
+      '<div class="sstep">' +
+        '<button data-act="bump-block" data-key="' + key + '" data-dir="-1" aria-label="Decrease ' + label + '"' +
+          (locked || !canDec ? " disabled" : "") + '>−</button>' +
+        '<button data-act="bump-block" data-key="' + key + '" data-dir="1" aria-label="Increase ' + label + '"' +
+          (locked || !canInc ? " disabled" : "") + '>+</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function blockMovementMarkup(sessionId, blockId, movementId) {
+    var session = findSession(sessionId);
+    var block = routeBlock(ui.route);
+    var bm = findBlockMovement(block, movementId);
+    if (!session || !block || !bm) {
+      ui.route = { kind: "list" };
+      return sessionsListMarkup();
+    }
+    var locked = isLocked();
+    var lib = findMovement(bm.movementId);
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="back-block">‹ BLOCK</button>' +
+      '<button class="sheet-done" data-act="done-block-movement">DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">MOVEMENT</div>';
+    html += '<div class="detail-name">' + esc(movementName(bm)) + '</div>';
+    html += '<div class="sheet-note">' + plural(block.rounds, "ROUND", "ROUNDS") + ' · ' +
+      plural(block.setsPerRound, "SET", "SETS") + ' EACH</div>';
+    html += lockBannerMarkup(locked);
+    html += '<div class="section-head"><div class="section-k">END CONDITION</div></div>';
+    html += segMarkup([
+      { value: "manual", label: "MANUAL" },
+      { value: "time", label: "TIME" },
+      { value: "reps", label: "REPS" }
+    ], bm.endCondition, "bm-condition", locked);
+    if (bm.endCondition === "manual") {
+      html += '<div class="sheet-note">NO TARGET · TAP SET DONE WHEN THE SET ENDS.</div>';
+    } else {
+      html += '<div class="rows">' + targetRow("blockMovement", bm.target, bm.endCondition, "TARGET", locked) + '</div>';
+    }
+    if (lib && bm.endCondition === "reps" && !lib.profile) {
+      html += '<div class="danger-note">NO PROFILE · RE-RECORD THIS MOVEMENT BEFORE THE WATCH CAN COUNT.</div>';
+    }
+    html += '<div class="editor-foot">';
+    if (block.movements.length > 1) {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "blockMovement" && ui.deleteArmed.id === bm.id;
+      html += '<button class="danger-link' + (armed ? " armed" : "") + '" data-act="delete-block-movement" data-id="' +
+        esc(bm.id) + '"' + (locked ? " disabled" : "") + '>' +
+        (armed ? "TAP AGAIN TO DELETE" : "REMOVE FROM BLOCK") + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function targetRow(scope, value, condition, label, locked) {
+    var isEditing = ui.editingNumber && ui.editingNumber.scope === scope && ui.editingNumber.key === "target";
+    var text = condition === "time" ? fmt(value) : String(value == null ? "—" : value);
+    var valueHtml;
+    if (isEditing) {
+      valueHtml = '<input class="num-input" data-el="numberInput" type="text" inputmode="numeric" value="' +
+        esc(ui.numberDraft) + '" aria-label="' + label + '">';
+    } else {
+      valueHtml = '<button class="sv sv-btn" data-act="edit-number" data-key="target"' +
+        ' aria-label="Edit ' + label + '"' + (locked ? " disabled" : "") + '>' + text + '</button>';
+    }
+    var step = condition === "time" ? 15 : 1;
+    var min = condition === "time" ? LIMITS.time[0] : 1;
+    var max = condition === "time" ? LIMITS.time[1] : Number.MAX_SAFE_INTEGER;
+    var act = scope === "blockMovement" ? "bump-bm-target" : "bump-movement-target";
+    return '<div class="srow">' +
+      '<span class="sk">' + label + '</span>' +
+      valueHtml +
+      '<div class="sstep">' +
+        '<button data-act="' + act + '" data-dir="-1" aria-label="Decrease ' + label + '"' +
+          (locked || value <= min ? " disabled" : "") + '>−</button>' +
+        '<button data-act="' + act + '" data-dir="1" aria-label="Increase ' + label + '"' +
+          (locked || value >= max ? " disabled" : "") + '>+</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function pickerMarkup(sessionId, blockId) {
+    var session = findSession(sessionId);
+    var block = routeBlock(ui.route);
+    if (!session || !block) {
+      ui.route = { kind: "list" };
+      return sessionsListMarkup();
+    }
+    var locked = isLocked();
+    var pick = ui.picker || pickerDefault();
+    var pending = pick.pending || [];
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="cancel-picker">‹ BLOCK</button>' +
+      '<button class="sheet-done" data-act="done-picker"' +
+        (locked ? " disabled" : "") + '>DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">ADD MOVEMENT</div>';
+    html += '<div class="sessions-title">SET END</div>';
+    html += '<div class="sheet-note">Choose how the set ends, then queue a recorded movement or name a new one.</div>';
+    html += lockBannerMarkup(locked);
+    html += segMarkup([
+      { value: "manual", label: "MANUAL" },
+      { value: "time", label: "TIME" },
+      { value: "reps", label: "REPS" }
+    ], pick.condition, "picker-condition", locked);
+    if (pick.condition === "manual") {
+      html += '<div class="sheet-note">NO TARGET · TAP SET DONE WHEN THE SET ENDS.</div>';
+    } else {
+      html += '<div class="rows">' + pickerTargetRow(pick, locked) + '</div>';
+    }
+    var newName = pick.name || "";
+    html += '<div class="section-k">NEW MOVEMENT</div>';
+    html += '<input class="preset-name new-movement-name" data-el="pickerName" value="' + esc(newName) +
+      '" maxlength="18" spellcheck="false" autocomplete="off" aria-label="New movement name"' +
+      (locked ? " disabled" : "") + '>';
+    if (pick.condition === "reps") {
+      html += '<div class="sheet-note">NO PROFILE · THE WATCH CANNOT COUNT IT UNTIL IT IS RECORDED.</div>';
+    }
+    html += '<button class="use-btn new-movement-add" data-act="add-new-movement"' +
+      (locked || !newName.trim() ? " disabled" : "") + '>ADD MOVEMENT</button>';
+    html += '<div class="section-head"><div class="section-k">TO ADD</div><div class="section-count">' +
+      plural(pending.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
+    if (!pending.length) {
+      html += '<div class="empty-note">Nothing queued yet. Add a movement or tap one below.</div>';
+    } else {
+      pending.forEach(function (entry) {
+        html += '<div class="lib-row on">' +
+          '<div class="sc-main"><div class="sc-name">' + esc(pickerEntryName(entry)) + '</div>' +
+            '<div class="sc-meta">' + esc(conditionTargetLabel(entry.condition, entry.target)) + '</div></div>' +
+          '<button class="row-trash" data-act="remove-pending" data-id="' + esc(entry.id) +
+            '" aria-label="Remove ' + esc(pickerEntryName(entry)) + '"' + (locked ? " disabled" : "") + '>' +
+            ICON.trash + '</button>' +
+        '</div>';
+      });
+    }
+    html += '<div class="section-head"><div class="section-k">MOVEMENT</div>' +
+      '<div class="section-count">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
+    html += '<div class="sheet-note">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") +
+      ' in the library · tap one to queue or unqueue it.</div>';
+    if (!movements.length) {
+      html += '<div class="empty-note">No movements yet. Record one first.</div>';
+    } else {
+      movements.forEach(function (m) {
+        var queued = pending.some(function (entry) { return entry.movementId === m.id; });
+        html += '<button class="lib-row' + (queued ? " on" : "") + '" data-act="toggle-block-movement" data-id="' + esc(m.id) + '"' +
+          (locked ? " disabled" : "") + '>' +
+          '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
+            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + '</div></div>' +
+          '<span class="chev">' + (queued ? "✓" : "+") + '</span></button>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function pickerTargetRow(pick, locked) {
+    var min = pick.condition === "time" ? LIMITS.time[0] : 1;
+    var max = pick.condition === "time" ? LIMITS.time[1] : Number.MAX_SAFE_INTEGER;
+    var text = pick.condition === "time" ? fmt(pick.target) : String(pick.target);
+    return '<div class="srow">' +
+      '<span class="sk">TARGET</span>' +
+      '<span class="sv">' + text + '</span>' +
+      '<div class="sstep">' +
+        '<button data-act="picker-target" data-dir="-1" aria-label="Decrease target"' +
+          (locked || pick.target <= min ? " disabled" : "") + '>−</button>' +
+        '<button data-act="picker-target" data-dir="1" aria-label="Increase target"' +
+          (locked || pick.target >= max ? " disabled" : "") + '>+</button>' +
+      '</div></div>';
+  }
+
+  function libraryMarkup() {
+    var locked = isLocked();
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="back-list">‹ SESSIONS</button>' +
+      '<button class="sheet-done" data-act="record-new"' + (locked ? " disabled" : "") + '>+</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">LIBRARY</div>';
+    html += '<div class="sessions-title">MOVEMENTS</div>';
+    html += '<div class="sheet-note">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + ' · recorded on the watch</div>';
+    html += lockBannerMarkup(locked);
+    if (!movements.length) {
+      html += '<div class="empty-note">No movements yet. Record a movement on the watch to create one.</div>';
+    } else {
+      movements.forEach(function (m) {
+        html += '<button class="lib-row" data-act="open-movement" data-id="' + esc(m.id) + '">' +
+          '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
+            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + '</div></div>' +
+          '<span class="chev">›</span></button>';
+      });
+    }
+    html += '<button class="record-row" data-act="record-new"' + (locked ? " disabled" : "") + '>+ RECORD MOVEMENT</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function movementDetailMarkup(movementId) {
+    var m = findMovement(movementId);
+    if (!m) {
+      ui.route = { kind: "library" };
+      return libraryMarkup();
+    }
+    var locked = isLocked();
+    var used = movementUsage(m.id);
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="back-library">‹ LIBRARY</button>' +
+      '<button class="sheet-done" data-act="done-movement">DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">MOVEMENT</div>';
+    html += '<input class="preset-name" data-el="movementName" value="' + esc(m.name) +
+      '" maxlength="18" spellcheck="false" autocomplete="off" aria-label="Movement name"' + (locked ? " disabled" : "") + '>';
+    html += '<div class="sheet-note">' + (used.length ? "USED IN " + esc(used.join(" · ")) : "NOT IN A SESSION") + '</div>';
+    html += lockBannerMarkup(locked);
+    html += '<div class="section-k">PROFILE</div>';
+    html += '<div class="sheet-note">' + profileText(m.profile) + '</div>';
+    if (!m.profile) {
+      html += '<div class="danger-note">NO PROFILE · RE-RECORD THIS MOVEMENT BEFORE THE WATCH CAN COUNT.</div>';
+    }
+    html += '<div class="editor-foot">';
+    html += '<button class="use-btn" data-act="re-record"' + (locked ? " disabled" : "") + '>RE-RECORD ON WATCH</button>';
+    if (used.length) {
+      html += '<button class="danger-link" disabled>DELETE MOVEMENT</button>' +
+        '<div class="danger-note">USED BY ' + esc(used.join(" · ").toUpperCase()) + ' · REMOVE IT FROM THE PLAN FIRST.</div>';
+    } else {
+      var armed = ui.deleteArmed && ui.deleteArmed.kind === "libraryMovement" && ui.deleteArmed.id === m.id;
+      html += '<button class="danger-link' + (armed ? " armed" : "") + '" data-act="delete-movement"' +
+        (locked ? " disabled" : "") + '>' + (armed ? "TAP AGAIN TO DELETE" : "DELETE MOVEMENT") + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function recordMarkup() {
+    if (!ui.record) {
+      ui.route = { kind: "library" };
+      return libraryMarkup();
+    }
+    var locked = isLocked();
+    var record = ui.record;
+    var editing = !!record.movementId;
+    var html = '<div class="sessions-scroll">';
+    html += '<div class="editor-head">' +
+      '<button class="back-pill" data-act="record-back">‹ ' + (editing ? "MOVEMENT" : "LIBRARY") + '</button>' +
+      '<button class="sheet-done" data-act="record-back">DONE</button>' +
+    '</div>';
+    html += '<div class="editor-kicker">RECORD</div>';
+    html += '<div class="sessions-title">' + (editing ? "RE-RECORD" : "NEW MOVEMENT") + '</div>';
+    html += lockBannerMarkup(locked);
+
+    if (record.step === "idle") {
+      html += '<div class="sheet-note">The watch records 15 seconds of your movement in the background. You can put your wrist down.</div>';
+      html += watchRecordStrip();
+      html += '<div class="editor-foot">' +
+        '<button class="use-btn" data-act="start-recording"' + (locked || !state.watchReachable ? " disabled" : "") + '>START RECORDING</button>' +
+      '</div>';
+    } else if (record.step === "waiting") {
+      html += '<div class="record-box">' +
+        '<div class="record-state"><span class="watch-dot"></span>WAITING FOR THE TRACE</div>' +
+        '<div class="sheet-note">Keep the watch on your wrist. It records 15 seconds in the background and sends the trace automatically.</div>' +
+        '<div class="sheet-note">After the window, the watch fetches the motion; this can take a few seconds.</div>' +
+        '<div class="sim-row">' +
+          '<button class="mini-btn primary" data-act="simulate-trace">GOOD TRACE</button>' +
+          '<button class="mini-btn" data-act="simulate-short">2 REPS</button>' +
+          '<button class="mini-btn" data-act="simulate-timeout">TIMEOUT</button>' +
+          '<button class="mini-btn" data-act="simulate-nomotion">NO MOTION</button>' +
+        '</div>' +
+      '</div>';
+      html += '<div class="editor-foot"><button class="danger-link" data-act="record-back">CANCEL</button></div>';
+    } else if (record.step === "received") {
+      html += '<div class="record-box">' +
+        '<div class="record-state"><span class="watch-dot"></span>TRACE RECEIVED</div>' +
+        traceSVG(5) +
+        '<div class="profile-grid">' +
+          '<div class="profile-cell"><div class="profile-k">SIGNAL</div><div class="profile-v">FOREARM</div></div>' +
+          '<div class="profile-cell"><div class="profile-k">MIN PERIOD</div><div class="profile-v">' + record.profile.minPeriod.toFixed(2) + ' s</div></div>' +
+          '<div class="profile-cell"><div class="profile-k">RISE</div><div class="profile-v">' + Math.round(record.profile.rise) + '°</div></div>' +
+          '<div class="profile-cell"><div class="profile-k">FALL</div><div class="profile-v">' + Math.round(record.profile.fall) + '°</div></div>' +
+        '</div>' +
+        '<div class="sheet-note">PROFILE OK · THREE OR MORE STEADY CYCLES.</div>' +
+      '</div>';
+      html += '<div class="section-k">NAME</div>';
+      html += '<input class="preset-name" data-el="recordName" value="' + esc(record.draft.name) +
+        '" maxlength="18" spellcheck="false" autocomplete="off" aria-label="Movement name"' + (locked ? " disabled" : "") + '>';
+      html += '<div class="editor-foot">' +
+        '<button class="use-btn" data-act="save-record"' + (locked ? " disabled" : "") + '>SAVE MOVEMENT</button>' +
+        '<button class="danger-link" data-act="discard-record">DISCARD</button>' +
+      '</div>';
+    } else {
+      html += '<div class="record-box">' +
+        '<div class="record-state bad"><span class="watch-dot"></span>RECORDING FAILED</div>' +
+        '<div class="sheet-note">' + esc(record.reason || "NO TRACE ARRIVED") + '</div>' +
+      '</div>';
+      html += '<div class="editor-foot">' +
+        '<button class="use-btn" data-act="retry-record">TRY AGAIN</button>' +
+        '<button class="danger-link" data-act="record-back">CANCEL</button>' +
+      '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function watchRecordStrip() {
+    if (state.watchReachable) {
+      return '<div class="watch-strip"><span class="watch-dot"></span>' +
+        '<span class="watch-label">WATCH READY</span>' +
+        '<span class="watch-count">OPEN THE WATCH APP</span>' +
+        '<span class="watch-sim"><button data-act="watch-drop">DISCONNECT</button></span></div>';
+    }
+    return '<div class="watch-strip off"><span class="watch-dot"></span>' +
+      '<span class="watch-label">WATCH UNAVAILABLE</span>' +
+      '<span class="watch-count">OPEN RESTLESS ON THE WATCH</span>' +
+      '<span class="watch-sim"><button data-act="watch-connect">CONNECT</button></span></div>';
+  }
+  function traceSVG(cycles) {
+    var points = [];
+    for (var i = 0; i <= 120; i++) {
+      var x = (i / 120) * 300;
+      var y = 40 - Math.sin((i / 120) * Math.PI * 2 * cycles) * 26;
+      points.push(x.toFixed(1) + "," + y.toFixed(1));
+    }
+    return '<svg class="trace-svg" viewBox="0 0 300 80" aria-hidden="true">' +
+      '<line class="trace-grid" x1="0" y1="40" x2="300" y2="40"></line>' +
+      '<polyline class="trace-line" points="' + points.join(" ") + '"></polyline>' +
+    '</svg>';
+  }
+  function recordTargetRow(draft, locked) {
+    var text = draft.condition === "time" ? fmt(draft.target) : String(draft.target == null ? "—" : draft.target);
+    var step = draft.condition === "time" ? 15 : 1;
+    var min = draft.condition === "time" ? LIMITS.time[0] : 1;
+    var max = draft.condition === "time" ? LIMITS.time[1] : Number.MAX_SAFE_INTEGER;
+    return '<div class="srow">' +
+      '<span class="sk">TARGET</span>' +
+      '<span class="sv">' + text + '</span>' +
+      '<div class="sstep">' +
+        '<button data-act="record-target" data-dir="-1" aria-label="Decrease target"' +
+          (locked || draft.target <= min ? " disabled" : "") + '>−</button>' +
+        '<button data-act="record-target" data-dir="1" aria-label="Increase target"' +
+          (locked || draft.target >= max ? " disabled" : "") + '>+</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function groupChips(selected, action, locked) {
+    var options = GROUPS.slice();
+    if (selected && options.indexOf(selected) < 0) options.push(selected);
+    var html = '<div class="chip-row">';
+    options.forEach(function (group) {
+      html += '<button class="chip' + (group === selected ? " on" : "") + '" data-act="' + action +
+        '" data-group="' + esc(group) + '"' + (locked ? " disabled" : "") + '>' + esc(group.toUpperCase()) + '</button>';
+    });
+    return html + '</div>';
+  }
+  function segMarkup(options, selected, action, locked) {
+    var html = '<div class="seg">';
+    options.forEach(function (option) {
+      html += '<button class="' + (option.value === selected ? "on" : "") + '" data-act="' + action +
+        '" data-value="' + option.value + '"' + (locked ? " disabled" : "") + '>' + option.label + '</button>';
+    });
+    return html + '</div>';
+  }
+  function lockBannerMarkup(locked) {
+    return locked
+      ? '<div class="lock-banner">EDITING LOCKED DURING A SET OR REST · SWITCH TO TIMER TO SET DONE OR PAUSE</div>'
+      : '';
+  }
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmt(s) { var v = Math.max(0, Math.ceil(s)); return Math.floor(v / 60) + ":" + pad(v % 60); }
+  function fmtLong(s) {
+    var v = Math.max(0, Math.round(s));
+    var h = Math.floor(v / 3600);
+    var m = Math.floor((v % 3600) / 60);
+    var sec = v % 60;
+    return h ? (h + ":" + pad(m) + ":" + pad(sec)) : (m + ":" + pad(sec));
+  }
+
+  function focusNameInput() {
+    var input = $('[data-el="sessionName"], [data-el="blockName"], [data-el="movementName"], [data-el="recordName"]', appEl);
+    if (input) { input.focus(); input.select(); }
+  }
+  function focusNumberInput() {
+    var input = $('[data-el="numberInput"]', appEl);
+    if (input) { input.focus(); input.select(); }
+  }
+  function scrollBlockStrip() {
+    var strip = $('[data-el="blockStrip"]', appEl);
+    if (!strip) return;
+    var chip = $(".block-chip.on", strip);
+    if (!chip) return;
+    strip.scrollLeft = Math.max(0, chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2);
+  }
+
+  /* ------------------------------------------------------------------ sync */
+  function setText(el, text) {
+    if (!el) return;
+    if (textCache.get(el) !== text) {
+      textCache.set(el, text);
+      el.textContent = text;
+    }
+  }
+
+  function sync() {
+    var group = groupOf();
+    var session = activeSession();
+    var p = currentPos();
+    var accent = accentKind();
+    var wrap = $(".app-screen", appEl);
+    if (wrap && ui.tab === "timer" && wrap.getAttribute("data-phase") !== accent) {
+      wrap.setAttribute("data-phase", accent);
+    }
+
+    if (ui.tab === "timer" && p) {
+      var kicker, timeText, sub, progress = 0, small = false;
+      var total = sessionTotals(session).sets;
+
+      if (group === "gate") {
+        kicker = "READY";
+        timeText = "START";
+        sub = plural(session.blocks.length, "BLOCK", "BLOCKS") + " · " +
+          plural(total, "SET", "SETS") + " · " + fmtLong(sessionTotals(session).rest) + " TOTAL REST";
+        small = true;
+      } else if (group === "ready") {
+        var rest = upcomingRest();
+        if (rest) {
+          if (rest.dur <= 0) {
+            kicker = "NO REST";
+            timeText = "NEXT";
+            sub = "AFTER THIS SET";
+            small = true;
+          } else {
+            kicker = restKindLabel(rest.kind);
+            timeText = fmt(rest.dur);
+            sub = "AFTER THIS SET";
+          }
+        } else {
+          kicker = "LAST SET";
+          timeText = "FINISH";
+          sub = "NO REST AFTER";
+          small = true;
+        }
+      } else if (group === "work") {
+        kicker = "WORK";
+        timeText = fmt(remainingSetNow());
+        var workRest = upcomingRest();
+        sub = workRest ? (workRest.dur > 0 ? "REST " + fmt(workRest.dur) + " AFTER" : "NEXT SET IMMEDIATELY") : "NO REST AFTER";
+        progress = setProgress();
+      } else if (group === "rest") {
+        kicker = state.status === "paused" ? "PAUSED" : restKindLabel(state.restKind);
+        timeText = fmt(remainingNow());
+        sub = state.rest ? state.rest.label : "";
+        progress = restProgress();
+      } else {
+        kicker = state.doneSets + " OF " + plural(total, "SET", "SETS");
+        timeText = "DONE";
+        sub = plural(session.blocks.length, "BLOCK", "BLOCKS") + " · " +
+          plural(sessionTotals(session).movements, "MOVEMENT", "MOVEMENTS") + " · " +
+          fmtLong(sessionTotals(session).rest) + " TOTAL REST";
+        progress = 1;
+        small = true;
+      }
+
+      setText($("[data-el='kicker']", appEl), kicker);
+      var timeEl = $("[data-el='time']", appEl);
+      setText(timeEl, timeText);
+      if (timeEl) timeEl.classList.toggle("small", small);
+      setText($("[data-el='sub']", appEl), sub);
+
+      var ring = $("[data-el='ring']", appEl);
+      if (ring) ring.style.strokeDashoffset = String(1005.31 * (1 - progress));
+
+      setText($("[data-el='mapCap']", appEl), state.doneSets + " OF " + plural(total, "SET", "SETS"));
+      paintMap(p, session);
+
+      var blockStart = p.blockStart;
+      var blockTotal = blockTotalSets(p.block);
+      var doneInBlock = clamp(state.doneSets - blockStart, 0, blockTotal);
+      var mapBar = $("[data-el='mapBar']", appEl);
+      if (mapBar) {
+        mapBar.style.width = (blockTotal ? (doneInBlock / blockTotal) * 100 : 0) + "%";
+        setText($(".map-bar-label", appEl), doneInBlock + " OF " + blockTotal + " SETS IN THIS BLOCK");
+      }
+
+      var watchCount = $("[data-el='watchCount']", appEl);
+      if (watchCount) {
+        var target = p.movement.endCondition === "reps" ? (p.movement.target || 1) : 0;
+        setText(watchCount, state.reps + " OF " + target + " REPS");
+      }
+
+      var main, btnSub;
+      if (group === "gate") {
+        main = "START SESSION";
+        btnSub = "BLOCK 1 · " + session.blocks[0].name.toUpperCase();
+      } else if (group === "ready") {
+        if (p.movement.endCondition === "time") {
+          main = "START";
+          btnSub = fmt(p.movement.target) + " HOLD";
+        } else if (p.movement.endCondition === "reps") {
+          main = "SET DONE";
+          btnSub = watchReady(p) ? state.reps + " OF " + (p.movement.target || 1) + " REPS · WATCH ARMED" : "WATCH UNAVAILABLE · TAP WHEN DONE";
+        } else {
+          var readyRest = upcomingRest();
+          main = "SET DONE";
+          btnSub = readyRest ? (readyRest.dur > 0 ? "START " + fmt(readyRest.dur) + " " + (readyRest.kind === "set" ? "SET" : "ROUND") + " REST" : "NEXT SET IMMEDIATELY") : "NO REST AFTER";
+        }
+      } else if (group === "work") {
+        var workRest2 = upcomingRest();
+        main = "SET DONE";
+        btnSub = workRest2 ? (workRest2.dur > 0 ? "REST " + fmt(workRest2.dur) + " AFTER" : "NEXT SET IMMEDIATELY") : "FINISH AFTER THIS SET";
+      } else if (group === "rest") {
+        if (state.status === "paused") {
+          main = "RESUME";
+          btnSub = "TAP TO RESUME";
+        } else {
+          main = "PAUSE";
+          btnSub = restKindLabel(state.restKind);
+        }
+      } else {
+        main = "START AGAIN";
+        btnSub = plural(total, "SET", "SETS") + " · " + fmtLong(sessionTotals(session).rest) + " TOTAL REST";
+      }
+      setText($("[data-el='btnMain']", appEl), main);
+      setText($("[data-el='btnSub']", appEl), btnSub);
+    }
+
+    syncIsland(false);
+
+    var debugSig = group + "|" + state.status + "|" + state.doneSets + "|" + (state.restKind || "") + "|" +
+      Math.floor(remainingNow()) + "|" + Math.floor(remainingSetNow()) + "|" + state.reps + "|" + state.watchReachable;
+    if (debugSig !== ui.debugSig) {
+      ui.debugSig = debugSig;
+      var txt;
+      if (!p) {
+        txt = "NO SESSION";
+      } else if (group === "gate") {
+        txt = "READY · NOT STARTED · BLOCK 1/" + session.blocks.length + " · " + p.block.name + " · " +
+          movementName(p.movement);
+      } else if (group === "ready") {
+        txt = "READY · BLOCK " + (p.blockIndex + 1) + "/" + session.blocks.length + " · " + p.block.name + " · " +
+          movementName(p.movement) + " · " + positionLabel(p.block, p) +
+          " · " + (p.movement.endCondition === "reps" ? (watchReady(p) ? "WATCH ARMED " + state.reps + "/" + (p.movement.target || 1) : "WATCH UNAVAILABLE") : movementConditionLabel(p.movement));
+      } else if (group === "work") {
+        txt = "PERFORMING · WORK " + fmt(remainingSetNow()) + " · " + movementName(p.movement) + " · " +
+          positionLabel(p.block, p);
+      } else if (group === "rest") {
+        txt = state.status.toUpperCase() + " · " + restKindLabel(state.restKind) + " · " + fmt(remainingNow()) +
+          " · " + (state.rest ? state.rest.label : "") + " · NEXT " + movementName(p.movement);
+      } else {
+        txt = "DONE · " + plural(sessionTotals(session).sets, "SET", "SETS") + " · " +
+          plural(session.blocks.length, "BLOCK", "BLOCKS") + " · " + fmtLong(sessionTotals(session).rest) + " TOTAL REST";
+      }
+      var safeText = txt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      debugEl.innerHTML = safeText.replace(/^(READY|PERFORMING|RESTING|PAUSED|DONE|NO SESSION)/, "<b>$1</b>");
+    }
+  }
+
+  function paintMap(p, session) {
+    var dots = $$(".map-dot", appEl);
+    if (!dots.length) return;
+    var block = p.block;
+    var doneInBlock = clamp(state.doneSets - p.blockStart, 0, blockTotalSets(block));
+    var sig = block.id + "|" + state.status + "|" + doneInBlock + "|" + block.rounds + "|" + block.setsPerRound + "|" + block.movements.length;
+    if (sig === ui.mapSig) return;
+    ui.mapSig = sig;
+
+    var stepsPer = Math.max(1, block.setsPerRound);
+    var perRound = safeMul(Math.max(1, block.movements.length), stepsPer);
+    dots.forEach(function (dot) {
+      var r = Number(dot.getAttribute("data-r"));
+      var m = Number(dot.getAttribute("data-m"));
+      var k = Number(dot.getAttribute("data-k"));
+      var index = (r - 1) * perRound + m * stepsPer + (k - 1);
+      dot.classList.toggle("done", index < doneInBlock);
+      dot.classList.toggle("current", index === doneInBlock && state.status !== "done");
+    });
+    $$(".map-row", appEl).forEach(function (row) {
+      row.classList.toggle("active", Number(row.getAttribute("data-r")) === p.round && state.status !== "done");
+    });
+  }
+
+  /* ------------------------------------------------------------------ island */
+  function shortMovement(name) {
+    var clean = String(name || "MOV").replace(/[^A-Za-z0-9]/g, "");
+    return (clean.slice(0, 3).toUpperCase() || "MOV");
+  }
+  function compactLabel(group, p) {
+    if (group === "done") return "DONE";
+    return shortMovement(movementName(p.movement));
+  }
+  function compactTime(group) {
+    if (group === "done") return totalSets() + " SETS";
+    if (group === "work") return fmt(remainingSetNow());
+    if (group === "rest") return fmt(remainingNow());
+    return "READY";
+  }
+  function islandActionsHTML(group, p) {
+    if (group === "ready") {
+      if (p.movement.endCondition === "time") {
+        return '<button class="primary" data-act="primary">Start · ' + fmt(p.movement.target) + '</button>';
+      }
+      var rest = upcomingRest();
+      return '<button class="primary" data-act="primary">' +
+        (rest ? (rest.dur > 0 ? "Set done · " + fmt(rest.dur) : "Set done") : "Finish session") +
+      '</button>';
+    }
+    if (group === "work") {
+      var workRest = upcomingRest();
+      return '<button class="primary" data-act="primary">' +
+        (workRest ? (workRest.dur > 0 ? "Set done · " + fmt(workRest.dur) : "Set done") : "Finish session") +
+      '</button>';
+    }
+    if (group === "rest") {
+      return '<button class="primary" data-act="primary">' +
+        (state.status === "paused" ? "Resume" : "Pause") +
+      '</button><button class="ghost" data-act="skip">Skip</button>';
+    }
+    return '<button class="primary" data-act="primary">Again</button>';
+  }
+  function syncIsland(force) {
+    var group = groupOf();
+    var session = activeSession();
+    var p = currentPos();
+    var accent = accentKind();
+    if (!p) return;
+
+    var gate = group === "gate";
+    islandEl.classList.toggle("dormant", gate);
+    if (gate) {
+      ui.expanded = false;
+      islandEl.classList.remove("expanded");
+      screenEl.classList.remove("island-open");
+      islandEl.style.width = "126px";
+      islandEl.style.height = "37px";
+      islandEl.style.borderRadius = "22px";
+      islandEl.style.setProperty("--phase", PHASE_COLORS.set);
+      return;
+    }
+
+    islandEl.classList.toggle("expanded", ui.expanded);
+    screenEl.classList.toggle("island-open", ui.expanded);
+    islandEl.style.setProperty("--phase", PHASE_COLORS[accent] || PHASE_COLORS.set);
+
+    var compactW = group === "ready" ? 200 : group === "done" ? 190 : 214;
+    islandEl.style.width = (ui.expanded ? 380 : compactW) + "px";
+    islandEl.style.height = (ui.expanded ? 186 : 37) + "px";
+    islandEl.style.borderRadius = (ui.expanded ? 44 : 22) + "px";
+
+    setText($("[data-el='icLabel']", islandEl), compactLabel(group, p));
+    setText($("[data-el='icTime']", islandEl), compactTime(group));
+
+    var iePhase, ieSub, ieTime, ieNext, progress = 0, small = false;
+    var total = sessionTotals(session).sets;
+    var positionText = positionLabel(p.block, p);
+
+    if (group === "ready") {
+      var rest = upcomingRest();
+      if (rest) {
+        if (rest.dur <= 0) {
+          iePhase = "NO REST";
+          ieTime = "NEXT";
+          ieNext = movementName(p.movement).toUpperCase() + (positionText ? " · " + positionText : "");
+          small = true;
+        } else {
+          iePhase = restKindLabel(rest.kind);
+          ieTime = fmt(rest.dur);
+          ieNext = movementName(p.movement).toUpperCase() + (positionText ? " · " + positionText : "");
+        }
+      } else {
+        iePhase = "LAST SET";
+        ieTime = "FINISH";
+        ieNext = movementName(p.movement).toUpperCase() + " · NO REST AFTER";
+        small = true;
+      }
+      ieSub = "BLOCK " + (p.blockIndex + 1) + "/" + session.blocks.length + " · " + p.block.name.toUpperCase();
+    } else if (group === "work") {
+      iePhase = "WORK";
+      ieTime = fmt(remainingSetNow());
+      ieSub = "BLOCK " + (p.blockIndex + 1) + "/" + session.blocks.length + " · " + p.block.name.toUpperCase();
+      var workRest = upcomingRest();
+      ieNext = workRest ? (workRest.dur > 0 ? "REST " + fmt(workRest.dur) + " AFTER" : "NEXT SET IMMEDIATELY") : "NO REST AFTER";
+      progress = setProgress();
+    } else if (group === "rest") {
+      iePhase = state.status === "paused" ? "PAUSED" : restKindLabel(state.restKind);
+      ieTime = fmt(remainingNow());
+      ieSub = "BLOCK " + (p.blockIndex + 1) + "/" + session.blocks.length + " · " + p.block.name.toUpperCase();
+      ieNext = state.rest ? state.rest.label : "";
+      progress = restProgress();
+    } else {
+      iePhase = "DONE";
+      ieSub = plural(session.blocks.length, "BLOCK", "BLOCKS") + " · " + plural(sessionTotals(session).movements, "MOVEMENT", "MOVEMENTS");
+      ieTime = "DONE";
+      ieNext = plural(total, "SET", "SETS") + " · " + fmtLong(sessionTotals(session).rest) + " TOTAL REST";
+      progress = 1;
+      small = true;
+    }
+
+    setText($("[data-el='iePhase']", islandEl), iePhase);
+    setText($("[data-el='ieSub']", islandEl), ieSub);
+    var ieTimeEl = $("[data-el='ieTime']", islandEl);
+    setText(ieTimeEl, ieTime);
+    if (ieTimeEl) ieTimeEl.classList.toggle("small", small);
+    setText($("[data-el='ieNext']", islandEl), ieNext);
+    $("[data-el='ieBar']", islandEl).style.width = (progress * 100) + "%";
+
+    var sig = activeSessionId + "|" + group + "|" + state.status + "|" + state.doneSets + "|" +
+      (state.restKind || "") + "|" + session.blocks.length + "|" + p.block.id + "|" +
+      p.movement.id + "|" + p.movement.endCondition + "|" + p.movement.target;
+    if (force || sig !== ui.islandSig) {
+      ui.islandSig = sig;
+      $("[data-el='ieActions']", islandEl).innerHTML = islandActionsHTML(group, p);
+    }
+  }
+
+  /* ------------------------------------------------------------------ actions */
+  function handleAct(act, el) {
+    switch (act) {
+      case "primary": {
+        if (state.status === "notStarted") {
+          startSession();
+        } else if (state.status === "ready") {
+          var p = currentPos();
+          if (p && p.movement.endCondition === "time") startSet();
+          else setDone();
+        } else if (state.status === "performing") {
+          setDone();
+        } else if (state.status === "resting") {
+          pauseRest();
+        } else if (state.status === "paused") {
+          resumeRest();
+        } else if (state.status === "done") {
+          again();
+        }
+        break;
+      }
+      case "skip":
+        skipRest();
+        break;
+      case "watch-rep":
+        watchRep();
+        break;
+      case "watch-drop":
+        watchDrop();
+        break;
+      case "watch-connect":
+        watchConnect();
+        break;
+      case "tab-timer":
+        flushEdit();
+        ui.draft = null;
+        ui.stagedBlock = null;
+        ui.tab = "timer";
+        ui.route = { kind: "list" };
+        ui.deleteArmed = null;
+        ui.editingNumber = null;
+        render(false);
+        break;
+      case "tab-sessions":
+        flushEdit();
+        ui.draft = null;
+        ui.stagedBlock = null;
+        ui.tab = "sessions";
+        ui.route = { kind: "list" };
+        ui.deleteArmed = null;
+        ui.editingNumber = null;
+        render(false);
+        break;
+      case "edit-session":
+        if (isLocked()) break;
+        flushEdit();
+        ui.stagedBlock = null;
+        ui.tab = "sessions";
+        ui.route = { kind: "session", id: activeSessionId };
+        ui.deleteArmed = null;
+        ui.editingNumber = null;
+        render(false);
+        break;
+      case "restart": {
+        if (state.doneSets <= 0 || state.status === "done" || state.status === "notStarted") break;
+        if (!ui.restartArmed) {
+          ui.restartArmed = true;
+          ui.restartStatus = state.status;
+          render(false);
+          break;
+        }
+        again();
+        break;
+      }
+      case "toggle-chrome": {
+        var flat = document.body.classList.toggle("flat-chrome");
+        el.setAttribute("aria-pressed", flat ? "false" : "true");
+        el.textContent = flat ? "CHROME · FLAT" : "CHROME · LIQUID GLASS";
+        break;
+      }
+      case "open-session":
+        openSession(el.getAttribute("data-id"));
+        break;
+      case "add-session":
+        newSession();
+        break;
+      case "back-list":
+        if (ui.draft) ui.draft = null;
+        backToList();
+        break;
+      case "done-session":
+        if (ui.draft) {
+          commitDraft();
+          ui.route = { kind: "list" };
+          ui.deleteArmed = null;
+          ui.editingNumber = null;
+          render(false);
+        } else {
+          backToList();
+        }
+        break;
+      case "back-session":
+        backToSession(ui.route.sessionId);
+        break;
+      case "done-block":
+        if (ui.route.staged && !commitStagedBlock(ui.route.sessionId)) break;
+        backToSession(ui.route.sessionId);
+        break;
+      case "back-block":
+        backToBlock(ui.route.sessionId, ui.route.blockId);
+        break;
+      case "done-block-movement":
+        backToBlock(ui.route.sessionId, ui.route.blockId);
+        break;
+      case "done-picker":
+        commitPicker();
+        break;
+      case "cancel-picker":
+        cancelPicker();
+        break;
+      case "back-library":
+        backToLibrary();
+        break;
+      case "done-movement":
+        backToLibrary();
+        break;
+      case "record-back":
+        recordBack();
+        break;
+      case "use-session":
+        if (ui.draft) {
+          var committed = commitDraft();
+          if (!committed) break;
+          ui.route = { kind: "list" };
+          ui.deleteArmed = null;
+          ui.editingNumber = null;
+          useSession(committed.id);
+        } else {
+          useSession(el.getAttribute("data-id"));
+        }
+        break;
+      case "restart-session":
+        restartSession();
+        break;
+      case "delete-session":
+        deleteSession(el.getAttribute("data-id"));
+        break;
+      case "add-block":
+        addBlock(ui.route.id);
+        break;
+      case "open-block":
+        openBlock(ui.route.id, el.getAttribute("data-id"));
+        break;
+      case "move-block":
+        if (ui.route.kind === "session") moveBlock(ui.route.id, el.getAttribute("data-id"), el.getAttribute("data-dir"));
+        break;
+      case "delete-block":
+        if (ui.route.kind === "block") deleteBlock(ui.route.sessionId, el.getAttribute("data-id"));
+        break;
+      case "delete-block-row":
+        if (ui.route.kind === "session") deleteBlock(ui.route.id, el.getAttribute("data-id"));
+        break;
+      case "bump-block":
+        bumpBlock(el.getAttribute("data-key"), el.getAttribute("data-dir"));
+        break;
+      case "edit-number":
+        startEditNumber(el.getAttribute("data-key"));
+        break;
+      case "open-block-movement":
+        openBlockMovement(ui.route.sessionId, ui.route.blockId, el.getAttribute("data-id"));
+        break;
+      case "move-block-movement":
+        moveBlockMovement(ui.route.sessionId, ui.route.blockId, el.getAttribute("data-id"), el.getAttribute("data-dir"));
+        break;
+      case "delete-block-movement":
+        removeBlockMovement(ui.route.sessionId, ui.route.blockId, el.getAttribute("data-id"));
+        break;
+      case "delete-block-movement-row":
+        if (ui.route.kind === "block") removeBlockMovement(ui.route.sessionId, ui.route.blockId, el.getAttribute("data-id"));
+        break;
+      case "picker-condition":
+        ui.picker.condition = el.getAttribute("data-value");
+        if (ui.picker.condition === "manual") ui.picker.target = null;
+        else if (ui.picker.condition === "time") ui.picker.target = safeTime(ui.picker.target, 60);
+        else ui.picker.target = Math.max(1, safeCount(ui.picker.target, 10));
+        render(false);
+        break;
+      case "picker-target":
+        var pickDir = Number(el.getAttribute("data-dir"));
+        if (ui.picker.condition === "time") {
+          ui.picker.target = clamp((ui.picker.target || 15) + pickDir * 15, LIMITS.time[0], LIMITS.time[1]);
+        } else {
+          ui.picker.target = Math.max(1, (ui.picker.target || 1) + pickDir);
+        }
+        render(false);
+        break;
+      case "bm-condition":
+        setBlockMovementCondition(ui.route.movementId, el.getAttribute("data-value"));
+        break;
+      case "bump-bm-target":
+        bumpBlockMovementTarget(ui.route.movementId, el.getAttribute("data-dir"));
+        break;
+      case "bm-default":
+        useBlockMovementDefault(ui.route.movementId);
+        break;
+      case "open-picker":
+        openPicker(ui.route.sessionId, ui.route.blockId);
+        break;
+      case "add-from-library":
+        addFromLibrary(el.getAttribute("data-id"));
+        break;
+      case "toggle-block-movement":
+        queueMovementToBlock(el.getAttribute("data-id"));
+        break;
+      case "add-new-movement":
+        queueNewMovementToBlock();
+        break;
+      case "remove-pending":
+        removePendingPicker(el.getAttribute("data-id"));
+        break;
+      case "open-library":
+        openLibrary();
+        break;
+      case "open-movement":
+        openMovement(el.getAttribute("data-id"));
+        break;
+      case "record-new":
+        startRecord(null);
+        break;
+      case "re-record":
+        startRecord(ui.route.id);
+        break;
+      case "start-recording":
+        startRecordingNow();
+        break;
+      case "simulate-trace":
+        simulateTrace(5);
+        break;
+      case "simulate-short":
+        simulateTrace(2);
+        break;
+      case "simulate-timeout":
+        failRecording("NO TRACE ARRIVED");
+        break;
+      case "simulate-nomotion":
+        failRecording("NO MOTION DETECTED");
+        break;
+      case "retry-record":
+        retryRecording();
+        break;
+      case "save-record":
+        saveRecordedMovement();
+        break;
+      case "discard-record":
+        discardRecording();
+        break;
+      case "record-group":
+        setRecordGroup(el.getAttribute("data-group"));
+        break;
+      case "record-condition":
+        setRecordCondition(el.getAttribute("data-value"));
+        break;
+      case "record-target":
+        bumpRecordTarget(el.getAttribute("data-dir"));
+        break;
+      case "movement-group":
+        setMovementGroup(ui.route.id, el.getAttribute("data-group"));
+        break;
+      case "movement-condition":
+        setMovementCondition(ui.route.id, el.getAttribute("data-value"));
+        break;
+      case "bump-movement-target":
+        bumpMovementDefaultTarget(ui.route.id, el.getAttribute("data-dir"));
+        break;
+      case "delete-movement":
+        deleteMovement(ui.route.id);
+        break;
+    }
+  }
+
+  /* ------------------------------------------------------------------ events */
+  var holdDelay = 0;
+  var holdRepeat = 0;
+  var holdButton = null;
+  var holdFired = false;
+  var suppressStepClick = false;
+
+  function liveStepButton(source) {
+    if (!source) return null;
+    var selector = '[data-act="' + source.getAttribute("data-act") + '"]';
+    var key = source.getAttribute("data-key");
+    var dir = source.getAttribute("data-dir");
+    if (key != null) selector += '[data-key="' + key + '"]';
+    if (dir != null) selector += '[data-dir="' + dir + '"]';
+    return appEl.querySelector(selector);
+  }
+  function stopStepHold() {
+    if (holdDelay) {
+      clearTimeout(holdDelay);
+      holdDelay = 0;
+    }
+    if (holdRepeat) {
+      clearInterval(holdRepeat);
+      holdRepeat = 0;
+    }
+    if (holdFired) suppressStepClick = true;
+    holdButton = null;
+    holdFired = false;
+  }
+  function repeatStep() {
+    if (!holdButton) {
+      stopStepHold();
+      return;
+    }
+    if (isLocked()) {
+      stopStepHold();
+      return;
+    }
+    var live = liveStepButton(holdButton);
+    if (!live || live.disabled) {
+      stopStepHold();
+      return;
+    }
+    holdFired = true;
+    handleAct(live.getAttribute("data-act"), live);
+  }
+  function startStepHold(source) {
+    stopStepHold();
+    if (!source || source.disabled || isLocked()) return;
+    suppressStepClick = false;
+    holdButton = source;
+    holdFired = false;
+    holdDelay = setTimeout(function () {
+      holdDelay = 0;
+      repeatStep();
+      if (!holdButton) return;
+      holdRepeat = setInterval(repeatStep, 100);
+    }, 500);
+  }
+
+  appEl.addEventListener("pointerdown", function (e) {
+    var button = e.target.closest ? e.target.closest(".sstep button") : null;
+    if (!button) return;
+    if (e.button !== undefined && e.button > 0) return;
+    startStepHold(button);
+  });
+  document.addEventListener("pointerup", stopStepHold);
+  document.addEventListener("pointercancel", stopStepHold);
+  window.addEventListener("blur", stopStepHold);
+
+  document.addEventListener("click", function (e) {
+    var inIsland = !!(e.target.closest && e.target.closest("#island"));
+    var actEl = e.target.closest ? e.target.closest("[data-act]") : null;
+    if (actEl) {
+      if (suppressStepClick && actEl.closest(".sstep")) {
+        suppressStepClick = false;
+        return;
+      }
+      suppressStepClick = false;
+      var act = actEl.getAttribute("data-act");
+      var switched = inIsland && ui.tab === "sessions" && (act === "primary" || act === "skip");
+      if (switched) {
+        flushEdit();
+        ui.tab = "timer";
+        ui.route = { kind: "list" };
+        ui.deleteArmed = null;
+        ui.editingNumber = null;
+      }
+      handleAct(act, actEl);
+      if (switched) render(false);
+      if (!inIsland && ui.expanded) {
+        ui.expanded = false;
+        syncIsland(true);
+      }
+      return;
+    }
+    if (!inIsland && ui.expanded) {
+      ui.expanded = false;
+      syncIsland(true);
+    }
+  });
+
+  var dragState = null;
+  var dragGhost = null;
+  function clearDrag() {
+    dragState = null;
+    if (dragGhost && dragGhost.parentNode) dragGhost.parentNode.removeChild(dragGhost);
+    dragGhost = null;
+    $$(".block-row.dragging, .block-row.drop-target", appEl).forEach(function (row) {
+      row.classList.remove("dragging");
+      row.classList.remove("drop-target");
+    });
+  }
+  function moveDragGhost(e) {
+    if (!dragGhost) return;
+    var x = e.clientX;
+    var y = e.clientY;
+    if (!x && !y) return;
+    dragGhost.style.left = (x + 14) + "px";
+    dragGhost.style.top = (y - 34) + "px";
+  }
+  appEl.addEventListener("dragstart", function (e) {
+    var handle = e.target.closest ? e.target.closest("[data-drag-handle]") : null;
+    if (!handle || isLocked()) {
+      e.preventDefault();
+      return;
+    }
+    var row = handle.closest("[data-drag-row]");
+    if (!row) return;
+    dragState = { kind: row.getAttribute("data-drag-row"), id: row.getAttribute("data-id") };
+    row.classList.add("dragging");
+    var card = row.querySelector(".block-open");
+    if (card) {
+      var rect = card.getBoundingClientRect();
+      dragGhost = card.cloneNode(true);
+      dragGhost.classList.add("drag-ghost");
+      dragGhost.removeAttribute("data-act");
+      dragGhost.style.width = rect.width + "px";
+      dragGhost.style.left = ((e.clientX || rect.left) + 14) + "px";
+      dragGhost.style.top = ((e.clientY || rect.top) - 34) + "px";
+      document.body.appendChild(dragGhost);
+    }
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", dragState.id);
+      var blank = new Image();
+      blank.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+      e.dataTransfer.setDragImage(blank, 0, 0);
+    }
+  });
+  appEl.addEventListener("drag", moveDragGhost);
+  appEl.addEventListener("dragover", function (e) {
+    moveDragGhost(e);
+    if (!dragState) return;
+    var row = e.target.closest ? e.target.closest("[data-drag-row]") : null;
+    if (!row || row.getAttribute("data-drag-row") !== dragState.kind) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    $$(".block-row.drop-target", appEl).forEach(function (other) { other.classList.remove("drop-target"); });
+    row.classList.add("drop-target");
+  });
+  appEl.addEventListener("drop", function (e) {
+    if (!dragState) return;
+    e.preventDefault();
+    var row = e.target.closest ? e.target.closest("[data-drag-row]") : null;
+    var state = dragState;
+    clearDrag();
+    if (row && row.getAttribute("data-drag-row") === state.kind) {
+      reorderRow(state.kind, state.id, row.getAttribute("data-id"));
+    }
+  });
+  appEl.addEventListener("dragend", clearDrag);
+
+  islandEl.addEventListener("click", function (e) {
+    if (e.target.closest("[data-act]")) return;
+    if (groupOf() === "gate") return;
+    e.stopPropagation();
+    ui.expanded = !ui.expanded;
+    syncIsland(true);
+  });
+  islandEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (groupOf() === "gate") return;
+      ui.expanded = !ui.expanded;
+      syncIsland(true);
+    }
+  });
+
+  appEl.addEventListener("input", function (e) {
+    var t = e.target;
+    if (!t || !t.matches) return;
+    if (t.matches('[data-el="sessionName"]') && ui.route.kind === "session") {
+      var session = findSession(ui.route.id);
+      if (session) {
+        session.name = liveName(t.value);
+        markEdited(session);
+      }
+    } else if (t.matches('[data-el="blockName"]') && ui.route.kind === "block") {
+      var blockSession = findSession(ui.route.sessionId);
+      var block = routeBlock(ui.route);
+      if (block) {
+        block.name = liveName(t.value);
+        if (!ui.route.staged) markEdited(blockSession);
+      }
+    } else if (t.matches('[data-el="movementName"]') && ui.route.kind === "movement") {
+      var movement = findMovement(ui.route.id);
+      if (movement) {
+        movement.name = liveName(t.value);
+        markEdited(null);
+      }
+    } else if (t.matches('[data-el="recordName"]') && ui.record) {
+      ui.record.draft.name = liveName(t.value);
+    } else if (t.matches('[data-el="pickerName"]') && ui.route.kind === "picker") {
+      if (!ui.picker) ui.picker = pickerDefault();
+      ui.picker.name = liveName(t.value);
+      var addButton = $('[data-act="add-new-movement"]', appEl);
+      if (addButton) addButton.disabled = !ui.picker.name.trim();
+    } else if (t.matches('[data-el="numberInput"]')) {
+      ui.numberDraft = t.value;
+    }
+  });
+
+  appEl.addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (!t || !t.matches) return;
+    if (t.matches('[data-el="sessionName"]')) {
+      commitSessionName(t);
+    } else if (t.matches('[data-el="blockName"]')) {
+      commitBlockName(t);
+    } else if (t.matches('[data-el="movementName"]')) {
+      commitMovementName(t);
+    } else if (t.matches('[data-el="recordName"]')) {
+      commitRecordName(t);
+    } else if (t.matches('[data-el="pickerName"]') && ui.picker) {
+      ui.picker.name = trimName(t.value, "");
+      if (t.value !== ui.picker.name) t.value = ui.picker.name;
+      var addButton = $('[data-act="add-new-movement"]', appEl);
+      if (addButton) addButton.disabled = !ui.picker.name;
+    } else if (t.matches('[data-el="numberInput"]')) {
+      commitNumberInput(t, false);
+    }
+  });
+
+  appEl.addEventListener("keydown", function (e) {
+    var t = e.target;
+    if (!t || !t.matches) return;
+    if (t.matches('[data-el="pickerName"]') && e.key === "Enter") {
+      e.preventDefault();
+      queueNewMovementToBlock();
+      return;
+    }
+    if ((t.matches('[data-el="sessionName"]') || t.matches('[data-el="blockName"]') ||
+         t.matches('[data-el="movementName"]') || t.matches('[data-el="recordName"]')) && e.key === "Enter") {
+      e.preventDefault();
+      t.blur();
+      return;
+    }
+    if (t.matches('[data-el="numberInput"]')) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        commitNumberInput(t, true);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        var target = resolveEditTarget(ui.editingNumber ? ui.editingNumber.key : "");
+        if (target && ui.editingNumber) t.value = String(target.value == null ? "" : target.value);
+        ui.editingNumber = null;
+        t.blur();
+      }
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (ui.expanded) {
+        ui.expanded = false;
+        syncIsland(true);
+        return;
+      }
+      if (ui.tab === "sessions") {
+        if (ui.route.kind === "record") recordBack();
+        else if (ui.route.kind === "movement") backToLibrary();
+        else if (ui.route.kind === "library") backToList();
+        else if (ui.route.kind === "picker") cancelPicker();
+        else if (ui.route.kind === "blockMovement") backToBlock(ui.route.sessionId, ui.route.blockId);
+        else if (ui.route.kind === "block") backToSession(ui.route.sessionId);
+        else if (ui.route.kind === "session") backToList();
+        else {
+          flushEdit();
+          ui.tab = "timer";
+          render(false);
+        }
+      }
+    }
+    if (e.key === " ") {
+      var t = e.target;
+      if (t && t.closest && t.closest("button, input, textarea")) return;
+      if (ui.tab !== "timer") return;
+      if (state.status === "resting" || state.status === "paused") {
+        e.preventDefault();
+        state.status === "resting" ? pauseRest() : resumeRest();
+      }
+    }
+  });
+
+  window.addEventListener("beforeunload", function () {
+    commitEdit();
+  });
+
+  /* ------------------------------------------------------------------ timer */
+  var frame = function (now) {
+    if (state.status === "resting") {
+      var rem = (state.deadline - now) / 1000;
+      if (rem <= 0) finishRest(true);
+    } else if (state.status === "performing") {
+      if (state.setDeadline - now <= 0) setDone();
+    }
+    sync();
+    requestAnimationFrame(frame);
+  };
+
+  /* ------------------------------------------------------------------ fit + boot */
+  function fit() {
+    var availH = window.innerHeight - 126;
+    var availW = window.innerWidth - 28;
+    var s = Math.min(1, availH / 880, availW / 430);
+    s = Math.max(0.5, s);
+    frameEl.style.transform = "scale(" + s + ")";
+    stageEl.style.height = (880 * s) + "px";
+    stageEl.style.width = (430 * s) + "px";
+  }
+  window.addEventListener("resize", fit);
+
+  function boot() {
+    resetSession();
+    render(false);
+    fit();
+    requestAnimationFrame(frame);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
