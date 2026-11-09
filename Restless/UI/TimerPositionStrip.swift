@@ -86,11 +86,16 @@ struct TimerPositionStrip: View {
     let snapshot: SessionSnapshot
     let movementName: String
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         let copy = TimerPositionCopy(snapshot: snapshot, movementName: movementName)
-        ViewThatFits(in: .horizontal) {
-            line(copy, stacked: false)
-            line(copy, stacked: true)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                line(copy, stacked: true)
+            } else {
+                line(copy, stacked: false)
+            }
         }
         .frame(minHeight: 24)
     }
@@ -153,9 +158,8 @@ struct TimerPositionStrip: View {
 }
 
 private struct PositionLineStyle: ViewModifier {
-    /// The single-line candidate keeps its ideal width so `ViewThatFits` can
-    /// reject it; the stacked candidate may wrap its text at accessibility
-    /// sizes instead of clipping at the edge.
+    /// The one-line strip scales or truncates a long name; the stacked candidate
+    /// may wrap its text at accessibility sizes instead of clipping at the edge.
     let wraps: Bool
 
     func body(content: Content) -> some View {
@@ -163,7 +167,8 @@ private struct PositionLineStyle: ViewModifier {
             .font(Theme.TypeScale.label)
             .tracking(0.8)
             .lineLimit(wraps ? nil : 1)
+            .minimumScaleFactor(wraps ? 1 : 0.6)
             .multilineTextAlignment(.center)
-            .fixedSize(horizontal: !wraps, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

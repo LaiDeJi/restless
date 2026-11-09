@@ -196,3 +196,82 @@ func duplicateRowsCollapseOnRead() throws {
     #expect(record.preset.totalSets == 16)
     #expect(record.preset.totalRest == 720)
 }
+
+@MainActor
+@Test("Legacy rows with no sort index read in creation order and normalize to 0..<n")
+func legacyOrderNormalizes() throws {
+    let container = try memoryContainer()
+    let context = ModelContext(container)
+    let base = Date(timeIntervalSince1970: 1_000_000)
+    var made: [PresetRecord] = []
+    for (index, name) in ["Chest", "Arms", "Core"].enumerated() {
+        let record = PresetRecord(.chest)
+        record.name = name
+        record.createdAt = base.addingTimeInterval(TimeInterval(index))
+        record.sortIndex = nil
+        context.insert(record)
+        made.append(record)
+    }
+    try context.save()
+
+    #expect(PresetRepository.fetchAll(context).map(\.name) == ["Chest", "Arms", "Core"])
+
+    PresetRepository.normalizeOrder(in: context)
+
+    let ordered = PresetRepository.fetchAll(context)
+    #expect(ordered.map(\.name) == ["Chest", "Arms", "Core"])
+    #expect(ordered.map(\.sortIndex) == [0, 1, 2])
+}
+
+@MainActor
+@Test("A manual order survives a read and a gap normalizes back to 0..<n")
+func manualOrderSurvivesRead() throws {
+    let container = try memoryContainer()
+    let context = ModelContext(container)
+    var made: [PresetRecord] = []
+    for (index, name) in ["Chest", "Arms", "Core"].enumerated() {
+        let record = PresetRecord(.chest)
+        record.name = name
+        record.createdAt = Date(timeIntervalSince1970: 1_000_000 + Double(index))
+        record.sortIndex = index
+        context.insert(record)
+        made.append(record)
+    }
+    try context.save()
+
+    made[2].sortIndex = -1
+    try context.save()
+    #expect(PresetRepository.fetchAll(context).map(\.name) == ["Core", "Chest", "Arms"])
+
+    made[2].sortIndex = 7
+    try context.save()
+    PresetRepository.normalizeOrder(in: context)
+
+    let ordered = PresetRepository.fetchAll(context)
+    #expect(ordered.map(\.name) == ["Chest", "Arms", "Core"])
+    #expect(ordered.map(\.sortIndex) == [0, 1, 2])
+}
+
+@MainActor
+@Test("A new session appends after the existing ones")
+func newSessionAppends() throws {
+    let container = try memoryContainer()
+    let context = ModelContext(container)
+    for (index, name) in ["Chest", "Arms"].enumerated() {
+        let record = PresetRecord(.chest)
+        record.name = name
+        record.createdAt = Date(timeIntervalSince1970: 1_000_000 + Double(index))
+        record.sortIndex = index
+        context.insert(record)
+    }
+    try context.save()
+
+    var draft = WorkoutPreset(name: "Core", blocks: [.fallback])
+    draft.name = "Core"
+    let saved = SessionDraftCommit.save(draft, usedNames: ["Chest", "Arms"], in: context)
+
+    let ordered = PresetRepository.fetchAll(context)
+    #expect(ordered.map(\.name) == ["Chest", "Arms", "Core"])
+    #expect(ordered.last?.id == saved.id)
+    #expect(saved.sortIndex == 2)
+}

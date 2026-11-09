@@ -127,6 +127,8 @@ final class WatchSessionModel {
             beginCounting(token: token, profile: profile, target: target)
         case .disarm:
             clear()
+        case .alert:
+            WatchHaptics.alert()
         case .startRecording(let requestID, let duration):
             beginRecording(requestID: requestID, duration: duration)
         case .cancelRecording:
@@ -426,5 +428,11 @@ final class WatchSessionModel {
 enum WatchHaptics {
     static func success() {
         WKInterfaceDevice.current().play(.success)
+    }
+
+    /// One alert haptic for a phone-side countdown completion. It is not a set
+    /// completion and must not count a rep.
+    static func alert() {
+        WKInterfaceDevice.current().play(.notification)
     }
 }

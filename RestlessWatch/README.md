@@ -16,7 +16,11 @@ its angle and rep markers live while the watch app is attached to the Mac.
 - The lab does not use HealthKit and needs the app in front with the screen on.
 - It counts the **watch arm only**. Alternating curls count one side.
 - The production timer plays one haptic when the target is reached and when a
-  recording stops; the lab adds none.
+  recording stops. It also plays one notification haptic when a rest or timed set
+  ends on the phone while the watch app is reachable; that alert does not count a
+  rep or change the armed set. In the background iOS mirrors the local
+  notification to the watch, so the app adds no second watch haptic. The lab
+  adds none.
 
 ## Count a set for the timer
 
@@ -28,6 +32,10 @@ watch arm is counted, and SET DONE on the phone still works.
 
 The first armed set asks for HealthKit workout access on the watch. Allow it;
 without it counting works only while the app is in front.
+
+A `WatchMessage.alert` from the phone plays one `.notification` haptic without
+touching the token, target, reps, or phase. It is best-effort: the phone sends it
+only when the watch link is reachable.
 
 ## Record a movement for the library
 

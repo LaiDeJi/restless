@@ -139,9 +139,16 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
 9. Editing is locked while the session is performing, resting, or paused; the
    timer hides EDIT and SESSIONS is read-only with its lock banner. Switching
    tabs must not change or pause the set or rest.
-10. The prototype is silent. Sound and rest-end notifications are undecided, not
-    an omission to fix silently. The watch plays one haptic when a set target is
-    reached and when a recording stops.
+10. The prototype is silent. Completion alerts are decided: Restless in the
+    foreground plays one phone haptic (and a reachable watch gets one haptic);
+    in the background one local notification is scheduled when the app
+    backgrounds and left for the system to deliver at the deadline, including
+    while the app is still executing. iOS mirrors it to the paired watch, so
+    the app sends no second watch alert. No alerting Live Activity update and
+    no system alarm is scheduled. The prototype simulates the notification card
+    visually and adds no audio. The watch plays one haptic when a set target is
+    reached and when a recording stops, plus one notification haptic for a
+    reachable foreground completion.
 11. The watch counts the watch arm only. Counting runs in an `HKWorkoutSession`,
     so motion continues with the wrist down and the screen off; if workout
     authorization is denied it falls back to the foreground. Recording a

@@ -146,18 +146,7 @@ struct PlanListRow<Destination: View, Content: View>: View {
     }
 
     private var gripDots: some View {
-        VStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: 4) {
-                    Circle().frame(width: 3, height: 3)
-                    Circle().frame(width: 3, height: 3)
-                }
-            }
-        }
-        .foregroundStyle(.white.opacity(isLocked ? 0.16 : 0.42))
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
-        .accessibilityHidden(true)
+        PlanGripDots(dimmed: isLocked)
     }
 
     private var trash: some View {
@@ -183,6 +172,122 @@ struct PlanListRow<Destination: View, Content: View>: View {
     }
 }
 
+/// The grip's dots, shared by the plan rows and the SESSIONS cards.
+struct PlanGripDots: View {
+    let dimmed: Bool
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: 4) {
+                    Circle().frame(width: 3, height: 3)
+                    Circle().frame(width: 3, height: 3)
+                }
+            }
+        }
+        .foregroundStyle(.white.opacity(dimmed ? 0.16 : 0.42))
+        .frame(width: 44, height: 44)
+        .contentShape(Rectangle())
+        .accessibilityHidden(true)
+    }
+}
+
+/// A SESSIONS card with the same trailing grip and drop target as a plan row.
+/// The card keeps its own tap action; the grip is a sibling, never the button.
+struct SessionDragRow<Content: View>: View {
+    let itemID: UUID
+    let isLocked: Bool
+    @Binding var draggingID: UUID?
+    @Binding var dropTargetID: UUID?
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onReorder: (UUID, UUID) -> Void
+    let onDropEnded: () -> Void
+    let onOpen: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var rowSize: CGSize = .zero
+
+    private var isDragSource: Bool { !isLocked && draggingID == itemID }
+    private var isDropTarget: Bool {
+        !isLocked && dropTargetID == itemID && draggingID != nil && draggingID != itemID
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button(action: onOpen) {
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(isDropTarget ? Theme.setAccent.opacity(0.55) : .clear, lineWidth: 1)
+                    )
+                    .opacity(isDragSource ? 0.35 : 1)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAction(named: "Move up") {
+                if !isLocked { onMoveUp() }
+            }
+            .accessibilityAction(named: "Move down") {
+                if !isLocked { onMoveDown() }
+            }
+
+            grip
+        }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            rowSize = size
+        }
+        .onDrop(
+            of: [.text],
+            delegate: PlanDropDelegate(
+                targetID: itemID,
+                draggingID: $draggingID,
+                dropTargetID: $dropTargetID,
+                onReorder: onReorder,
+                onDropEnded: onDropEnded
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var grip: some View {
+        if isLocked {
+            PlanGripDots(dimmed: true)
+        } else {
+            PlanGripDots(dimmed: false)
+                .overlay {
+                    PlanDragHandle(
+                        itemID: itemID,
+                        previewSize: rowSize,
+                        trailingInset: 0,
+                        draggingID: $draggingID,
+                        dropTargetID: $dropTargetID,
+                        preview: { size in dragPreview(size: size) }
+                    )
+                    .frame(width: 44, height: 44)
+                }
+        }
+    }
+
+    private func dragPreview(size: CGSize) -> some View {
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Theme.background)
+
+            content()
+        }
+        .frame(width: max(size.width, 320), height: max(size.height, 72))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.14), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.7), radius: 26, x: 0, y: 16)
+    }
+}
+
 /// The grip's 44 × 44 area catches the drag; the floating preview is drawn
 /// separately so it is not clipped to the grip. The hit test is bounded on both
 /// axes: an x-only check would claim a vertical strip and steal taps from the
@@ -202,7 +307,7 @@ private final class PlanDragSurfaceView: UIView {
 /// Reorders as the dragged row enters another row, so the list follows the
 /// finger instead of waiting for the drop. The handler receives stable ids, and
 /// each screen looks up the live indexes, so a fast drag cannot use stale ones.
-private struct PlanDropDelegate: DropDelegate {
+struct PlanDropDelegate: DropDelegate {
     let targetID: UUID
     @Binding var draggingID: UUID?
     @Binding var dropTargetID: UUID?
@@ -239,7 +344,7 @@ private struct PlanDropDelegate: DropDelegate {
 /// The grip's drag source. A UIKit drag interaction is the one place that
 /// reports both ends of the session, so the lifted source clears even when the
 /// drop lands outside every row.
-private struct PlanDragHandle<Preview: View>: UIViewRepresentable {
+struct PlanDragHandle<Preview: View>: UIViewRepresentable {
     let itemID: UUID
     let previewSize: CGSize
     let trailingInset: CGFloat

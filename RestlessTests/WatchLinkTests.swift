@@ -105,3 +105,27 @@ func disarmClearsArm() {
     #expect(link.armed == nil)
     #expect(transport.sent.last == .disarm)
 }
+
+@MainActor
+@Test("A reachable watch gets one alert haptic message")
+func alertIfReachableSendsOneMessage() {
+    let transport = FakeTransport()
+    let link = WatchLink(transport: transport)
+
+    link.alertIfReachable()
+
+    #expect(transport.sent == [.alert])
+}
+
+@MainActor
+@Test("An unreachable watch gets no alert message")
+func alertIfUnreachableSendsNothing() {
+    let transport = FakeTransport()
+    transport.isReachable = false
+    transport.onReachabilityChange?(false)
+    let link = WatchLink(transport: transport)
+
+    link.alertIfReachable()
+
+    #expect(transport.sent.isEmpty)
+}

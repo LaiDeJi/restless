@@ -27,6 +27,7 @@ struct SessionEditorScreen: View {
     @State private var dropTargetID: UUID?
     @State private var nameFieldFrame: CGRect = .zero
     @State private var showingNewBlock = false
+    @State private var showingRestartConfirmation = false
     @FocusState private var nameFocused: Bool
 
     private var isLocked: Bool { engine.snapshot.isLocked }
@@ -74,6 +75,14 @@ struct SessionEditorScreen: View {
         .onChange(of: isLocked) { _, locked in
             if locked { clearDrag() }
         }
+        .onChange(of: engine.snapshot.phase) { _, _ in
+            showingRestartConfirmation = false
+        }
+        .modifier(
+            RestartConfirmationAlert(isPresented: $showingRestartConfirmation) {
+                if let draft { restart(draft) }
+            }
+        )
         .navigationDestination(isPresented: $showingNewBlock) {
             if let draft {
                 BlockEditorScreen(draft: draft, target: .staged)
@@ -93,7 +102,7 @@ struct SessionEditorScreen: View {
                 header
                 kicker("SESSION")
                 nameField
-                summary(draft.session)
+                sessionSummary(draft.session)
 
                 if isActive && engine.snapshot.doneSets > 0 && !isLocked {
                     Text("EDITING THIS SESSION RESTARTS IT.")
@@ -170,14 +179,6 @@ struct SessionEditorScreen: View {
                 guard !capped.isEmpty else { return }
                 draft?.edit { $0.name = capped }
             }
-    }
-
-    private func summary(_ session: WorkoutPreset) -> some View {
-        Text("\(plural(session.blocks.count, "BLOCK", "BLOCKS")) · \(plural(session.totalSets, "SET", "SETS")) · \(durationString(session.totalRest)) TOTAL REST")
-            .font(Theme.TypeScale.body)
-            .tracking(0.2)
-            .foregroundStyle(Theme.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func blockRow(
@@ -272,7 +273,7 @@ struct SessionEditorScreen: View {
             } else if isActive {
                 if engine.snapshot.doneSets > 0 {
                     Button {
-                        restart(draft)
+                        showingRestartConfirmation = true
                     } label: {
                         footerButtonLabel("RESTART SESSION", prominent: false)
                     }
@@ -475,7 +476,7 @@ struct SessionEditorScreen: View {
     private func restart(_ draft: SessionDraftStore) {
         guard case .existing = mode else { return }
         flushAll()
-        engine.use(NameRules.normalize(draft.session), startImmediately: true)
+        engine.use(NameRules.normalize(draft.session))
         router.showTimer()
         router.sessionsPath.removeAll()
     }
@@ -498,4 +499,30 @@ struct SessionEditorScreen: View {
         }
         router.sessionsPath.removeAll()
     }
+}
+
+/// One confirmation for both restart entry points. The timer has its own copy
+/// of the same alert; the words must stay identical.
+private struct RestartConfirmationAlert: ViewModifier {
+    @Binding var isPresented: Bool
+    let onConfirm: () -> Void
+
+    func body(content: Content) -> some View {
+        content.alert("Restart this session?", isPresented: $isPresented) {
+            Button("Restart Session", role: .destructive, action: onConfirm)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears all completed sets, cancels the current rest, and returns to block 1, set 1.")
+        }
+    }
+}
+
+/// The editor's one-line totals. Kept out of the view body so the screen type
+/// stays inside its length budget.
+private func sessionSummary(_ session: WorkoutPreset) -> some View {
+    Text("\(plural(session.blocks.count, "BLOCK", "BLOCKS")) · \(plural(session.totalSets, "SET", "SETS")) · \(durationString(session.totalRest)) TOTAL REST")
+        .font(Theme.TypeScale.body)
+        .tracking(0.2)
+        .foregroundStyle(Theme.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
 }

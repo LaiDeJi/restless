@@ -26,6 +26,7 @@ struct RestlessLiveActivity: Widget {
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.62))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                         Text(positionLabel(context))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.45))
@@ -67,9 +68,12 @@ struct RestlessLiveActivity: Widget {
                     .foregroundStyle(snapshot.accentColor)
             } minimal: {
                 CompactTimerText(context: context)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(snapshot.accentColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .allowsTightening(true)
             }
             .widgetURL(URL(string: "restless://session"))
             .keylineTint(snapshot.accentColor)
@@ -152,7 +156,7 @@ private struct LockScreenPanel: View {
                         .tracking(0.2)
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.55)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -303,7 +307,11 @@ private struct CompactTimerText: View {
                 Text(clockString(snapshot.duration))
             }
         case .performing:
-            Text(clockString(snapshot.secondsRemainingSetNow))
+            if let deadline = snapshot.setDeadline {
+                Text(timerInterval: Date.now...deadline, countsDown: true)
+            } else {
+                Text(clockString(snapshot.secondsRemainingSetNow))
+            }
         case .paused:
             Text(clockString(snapshot.pausedRemaining))
         case .ready:

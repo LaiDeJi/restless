@@ -11,12 +11,12 @@ func queueNameTrimsAndCaps() {
     #expect(list.items.map(\.name) == ["Cable Fly"])
 
     let longQueued = list.queue(
-        name: "  A movement name that is far too long  ",
+        name: "  A movement name that is far too long for the cap  ",
         condition: .time,
         target: 60
     )
     #expect(longQueued)
-    #expect(list.items[1].name == "A movement name th")
+    #expect(list.items[1].name == "A movement name that is far too long for")
 }
 
 @Test("An empty name is not queued")

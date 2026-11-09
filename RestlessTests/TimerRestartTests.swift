@@ -120,7 +120,20 @@ func restartHiddenWhenDone() {
     #expect(snapshot.primaryAction == .restart)
 }
 
-@Test("The second restart tap lands ready at block 1 set 1 with zero sets")
+@Test("START AGAIN from done starts directly at block 1")
+func startAgainStartsDirectly() {
+    var snapshot = ready(pair)
+    runToDone(&snapshot)
+    #expect(snapshot.phase == .done)
+
+    SessionTransitions.apply(.restart, to: &snapshot, now: start)
+
+    #expect(snapshot.phase == .ready)
+    #expect(snapshot.doneSets == 0)
+    #expect(!snapshot.canRestart)
+}
+
+@Test("The restart transition lands at the start gate at block 1 set 1 with zero sets")
 func restartLandsOnTheFirstSet() {
     var snapshot = ready(pair)
     snapshot.setDone(now: start)
@@ -130,7 +143,7 @@ func restartLandsOnTheFirstSet() {
 
     SessionTransitions.apply(.restart, to: &snapshot, now: start)
 
-    #expect(snapshot.phase == .ready)
+    #expect(snapshot.phase == .notStarted)
     #expect(snapshot.doneSets == 0)
     #expect(snapshot.position.blockIndex == 0)
     #expect(snapshot.position.round == 1)
@@ -147,7 +160,7 @@ func restartClearsAPausedRest() {
 
     snapshot.restart(now: start)
 
-    #expect(snapshot.phase == .ready)
+    #expect(snapshot.phase == .notStarted)
     #expect(snapshot.doneSets == 0)
     #expect(snapshot.restKind == nil)
     #expect(snapshot.deadline == nil)

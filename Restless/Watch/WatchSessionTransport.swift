@@ -50,7 +50,7 @@ final class WatchSessionTransport: NSObject, WatchTransport {
         case .startRecording:
             // Queued: the watch may be asleep now and start when it wakes.
             _ = session.transferUserInfo(payload)
-        case .progress, .cancelRecording:
+        case .progress, .alert, .cancelRecording:
             // Only useful while the watch app is in front; drop it otherwise.
             guard session.isReachable else { return }
             session.sendMessage(payload, replyHandler: nil, errorHandler: nil)

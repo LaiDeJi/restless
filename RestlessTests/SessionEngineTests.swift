@@ -56,18 +56,17 @@ func pauseDoesNotTouchTimedSet() {
 }
 
 @MainActor
-@Test("Activation opens the gate and a direct restart starts ready")
+@Test("Activation and restart open the start gate")
 func activationGate() {
     SessionStore.clear()
     let engine = SessionEngine(preset: timed)
     #expect(engine.snapshot.phase == .notStarted)
 
+    engine.perform(.startSession)
+    #expect(engine.snapshot.phase == .ready)
+
     engine.use(timed)
     #expect(engine.snapshot.phase == .notStarted)
-    #expect(engine.snapshot.doneSets == 0)
-
-    engine.use(timed, startImmediately: true)
-    #expect(engine.snapshot.phase == .ready)
     #expect(engine.snapshot.doneSets == 0)
     SessionStore.clear()
 }

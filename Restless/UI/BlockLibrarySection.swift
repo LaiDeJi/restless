@@ -52,7 +52,8 @@ struct BlockLibrarySection: View {
                     .font(Theme.TypeScale.rowTitle)
                     .tracking(0.2)
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(record.movement.profile?.usesForearmSignal == true
                      ? "PROFILE · MANUAL"

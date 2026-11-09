@@ -26,7 +26,9 @@ enum SessionDraftCommit {
         if session.name == "New session" {
             session.name = NameRules.uniqueName("New session", used: usedNames)
         }
+        PresetRepository.normalizeOrder(in: context)
         let record = PresetRecord(session)
+        record.sortIndex = PresetRepository.fetchAll(context).count
         context.insert(record)
         try? context.save()
         return record

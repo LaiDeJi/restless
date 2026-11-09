@@ -141,7 +141,7 @@ func addOrReuseMovement() throws {
     let capped = try #require(
         MovementRepository.addOrReuse(name: "  Cable fly variation  ", in: context)
     )
-    #expect(capped.name == "Cable fly variatio")
+    #expect(capped.name == "Cable fly variation")
     #expect(capped.profile == nil)
 
     #expect(MovementRepository.addOrReuse(name: "   ", in: context) == nil)

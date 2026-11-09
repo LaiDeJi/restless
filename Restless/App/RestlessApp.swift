@@ -13,7 +13,10 @@ struct RestlessApp: App {
             self.container = container
             let context = ModelContext(container)
             let preset = PresetRepository.seedIfNeeded(in: context)
-            let engine = SessionEngine(preset: preset)
+            let engine = SessionEngine(
+                preset: preset,
+                scheduler: SystemCountdownAlertScheduler()
+            )
             engine.movementNamesProvider = {
                 MovementRepository.names(in: context)
             }

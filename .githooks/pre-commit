@@ -4,5 +4,27 @@
 # SwiftLint warnings do not fail (that matches the build phase); the OpenSpec
 # check does, so a spec left mid-edit cannot be committed.
 
+# Xcode and the GUI git clients launch hooks with a bare PATH, so add the usual
+# install locations: Homebrew, user-local bins, and nvm's node bins (openspec is
+# a global npm package, so it moves with the node version).
+for dir in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" \
+  "$HOME"/.nvm/versions/node/*/bin; do
+  [ -d "$dir" ] && PATH="$PATH:$dir"
+done
+export PATH
+
+missing=
+for tool in swiftlint openspec; do
+  command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+done
+if [ -n "$missing" ]; then
+  echo "pre-commit: not on PATH:$missing" >&2
+  echo "Install with 'brew install swiftlint' and 'npm i -g @fission-ai/openspec'," >&2
+  echo "or commit with --no-verify to skip both gates." >&2
+  exit 1
+fi
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
 swiftlint lint --quiet --reporter summary || exit 1
 openspec validate --all --strict || exit 1

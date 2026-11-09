@@ -23,7 +23,7 @@ enum EndCondition { case reps, time, manual }
 
 struct Movement {
     var id: UUID
-    var name: String        // trimmed, 18 characters
+    var name: String        // trimmed, 40 characters
     var profile: MovementProfile?   // nil until recorded
 }
 
@@ -36,7 +36,7 @@ struct BlockMovement {
 
 struct WorkoutBlock {
     var id: UUID
-    var name: String        // trimmed, 18 characters
+    var name: String        // trimmed, 40 characters
     var rounds: Int         // 1 or more
     var setsPerRound: Int   // 1 or more
     var setRest: Int        // seconds; 0 or 15...600, step 15
@@ -46,7 +46,7 @@ struct WorkoutBlock {
 
 struct WorkoutPreset {
     var id: UUID
-    var name: String        // trimmed, 18 characters
+    var name: String        // trimmed, 40 characters
     var blocks: [WorkoutBlock]      // never empty
 }
 ```
@@ -163,7 +163,7 @@ Transitions and the guards that matter:
 - **Pause** is valid only in `resting`; **resume** only in `paused`. A timed set is never paused. Resume recomputes the deadline from the frozen remaining, so paused time never eats the rest.
 - **Start again** resets to `ready`, `doneSets = 0`, empty rest and set fields, block 1. It is a direct start, not the gate.
 - **Use this session** activates it and resets to `notStarted` with zero completed sets.
-- **Restart session** in the editor starts directly: `ready` at block 1 with zero completed sets, never the gate.
+- **Restart session** in the editor returns to the start gate at block 1 with zero completed sets.
 - A committed edit to the **active** session's plan resets the session to `notStarted` with zero completed sets, no rest, and no running set. Editing another session never touches the running one.
 - Launch, and an install with no saved run, opens in `notStarted`. A restored snapshot keeps the phase it stored, so an in-flight `ready`/`resting` session from before a start gate continues rather than being interrupted.
 - Every mutation goes through one entry point (`SessionTransitions.apply`) so the button, the island link and the URL handler cannot drift. The reps completion from the watch uses the same `.setDone`.
@@ -201,7 +201,8 @@ Use `Text(timerInterval:pauses:countsDown:)` for the rest and work countdowns on
 - A block movement carries its own end condition and target; the library has no default to copy. A reps set also ends when the watch reaches its target; SET DONE remains available for every set. REPS and TIME label the target.
 - The library lives **inside SESSIONS** as a `MOVEMENTS` entry, not as a third tab. The two-tab shell and its "switching tabs never changes the rest" contract stay intact.
 - Library edits (name) do not reset the running session; they are not a plan change.
-- Names trim and cap at 18 characters: empty session → `Untitled`, empty block → `Untitled block`, empty movement → `Untitled movement`.
+- Names trim and cap at 40 characters, and a pasted newline, carriage return, or tab becomes a space before the trim: empty session → `Untitled`, empty block → `Untitled block`, empty movement → `Untitled movement`. Names are single-line data.
+- Long names: a SESSIONS card and a movement or pending row wrap to two lines; the timer header, block strip, position strip, expanded island, and Lock Screen rows stay on one line by scaling or truncating. A 40-character name must not move the ring or grow the 160-point panel.
 
 ## Watch counting
 
@@ -213,13 +214,13 @@ Counting runs in an `HKWorkoutSession`, so the watch keeps sampling with the wri
 
 Two persistent bottom tabs, `TIMER` and `SESSIONS`; TIMER is the default.
 
-- `TIMER` shows the live session. `EDIT` opens the active session in SESSIONS and is hidden during a set or rest. A `↺` restart pill sits beside EDIT once at least one set is done, stays available while EDIT is hidden, and is absent in `done`, where START AGAIN is the primary action. Its first tap arms `TAP AGAIN` in the round-rest amber without changing the session; the second applies the restart transition — ready at block 1, round 1, set 1, zero completed sets, never the gate. The armed state clears on any phase change, on leaving the timer, and on return. It is one session action, not an edit, so no alert and no new transition.
-- `SESSIONS` lists every session card (`name`, `n BLOCKS · n SETS · rest REST`, `ACTIVE` badge), then a `MOVEMENTS` card with the library. The add control opens the new-session editor on an unsaved draft; the card appears only after DONE or USE THIS SESSION. A session opens its ordered blocks; a block edits its rounds, sets per round, rests, and movements; a movement opens its end condition and target. Blocks and movements reorder by their grip and delete from their row. The library opens the flat movement list and a movement detail; both return to SESSIONS.
+- `TIMER` shows the live session. `EDIT` opens the active session in SESSIONS and is hidden during a set or rest. A `↺` restart pill sits beside EDIT once at least one set is done, stays available while EDIT is hidden, and is absent in `done`, where START AGAIN is the primary action. Tapping it opens one confirmation dialog: `Restart this session?`, `This clears all completed sets, cancels the current rest, and returns to block 1, set 1.`, a destructive `Restart Session`, and `Cancel`. Cancelling changes nothing. Confirming applies the restart transition — the start gate at block 1, round 1, set 1, zero completed sets and no Live Activity. The dialog closes when the phase it was opened in changes, on leaving the timer, and when the restart control disappears. The session editor's `RESTART SESSION` opens the same dialog and keeps its flush and return-to-timer path.
+- `SESSIONS` lists every session card (`name`, `n BLOCKS · n SETS · rest REST`, `ACTIVE` badge), then a `MOVEMENTS` card with the library. The order is manual and persisted: each card has the same 44 × 44 grip as a plan row, drag and drop reorders the list, a new session appends at the end, and the order survives relaunch. The `ACTIVE` badge stays on its own card and is never pinned to the top. Reordering writes the order only: it never activates, edits, or resets a session, and the grip is disabled while editing is locked. VoiceOver offers `Move up` and `Move down` on the card. The add control opens the new-session editor on an unsaved draft; the card appears only after DONE or USE THIS SESSION. A session opens its ordered blocks; a block edits its rounds, sets per round, rests, and movements; a movement opens its end condition and target. Blocks and movements reorder by their grip and delete from their row. The library opens the flat movement list and a movement detail; both return to SESSIONS.
 - An island link opens the app on the TIMER tab and then applies its action. Launch and `onOpenURL` handling live at the root so they work from either tab.
 
 ## Chrome
 
-On iOS 26 the timer's `EDIT` and restart pills and the SESSIONS add control render with Liquid Glass. On iOS 18 through 25 they keep the flat translucent capsule or circle. The material must not change an action, label, accessibility label, size, or hit area, and the armed restart keeps its `TAP AGAIN` label and amber emphasis with and without glass. Content stays flat: session cards, the countdown ring, the set map, primary buttons, editor fields, and the Live Activity do not use glass. The system tab bar, sheets, and menus keep the glass the system applies to them.
+On iOS 26 the timer's `EDIT` and restart pills and the SESSIONS add control render with Liquid Glass. On iOS 18 through 25 they keep the flat translucent capsule or circle. The material must not change an action, label, accessibility label, size, or hit area, and the restart keeps the same icon, accessibility label, and confirmation dialog with and without glass. Content stays flat: session cards, the countdown ring, the set map, primary buttons, editor fields, and the Live Activity do not use glass. The system tab bar, sheets, and menus keep the glass the system applies to them.
 
 ## Timer presentation
 
@@ -239,7 +240,7 @@ On iOS 26 the timer's `EDIT` and restart pills and the SESSIONS add control rend
 
 Immutable attributes carry the plan itself: the session name and its ordered blocks, each with name, rounds, sets per round, set rest, round rest, and movements with end condition and target. Everything that moves is `ContentState`: `phase`, `doneSets`, `restKind`, `duration`, `deadline`, `pausedRemaining`, and `setDeadline` for a timed set. The timed set's duration comes from the plan's target. Compare the whole plan to decide whether to end and re-request the activity; compare content to decide whether to update it. Launch ends any stale activity and requests a new one only when the session is running.
 
-No activity exists while the session is not started. Entering the gate ends any existing activity and requests none; `START SESSION` requests exactly one. A direct restart builds its final snapshot before the single persistence pass, so it does not end and re-request an activity. At most one activity exists.
+No activity exists while the session is not started. Entering the gate ends any existing activity and requests none; `START SESSION` requests exactly one. A restart lands in the gate and ends the activity, so the next START SESSION requests a new one. At most one activity exists.
 
 The widget builds a display-only snapshot from attributes + state and reuses the app's `kicker`, `subtitle`, `accentColor`, `currentPosition`, and `upcomingRest`. It must not carry its own position or rest maths.
 
@@ -302,7 +303,49 @@ app, so every change to it needs the screen locked with a rest or set running.
 - Tapping the compact island opens the app. It cannot run an action, and compact/minimal regions cannot hold buttons.
 - Current approach: island controls are `Link`s. If an App Group is provisioned for both targets, switch the links to `LiveActivityIntent` buttons so the action no longer opens the app.
 - Counting runs in an `HKWorkoutSession` and keeps sampling with the wrist down. If workout authorization is denied, the watch falls back to the foreground. The phone stays the source of truth and the manual fallback must always work.
-- Apple's rest-end notification and sound are not implemented; the prototype is silent. Decide before adding audio.
+- Completion alerts use one local notification with the system sound when the app is in the background. In-app completion is haptic only; Restless adds no custom audio asset and schedules no system alarm.
+- The local notification is the one background alert. The app does not depend on background execution: the system delivers the notification whether the app is still executing or suspended, and mirrors it to the paired watch.
+
+## Completion alerts
+
+A rest or timed work countdown that reaches zero raises exactly one alert. It
+never completes a set, skips a rest, or creates a second transition; the
+deadline reconciliation is the only state change.
+
+- **Foreground:** one phone haptic (`UINotificationFeedbackGenerator` success)
+  and, when the watch app is reachable, one `WatchMessage.alert` haptic. No
+  banner, no sound, no island expansion. The watch haptic must not change reps,
+  target, or phase.
+- **Background:** one local notification scheduled when the app moves to the
+  background. It is left pending at the deadline, even if the app is still
+  executing, so the system delivers exactly one notification. iOS mirrors it to
+  the paired watch, which plays the notification haptic. The app does not
+  depend on background execution and sends no alerting Live Activity update.
+  No system alarm is scheduled.
+- **Island:** the Live Activity stays a state display. The app updates it on
+  transitions while it is executing, but it never carries an alert
+  configuration and does not expand as part of the alert.
+- **Suspended stale activity:** a suspended app cannot rewrite the activity, so
+  the minimal island can sit at `0:00` after the deadline until the app opens.
+  The notification is the notice; opening it reconciles the activity to `READY`
+  or `DONE`. Do not treat the `0:00` as a new session state.
+- **Copy:** one pure `CompletionAlertCopy` builds the title and body from the
+  post-transition snapshot: `SET REST OVER`, `ROUND REST OVER`, or
+  `WORK SET OVER`, then what finished (`AFTER SET 2`, `AFTER ROUND 2`,
+  `AFTER CURL · NEXT PUSHDOWN`, `AFTER CHEST · NEXT ARMS`) and what follows
+  (`NEXT ROUND 2 OF 4 · NEXT SET 1 OF 4`). A final set reads `SESSION COMPLETE`
+  with the set, block, and total-rest totals. The notification and the timer
+  use the same strings.
+- **Cancellation:** pause, resume (arm again for the resumed deadline), skip,
+  restart, plan change, a zero set rest, an early SET DONE, and a launch after an
+  expired deadline all cancel pending alerts. A notification whose deadline is
+  reached in the background is not cancelled. Per-deadline identifiers let a
+  following countdown be armed without removing the request that is due now.
+- **Permission:** notification permission is requested when the first countdown
+  is armed. Denial is survivable: no background alert, and the session and timer
+  keep working. The prompt is not repeated.
+- The pending notification is cancelled before the foreground haptic, so a
+  deadline never alerts twice.
 
 ## Persistence
 
@@ -316,7 +359,7 @@ A missing or unreadable stored plan falls back to the seeded `Chest` block. A bl
 
 ## Copy
 
-Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `AFTER BENCH PRESS · NEXT INCLINE PRESS`, `AFTER CHEST · NEXT ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `TAP AGAIN`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `REPS`, `HOLD`.
+Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `AFTER BENCH PRESS · NEXT INCLINE PRESS`, `AFTER CHEST · NEXT ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `Restart this session?`, `Restart Session`, `Cancel`, `SET REST OVER`, `ROUND REST OVER`, `WORK SET OVER`, `SESSION COMPLETE`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `REPS`, `HOLD`.
 
 The `CONNECT`, `DISCONNECT`, and `+ REP` controls in the prototype are stand-ins for a real watch and are not production copy.
 
@@ -342,7 +385,7 @@ The timer's last-set primary action is `SET DONE`, not `FINISH SESSION`; the isl
 - Position at every block, round, movement, and set boundary, including the last-set clamp; the map draws one row per round with movement gaps and falls back to the bar above 12 rounds, 12 sets per round group, or 72 dots.
 - Copy: `ROUND r OF R · SET s OF S`, `ROUND r OF R` alone, `SET s OF S` alone, and no segment at 1 × 1.
 - Start set only for a timed set; the work countdown expires into the same rest; SET DONE early starts the rest; a timed set is never paused; pause/resume are rest-only.
-- The gate: a fresh snapshot is not started; START SESSION reaches block 1 set 1 without counting; set done and a second START SESSION in the gate or ready state are ignored; activating a session or committing an active-plan edit returns to the gate; RESTART SESSION lands ready with zero sets.
+- The gate: a fresh snapshot is not started; START SESSION reaches block 1 set 1 without counting; set done and a second START SESSION in the gate or ready state are ignored; activating a session or committing an active-plan edit returns to the gate; RESTART SESSION and the timer's restart also land at the gate with zero sets and no activity.
 - Draggable lists: move a block and a movement up and down, delete one from the row, refuse to delete the last block or movement, and disable both while editing is locked.
 - Staged blocks: a new block starts as `Untitled block` with rounds 1, sets per round 3, the previous block's rests, and no movements; editing it, adding movements, and reordering them leave `session.blocks` unchanged and do not dirty the draft; DONE rejects zero movements; DONE appends the block and flushes once; back or cancel discards it; a two-movement staged block commits at two rounds.
 - Timer hero: the ring centre is the same y for a one-row and a three-row map, for a one-line and a two-line position strip, and when a rest starts and ends; a map taller than the viewport keeps the ring centred on first display and scrolls; a short viewport clamps the ring below the chrome.
@@ -350,10 +393,10 @@ The timer's last-set primary action is `SET DONE`, not `FINISH SESSION`; the isl
 - Pause for longer than the remaining time, then resume: remaining is unchanged and the deadline moves. A rest that expires while the app is inactive reconciles to ready; a timed set that expires while inactive reconciles to its rest.
 - Editing locks during performing, resting, and paused; SESSIONS is read-only with the banner; switching tabs does not change the set or rest; editing the active plan resets, editing another session does not.
 - Watch counting: arming sends the profile and target; stale progress and duplicate completion are ignored; the watch counts the watch arm; the lab still builds and its CSV transfer is unchanged.
-- Restart: `canRestart` is true in ready, performing, resting and paused once a set is done, and false in notStarted and done; the first tap arms without changing the snapshot; the second lands ready at block 1 set 1 with zero sets; a phase change and leaving the timer disarm it; restart during a rest clears the rest.
+- Restart: `canRestart` is true in ready, performing, resting and paused once a set is done, and false in notStarted and done; tapping opens the dialog without changing the snapshot; cancelling leaves the phase and completed sets untouched; confirming lands in the start gate at block 1 set 1 with zero sets and no activity; a phase change and leaving the timer close the dialog; restart during a rest clears the rest. The editor's RESTART SESSION shows the same dialog and returns to the gate.
 - Position strip: multi-block ready and resting carry no block name; a single block names itself only when its name differs from the movement; a block and movement with the same name produce one segment; resting prefixes `UP NEXT`; rounds > 1 gives the round segment, sets per round > 1 the set segment, and 1 × 1 gives neither. No `BLOCK n OF m` anywhere.
 - Library add: one tap appends a MANUAL movement with no target to a saved block and to a staged block, flushes once, and raises a one-round block to two rounds on the second movement; the rows exclude used movements, disappear while locked, and a staged append leaves `session.blocks` unchanged until DONE.
-- Lock Screen panel: the state row reads `SET REST · AFTER SET 5`, `ROUND REST · AFTER ROUND 3`, `WORK · REST 1:00 AFTER`, `PAUSED · AFTER SET 5`, and ready's `SET REST · SET 5 OF 8`; the panel has no separate position or rest row; it fits 160 points with an 18-character movement at default, XXL and xxLarge text sizes and caps there for accessibility sizes.
+- Lock Screen panel: the state row reads `SET REST · AFTER SET 5`, `ROUND REST · AFTER ROUND 3`, `WORK · REST 1:00 AFTER`, `PAUSED · AFTER SET 5`, and ready's `SET REST · SET 5 OF 8`; the panel has no separate position or rest row; it fits 160 points with a 40-character movement at default, XXL and xxLarge text sizes and caps there for accessibility sizes.
 - Migration: a legacy `partsData` record with `R × S` reads as one block with rounds R and sets per round S, one manual movement, and the old rests; a legacy straight count C reads as rounds 1 and sets per round C, and a straight block with several movements splits into one block per movement; a legacy circuit count C reads as rounds C and sets per round 1; four adjacent duplicate circuit rows collapse to one movement with sets per round 4; a `blocksData` JSON round-trip preserves block and movement ids; the active session id survives.
 - Store: a v3 snapshot is ignored and the gate opens; a v4 snapshot keeps its phase.
 - Live Activity: attributes carry every block and movement; a plan change ends the old activity and requests a new one; no activity exists before the start and entering the gate ends a stale one; content updates only on transitions; the start-set link starts a ready timed set; set done during rest is ignored.

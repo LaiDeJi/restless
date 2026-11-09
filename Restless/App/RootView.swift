@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct RootView: View {
@@ -36,13 +37,22 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .environment(router)
         .onChange(of: scenePhase) { _, phase in
+            engine.setActive(phase == .active)
             if phase == .active { engine.refreshFromStore() }
         }
         .onOpenURL { url in
             router.showTimer()
             engine.handle(url)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .countdownAlertOpened)) { _ in
+            router.showTimer()
+            engine.refreshFromStore()
+        }
         .task {
+            engine.setActive(scenePhase == .active)
+            engine.foregroundWatchAlert = { [watchLink] in
+                watchLink.alertIfReachable()
+            }
             watchLink.onComplete = { [engine] in
                 engine.perform(.setDone)
             }

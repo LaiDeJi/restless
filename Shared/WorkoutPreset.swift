@@ -51,7 +51,7 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         let setRest = 0...600
         let setDuration = 15...600
         let restStep = 15
-        let nameLimit = 18
+        let nameLimit = 40
     }
 
     var totalSets: Int {
@@ -158,8 +158,18 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         return copy
     }
 
+    /// Names are single-line data: newlines and tabs from a paste become spaces
+    /// before the trim and the cap.
+    static func flattened(_ raw: String) -> String {
+        raw.replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+
     static func clampedName(_ raw: String, fallback: String) -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let flattened = flattened(raw)
+        let trimmed = flattened.trimmingCharacters(in: .whitespaces)
         return String((trimmed.isEmpty ? fallback : trimmed).prefix(bounds.nameLimit))
     }
 

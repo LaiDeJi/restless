@@ -4,11 +4,15 @@ import SwiftUI
 struct SessionsScreen: View {
     @Environment(SessionEngine.self) private var engine
     @Environment(AppRouter.self) private var router
+    @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query(sort: \PresetRecord.createdAt) private var records: [PresetRecord]
     @Query(sort: \MovementRecord.createdAt) private var movements: [MovementRecord]
+    @State private var draggingID: UUID?
+    @State private var dropTargetID: UUID?
 
     private var isLocked: Bool { engine.snapshot.isLocked }
+    private var orderedRecords: [PresetRecord] { PresetRepository.ordered(records) }
 
     var body: some View {
         ScrollView {
@@ -19,13 +23,21 @@ struct SessionsScreen: View {
                     EditingLockBanner()
                 }
 
-                ForEach(records) { record in
-                    Button {
-                        open(record)
-                    } label: {
-                        card(record)
-                    }
-                    .buttonStyle(.plain)
+                ForEach(orderedRecords) { record in
+                    SessionDragRow(
+                        itemID: record.id,
+                        isLocked: isLocked,
+                        draggingID: $draggingID,
+                        dropTargetID: $dropTargetID,
+                        onMoveUp: { move(record, by: -1) },
+                        onMoveDown: { move(record, by: 1) },
+                        onReorder: { source, target in
+                            move(source, onto: target)
+                        },
+                        onDropEnded: persistOrder,
+                        onOpen: { open(record) },
+                        content: { card(record) }
+                    )
                 }
 
                 librarySection
@@ -48,6 +60,16 @@ struct SessionsScreen: View {
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
+        .onChange(of: isLocked) { _, locked in
+            if locked {
+                draggingID = nil
+                dropTargetID = nil
+            }
+        }
+        .onDisappear {
+            draggingID = nil
+            dropTargetID = nil
+        }
     }
 
     private var header: some View {
@@ -130,7 +152,8 @@ struct SessionsScreen: View {
                 .font(Theme.TypeScale.rowTitle)
                 .tracking(0.2)
                 .foregroundStyle(.white)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text("\(plural(total.blocks.count, "BLOCK", "BLOCKS")) · \(plural(total.totalSets, "SET", "SETS")) · \(durationString(total.totalRest)) REST")
                 .font(Theme.TypeScale.meta.weight(.medium))
@@ -211,6 +234,43 @@ struct SessionsScreen: View {
 
     private func open(_ record: PresetRecord) {
         router.sessionsPath.append(.session(record.id))
+    }
+
+    /// Drag entry: move the in-memory order and assign contiguous indexes. The
+    /// store is written once on drop end, not on every row entered.
+    private func move(_ sourceID: UUID, onto targetID: UUID) {
+        guard !isLocked else { return }
+        var list = orderedRecords
+        guard let from = list.firstIndex(where: { $0.id == sourceID }),
+              let to = list.firstIndex(where: { $0.id == targetID }),
+              from != to else { return }
+        let record = list.remove(at: from)
+        list.insert(record, at: to)
+        applyOrder(list)
+    }
+
+    /// Accessibility Move up/down is one discrete action, so it persists at once.
+    private func move(_ record: PresetRecord, by delta: Int) {
+        guard !isLocked else { return }
+        var list = orderedRecords
+        guard let index = list.firstIndex(where: { $0.id == record.id }) else { return }
+        let target = index + delta
+        guard list.indices.contains(target) else { return }
+        let moved = list.remove(at: index)
+        list.insert(moved, at: target)
+        applyOrder(list)
+        persistOrder()
+    }
+
+    private func applyOrder(_ list: [PresetRecord]) {
+        for (index, record) in list.enumerated() {
+            record.sortIndex = index
+        }
+    }
+
+    private func persistOrder() {
+        guard !isLocked else { return }
+        try? context.save()
     }
 
     private func addSession() {

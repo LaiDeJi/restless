@@ -44,12 +44,18 @@ Session cards, the countdown ring, the set map, primary action buttons, editor f
 - **WHEN** the session cards and MOVEMENTS card are shown
 - **THEN** those cards are flat and the add control is the only glass element in the page
 
-### Requirement: Glass does not carry meaning alone
+### Requirement: Glass stays secondary to control state
 
-A control's state SHALL remain legible without relying on the material. The armed restart state SHALL keep its `TAP AGAIN` label and amber emphasis with and without Liquid Glass.
+A control's state SHALL remain legible without relying on the material. The restart control SHALL keep the same icon, accessibility label, and confirmation action with and without Liquid Glass; the material MUST NOT be the only indication that a restart is available.
 
-#### Scenario: Armed restart on both materials
+#### Scenario: Restart on both materials
 
-- **GIVEN** an armed restart control
-- **WHEN** it is shown on iOS 18 and on iOS 26
-- **THEN** both versions show `TAP AGAIN` in the round-rest amber, not a material-only change
+- **GIVEN** a running session with a completed set
+- **WHEN** the restart control is shown on iOS 18 and on iOS 26
+- **THEN** both versions show the same restart icon, announce Restart session, and open the same confirmation dialog
+
+#### Scenario: Glass is not the state
+
+- **GIVEN** iOS 26 with Liquid Glass enabled
+- **WHEN** the restart control is shown
+- **THEN** its availability and meaning are clear without relying on the material

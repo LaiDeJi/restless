@@ -5,13 +5,19 @@ import Observation
 @Observable
 final class SessionEngine {
     private(set) var snapshot: SessionSnapshot
+    private(set) var isActive = true
     private var ticker: Task<Void, Never>?
 
     /// Movement names for the Live Activity attributes. The engine owns the
     /// session, not the library, so the app supplies the lookup.
     var movementNamesProvider: (() -> [UUID: String])?
 
-    init(preset: WorkoutPreset) {
+    /// Set by RootView: a best-effort watch haptic for a foreground completion.
+    var foregroundWatchAlert: (() -> Void)?
+
+    @ObservationIgnored private var alertCenter: CompletionAlertCenter!
+
+    init(preset: WorkoutPreset, scheduler: any CountdownAlertScheduler = NoopCountdownAlertScheduler()) {
         if let saved = SessionStore.load(), saved.preset.id == preset.id {
             var restored = saved
             _ = restored.reconcile(now: .now)
@@ -19,7 +25,15 @@ final class SessionEngine {
         } else {
             snapshot = .initial(preset)
         }
+        alertCenter = CompletionAlertCenter(
+            scheduler: scheduler,
+            movementNames: { [weak self] in self?.movementNames ?? [:] },
+            watchAlert: { [weak self] in self?.foregroundWatchAlert?() }
+        )
         SessionStore.save(snapshot)
+        // No alert may survive a relaunch of a countdown that already ended.
+        alertCenter.cancelAll()
+        alertCenter.stopAlerting()
         restartTicker()
         // Read the names when the task runs: the app installs the library
         // provider right after constructing the engine.
@@ -31,16 +45,35 @@ final class SessionEngine {
 
     func perform(_ action: SessionAction) {
         SessionTransitions.apply(action, to: &snapshot)
+        alertCenter.sessionChanged(snapshot, isActive: isActive)
         persist()
         restartTicker()
     }
 
-    /// Activation lands in the start gate; a direct restart builds the final
-    /// ready snapshot before the single persistence pass.
-    func use(_ preset: WorkoutPreset, startImmediately: Bool = false) {
-        var next = SessionSnapshot.initial(preset)
-        if startImmediately { next.startSession() }
-        snapshot = next
+    /// A deadline transition. The alert centre leaves the notification that is
+    /// due now to the system, so this path must not report a session change
+    /// that would cancel it.
+    private func performDeadline(_ action: SessionAction) {
+        SessionTransitions.apply(action, to: &snapshot)
+        persist()
+        restartTicker()
+    }
+
+    /// Active, inactive, or background. Leaving the app during a countdown arms
+    /// one local notification for its deadline; the system delivers it and the
+    /// app does not cancel it while the deadline is reached in the background.
+    func setActive(_ active: Bool) {
+        isActive = active
+        alertCenter.setActive(active, snapshot: snapshot)
+    }
+
+    /// Activation and restart land in the start gate: the previous countdown is
+    /// cancelled, the activity is ended, and nothing runs until START SESSION.
+    func use(_ preset: WorkoutPreset) {
+        alertCenter.cancelAll()
+        alertCenter.stopAlerting()
+        snapshot = SessionSnapshot.initial(preset)
+        alertCenter.sessionChanged(snapshot, isActive: isActive)
         SessionStore.save(snapshot)
         restartTicker()
         let names = movementNames
@@ -53,7 +86,9 @@ final class SessionEngine {
         var restored = saved
         _ = restored.reconcile(now: .now)
         guard restored != snapshot else { return }
+        alertCenter.cancelAll()
         snapshot = restored
+        alertCenter.sessionChanged(snapshot, isActive: isActive)
         SessionStore.save(snapshot)
         restartTicker()
         let names = movementNames
@@ -99,13 +134,31 @@ final class SessionEngine {
                 if self.snapshot.phase == .resting,
                    let deadline = self.snapshot.deadline,
                    Date.now >= deadline {
-                    self.perform(.finishRest)
+                    self.performDeadline(.finishRest)
+                    let alert = CompletionAlertCopy.restFinished(
+                        self.snapshot,
+                        movementNames: self.movementNames
+                    )
+                    await self.alertCenter.countdownReached(
+                        self.snapshot,
+                        alert: alert,
+                        isActive: self.isActive
+                    )
                     return
                 }
                 if self.snapshot.isPerforming,
                    let setDeadline = self.snapshot.setDeadline,
                    Date.now >= setDeadline {
-                    self.perform(.setDone)
+                    self.performDeadline(.setDone)
+                    let alert = CompletionAlertCopy.workFinished(
+                        self.snapshot,
+                        movementNames: self.movementNames
+                    )
+                    await self.alertCenter.countdownReached(
+                        self.snapshot,
+                        alert: alert,
+                        isActive: self.isActive
+                    )
                     return
                 }
                 guard self.snapshot.phase == .resting || self.snapshot.isPerforming else { return }

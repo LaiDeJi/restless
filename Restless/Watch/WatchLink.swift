@@ -86,6 +86,13 @@ final class WatchLink {
         transport.send(.disarm)
     }
 
+    /// A best-effort extra for a foreground completion; the phone haptic is the
+    /// guarantee, so an unreachable watch sends nothing.
+    func alertIfReachable() {
+        guard reachable else { return }
+        transport.send(.alert)
+    }
+
     func handleProgress(token: UUID, reps: Int) {
         guard let armed, armed.token == token else { return }
         self.reps = min(max(reps, 0), armed.target)

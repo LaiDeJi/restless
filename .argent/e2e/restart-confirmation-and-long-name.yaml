@@ -1,0 +1,142 @@
+steps:
+  - launch: com.whc.restless
+  # The first launch after an install may still show the system notification
+  # prompt. Allow it; with permission already granted this tap is a no-op.
+  - wait: 900
+  - tap:
+      x: 0.684
+      y: 0.593
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  # A completed set makes RESTART available.
+  - tap:
+      x: 0.5
+      y: 0.868
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET DONE
+      timeoutMs: 5000
+  - tap:
+      x: 0.5
+      y: 0.868
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: PAUSE
+      timeoutMs: 5000
+  # The first countdown asks for notification permission. Allow it; on a
+  # re-run where permission is already granted this tap lands on the empty ring.
+  - wait: 700
+  - tap:
+      x: 0.684
+      y: 0.593
+  # Cancel leaves the rest and its completed set untouched.
+  - tap:
+      x: 0.89
+      y: 0.096
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: Restart this session?
+      timeoutMs: 3000
+  - tap:
+      x: 0.5
+      y: 0.625
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: PAUSE
+      timeoutMs: 3000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: AFTER SET 1
+      timeoutMs: 3000
+  # Confirm returns to the start gate: nothing runs, so no Live Activity.
+  - tap:
+      x: 0.89
+      y: 0.096
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: Restart Session
+      timeoutMs: 3000
+  - tap:
+      x: 0.5
+      y: 0.558
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BLOCK 1
+      timeoutMs: 3000
+  # A 40-character session name survives the draft and the save.
+  - tap:
+      id: list.bullet.rectangle.fill
+  - tap:
+      id: plus
+  - tap:
+      x: 0.5
+      y: 0.203
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      text: Single-arm cable lateral raise for the r
+  - tap:
+      x: 0.845
+      y: 0.1
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: Single-arm cable lateral raise for the r
+      timeoutMs: 5000

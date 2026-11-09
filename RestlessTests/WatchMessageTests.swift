@@ -64,3 +64,8 @@ private func roundTrip(_ message: WatchMessage) throws -> WatchMessage {
     let decoded = try JSONDecoder().decode(RecordingTracePayload.self, from: data)
     #expect(decoded == payload)
 }
+
+@Test func watchMessageRoundTripsAlert() throws {
+    #expect(try roundTrip(.alert) == .alert)
+    #expect(WatchMessage.alert != WatchMessage.disarm)
+}

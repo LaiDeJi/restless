@@ -84,6 +84,19 @@ struct SessionSnapshot: Codable, Hashable, Sendable {
         doneSets > 0 && phase != .done && phase != .notStarted
     }
 
+    /// The deadline of a running rest or timed work set, if any. This is the
+    /// only countdown that can raise a completion alert.
+    var countdownDeadline: Date? {
+        switch phase {
+        case .resting:
+            return deadline
+        case .performing:
+            return setDeadline
+        case .notStarted, .ready, .paused, .done:
+            return nil
+        }
+    }
+
     func remaining(at now: Date) -> TimeInterval {
         switch phase {
         case .resting:
@@ -234,9 +247,13 @@ extension SessionSnapshot {
         finishRest()
     }
 
+    /// Clears progress. A finished session has nothing to lose, so START AGAIN
+    /// starts directly at set 1; a session with progress returns to the gate so
+    /// no Live Activity is left running.
     mutating func restart(now: Date = .now) {
+        let wasDone = phase == .done
         self = .initial(preset, now: now)
-        phase = .ready
+        if wasDone { phase = .ready }
     }
 
     mutating func replacePreset(_ preset: WorkoutPreset, now: Date = .now) {

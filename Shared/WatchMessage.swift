@@ -7,6 +7,9 @@ enum WatchMessage: Codable, Hashable, Sendable {
     case disarm
     case progress(token: UUID, reps: Int)
     case completion(token: UUID)
+    /// One completion haptic while the watch app is reachable. It never changes
+    /// the armed set, reps, target, or phase.
+    case alert
 
     case startRecording(requestID: UUID, duration: Int)
     case cancelRecording(requestID: UUID)

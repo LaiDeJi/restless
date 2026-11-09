@@ -10,7 +10,7 @@ struct TimerScreen: View {
 
     @ScaledMetric(relativeTo: .largeTitle) private var largeCountdown: CGFloat = 78
     @ScaledMetric(relativeTo: .largeTitle) private var smallCountdown: CGFloat = 52
-    @State private var restartArmed = false
+    @State private var showingRestartConfirmation = false
 
     var body: some View {
         let snapshot = engine.snapshot
@@ -64,13 +64,21 @@ struct TimerScreen: View {
             syncArm(snapshot)
         }
         .onChange(of: snapshot.phase) { _, _ in
-            restartArmed = false
+            showingRestartConfirmation = false
         }
         .onChange(of: snapshot.canRestart) { _, canRestart in
-            if !canRestart { restartArmed = false }
+            if !canRestart { showingRestartConfirmation = false }
         }
         .onChange(of: router.tab) { _, tab in
-            if tab != .timer { restartArmed = false }
+            if tab != .timer { showingRestartConfirmation = false }
+        }
+        .alert("Restart this session?", isPresented: $showingRestartConfirmation) {
+            Button("Restart Session", role: .destructive) {
+                engine.perform(.restart)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears all completed sets, cancels the current rest, and returns to block 1, set 1.")
         }
     }
 
@@ -158,46 +166,25 @@ struct TimerScreen: View {
         .accessibilityLabel("Edit session")
     }
 
-    /// Two taps, like the app's delete arming: the first only arms the control
-    /// and the second applies the existing restart transition.
+    /// Restart is one session action with one consequence; the confirmation
+    /// names it before any progress is cleared.
     private func restartButton(_ snapshot: SessionSnapshot) -> some View {
         Button {
-            guard restartArmed else {
-                restartArmed = true
-                return
-            }
-            restartArmed = false
-            engine.perform(.restart)
+            showingRestartConfirmation = true
         } label: {
-            Group {
-                if restartArmed {
-                    Text("TAP AGAIN")
-                        .font(Theme.TypeScale.compactAction.weight(.bold))
-                        .tracking(0.9)
-                        .foregroundStyle(Theme.roundAccent)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                } else {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                }
-            }
-            .chromeGlass(
-                tint: restartArmed ? Theme.roundAccent.opacity(0.5) : nil,
-                in: Capsule(),
-                fallbackFill: restartArmed
-                    ? Theme.roundAccent.opacity(0.14)
-                    : .white.opacity(0.08),
-                fallbackStroke: restartArmed
-                    ? Theme.roundAccent.opacity(0.34)
-                    : .white.opacity(0.12)
-            )
-            .contentShape(Capsule())
+            Image(systemName: "arrow.counterclockwise")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .chromeGlass(
+                    in: Capsule(),
+                    fallbackFill: .white.opacity(0.08),
+                    fallbackStroke: .white.opacity(0.12)
+                )
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(restartArmed ? "Tap again to restart session" : "Restart session")
+        .accessibilityLabel("Restart session")
     }
 
     // MARK: Blocks
@@ -223,6 +210,7 @@ struct TimerScreen: View {
                                 .font(Theme.TypeScale.label.weight(.bold))
                                 .tracking(0.8)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                         }
                         .foregroundStyle(active ? Theme.ink : .white.opacity(complete ? 0.4 : 0.62))
                         .padding(.horizontal, 12)

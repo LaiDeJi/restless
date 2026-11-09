@@ -317,13 +317,13 @@ func pauseAcrossBlockBoundary() {
     #expect(snapshot.remaining(at: start.addingTimeInterval(600)) == 90)
 }
 
-@Test("Starting again returns to the first set of the first block")
+@Test("Restarting from progress returns to the start gate at the first block")
 func restart() {
     var snapshot = ready(twoBlocks)
     completeSets(3, in: &snapshot)
     snapshot.restart(now: start)
 
-    #expect(snapshot.phase == .ready)
+    #expect(snapshot.phase == .notStarted)
     #expect(snapshot.doneSets == 0)
     #expect(snapshot.restKind == nil)
     #expect(snapshot.position.blockIndex == 0)
@@ -496,7 +496,7 @@ func restartClearsTimedSet() {
     snapshot.startSet(now: start)
     snapshot.restart(now: start)
 
-    #expect(snapshot.phase == .ready)
+    #expect(snapshot.phase == .notStarted)
     #expect(snapshot.setDuration == 0)
     #expect(snapshot.setDeadline == nil)
 }
