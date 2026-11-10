@@ -13,11 +13,12 @@
     rest, and a round rest. Every set ends on one of two conditions: a timed
     hold on the phone or a manual tap.
 
-    Each round runs every movement in order for its sets-per-round sets. A set
-    rest follows every set except the last of its round; a round rest follows
-    the last set of a round. A block with one movement is that movement
-    repeated; two or more movements repeat the group. A sequential pair is two
-    blocks.
+    Each movement runs all of its rounds before the next movement starts: a
+    block with two movements and three rounds runs the first movement's three
+    rounds, then the second's. A set rest separates only the sets inside a
+    round; a round rest follows every round boundary, every movement switch,
+    and every block transition. A block with one movement is that movement
+    repeated. A sequential pair is two blocks.
 
     A timed set runs a work countdown in the performing phase, then starts the
     same rest as any other set. The final set of the final block has no rest.
@@ -1499,7 +1500,9 @@
   }
   .map-row.active .map-label { color: rgba(255,255,255,.72); }
   .map-dots { display: flex; align-items: center; gap: 5px; }
-  .map-gap { width: 5px; flex: 0 0 auto; }
+  /* One gap between movements, one row per round of each movement. */
+  .map-group { display: flex; flex-direction: column; gap: 6px; }
+  .map-group + .map-group { margin-top: 8px; }
 
   /* ---------------------------------------------------------------- segmented controls and chips */
   .seg {
@@ -2072,11 +2075,22 @@
     if (block.setsPerRound > 1) bits.push('SET ' + p.set + ' OF ' + block.setsPerRound);
     return bits.join(' · ');
   }
+  /// Movement-major: each movement runs all of its rounds before the next, so a
+  /// set rest separates only sets inside a round, and every round boundary,
+  /// movement switch, and block transition takes the round rest.
   function blockRest(block, hasNext) {
     if (!block.movements.length) return 0;
-    var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
-    var setRests = safeMul(safeMul(block.rounds, Math.max(0, perRound - 1)), block.setRest);
-    var roundRests = safeAdd(Math.max(0, block.rounds - 1), hasNext ? 1 : 0);
+    var movements = Math.max(1, block.movements.length);
+    var rounds = Math.max(1, block.rounds);
+    var sets = Math.max(1, block.setsPerRound);
+    var setRests = safeMul(
+      safeMul(safeMul(movements, rounds), Math.max(0, sets - 1)),
+      block.setRest
+    );
+    var roundRests = safeAdd(
+      safeMul(movements, Math.max(0, rounds - 1)),
+      safeAdd(Math.max(0, movements - 1), hasNext ? 1 : 0)
+    );
     return safeAdd(setRests, safeMul(roundRests, block.roundRest));
   }
   function sessionTotals(session) {
@@ -2115,11 +2129,12 @@
           set: 0,
           round: 0
         };
-        var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
-        var withinRound = i % perRound;
-        p.round = Math.floor(i / perRound) + 1;
-        p.movementIndex = Math.min(Math.floor(withinRound / Math.max(1, block.setsPerRound)), block.movements.length - 1);
-        p.set = (withinRound % Math.max(1, block.setsPerRound)) + 1;
+        var perMovement = safeMul(Math.max(1, block.rounds), Math.max(1, block.setsPerRound));
+        var movementCount = Math.max(1, block.movements.length);
+        p.movementIndex = Math.min(Math.floor(i / Math.max(1, perMovement)), movementCount - 1);
+        var withinMovement = i % Math.max(1, perMovement);
+        p.round = Math.floor(withinMovement / Math.max(1, block.setsPerRound)) + 1;
+        p.set = (withinMovement % Math.max(1, block.setsPerRound)) + 1;
         p.movement = block.movements[Math.min(p.movementIndex, block.movements.length - 1)];
         return p;
       }
@@ -2179,10 +2194,10 @@
 
     if (p.set < block.setsPerRound) {
       rest = { kind: "set", dur: block.setRest, transition: "set", set: p.set };
-    } else if (p.movementIndex < block.movements.length - 1) {
-      rest = { kind: "set", dur: block.setRest, transition: "movement", from: movement, to: block.movements[p.movementIndex + 1] };
     } else if (p.round < block.rounds) {
       rest = { kind: "round", dur: block.roundRest, transition: "round", round: p.round };
+    } else if (p.movementIndex < block.movements.length - 1) {
+      rest = { kind: "round", dur: block.roundRest, transition: "movement", from: movement, to: block.movements[p.movementIndex + 1] };
     } else if (nextBlock) {
       rest = { kind: "round", dur: block.roundRest, transition: "block", fromBlock: block, toBlock: nextBlock };
     }
@@ -2810,7 +2825,6 @@
     var appended = clone(block);
     appended.rounds = Math.max(1, appended.rounds);
     appended.setsPerRound = Math.max(1, appended.setsPerRound);
-    if (appended.movements.length > 1) appended.rounds = Math.max(appended.rounds, 2);
     session.blocks.push(appended);
     ui.stagedBlock = null;
     markEdited(session);
@@ -2939,8 +2953,8 @@
     if (isLocked()) return;
     restartToGate();
   }
+  /// ROUNDS keeps the value the user typed. Adding a movement never raises it.
   function blockMin(block, key) {
-    if (key === "rounds" && block.movements.length > 1) return 2;
     return 1;
   }
   function bumpBlock(key, dir) {
@@ -3073,9 +3087,7 @@
     var pick = ui.picker || pickerDefault();
     var entries = resolvePickerEntries(pick);
     if (entries.length) {
-      var before = target.movements.length;
       appendPickerEntries(target, entries);
-      if (before < 2 && target.movements.length >= 2) target.rounds = Math.max(target.rounds, 2);
       if (!route.staged) {
         markEdited(session);
         flushEdit();
@@ -3109,14 +3121,12 @@
     var movement = findMovement(movementId);
     if (!block || !movement) return;
     if (block.movements.some(function (bm) { return bm.movementId === movement.id; })) return;
-    var before = block.movements.length;
     block.movements.push({
       id: uid("bm"),
       movementId: movement.id,
       endCondition: "manual",
       target: null
     });
-    if (before < 2 && block.movements.length >= 2 && block.rounds < 2) block.rounds = 2;
     if (!ui.route.staged) {
       markEdited(findSession(ui.route.sessionId));
       flushEdit();
@@ -3452,9 +3462,6 @@
     if (raw) {
       if (editing.key === "rounds" || editing.key === "setsPerRound") {
         next = safeCount(raw, current);
-        if (editing.key === "rounds" && target.object.movements && target.object.movements.length > 1) {
-          next = Math.max(2, next);
-        }
       } else if (editing.key === "target" || editing.key === "defaultTarget") {
         next = safeTarget(target.condition, raw, current);
       } else {
@@ -3650,24 +3657,26 @@
 
   function mapMarkup(session, block, doneInBlock) {
     var total = blockTotalSets(block);
-    var perRound = safeMul(Math.max(1, block.movements.length), Math.max(1, block.setsPerRound));
+    var stepsPerRound = Math.max(1, block.setsPerRound);
+    var rows = safeMul(Math.max(1, block.rounds), Math.max(1, block.movements.length));
     var inner;
     var dots = MAP_LIMITS.dots;
-    if (block.rounds <= MAP_LIMITS.rounds && perRound <= MAP_LIMITS.perRound && total <= dots) {
-      var rows = "";
-      for (var r = 1; r <= block.rounds; r++) {
-        rows += '<div class="map-row" data-r="' + r + '">' +
-          '<span class="map-label">R' + r + '</span>' +
-          '<span class="map-dots">';
-        block.movements.forEach(function (bm, m) {
-          if (m > 0) rows += '<span class="map-gap"></span>';
-          for (var k = 1; k <= block.setsPerRound; k++) {
-            rows += '<i class="map-dot" data-r="' + r + '" data-m="' + m + '" data-k="' + k + '"></i>';
+    if (rows <= MAP_LIMITS.rounds && stepsPerRound <= MAP_LIMITS.perRound && total <= dots) {
+      var groups = "";
+      block.movements.forEach(function (bm, m) {
+        var movementRows = "";
+        for (var r = 1; r <= block.rounds; r++) {
+          movementRows += '<div class="map-row" data-m="' + m + '" data-r="' + r + '">' +
+            '<span class="map-label">R' + r + '</span>' +
+            '<span class="map-dots">';
+          for (var k = 1; k <= stepsPerRound; k++) {
+            movementRows += '<i class="map-dot" data-m="' + m + '" data-r="' + r + '" data-k="' + k + '"></i>';
           }
-        });
-        rows += '</span></div>';
-      }
-      inner = '<div class="map-grid">' + rows + '</div>';
+          movementRows += '</span></div>';
+        }
+        groups += '<div class="map-group" data-m="' + m + '">' + movementRows + '</div>';
+      });
+      inner = '<div class="map-grid">' + groups + '</div>';
     } else {
       var pct = total ? (doneInBlock / total) * 100 : 0;
       inner = '<div class="map-bar-wrap">' +
@@ -3729,7 +3738,7 @@
         '<div class="sc-meta">Reusable in any block</div></div>' +
       '<div class="sc-right"><span class="chev">›</span></div>' +
     '</button>';
-    html += '<div class="sessions-foot">Each round runs every movement in order for its sets-per-round sets. A set rest follows each set; a round rest follows each round.</div>';
+    html += '<div class="sessions-foot">Each movement runs all of its rounds before the next. A set rest follows each set inside a round; a round rest follows each round, each movement switch, and each block.</div>';
     return html + '</div>';
   }
 
@@ -4336,17 +4345,19 @@
     ui.mapSig = sig;
 
     var stepsPer = Math.max(1, block.setsPerRound);
-    var perRound = safeMul(Math.max(1, block.movements.length), stepsPer);
+    var rounds = Math.max(1, block.rounds);
     dots.forEach(function (dot) {
-      var r = Number(dot.getAttribute("data-r"));
       var m = Number(dot.getAttribute("data-m"));
+      var r = Number(dot.getAttribute("data-r"));
       var k = Number(dot.getAttribute("data-k"));
-      var index = (r - 1) * perRound + m * stepsPer + (k - 1);
+      var index = (m * rounds + (r - 1)) * stepsPer + (k - 1);
       dot.classList.toggle("done", index < doneInBlock);
       dot.classList.toggle("current", index === doneInBlock && state.status !== "done");
     });
     $$(".map-row", appEl).forEach(function (row) {
-      row.classList.toggle("active", Number(row.getAttribute("data-r")) === p.round && state.status !== "done");
+      var active = Number(row.getAttribute("data-m")) === p.movementIndex &&
+        Number(row.getAttribute("data-r")) === p.round;
+      row.classList.toggle("active", active && state.status !== "done");
     });
   }
 

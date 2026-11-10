@@ -1,12 +1,88 @@
 import SwiftUI
 
+/// The block map's rows and dots: one row per round of each movement, in run
+/// order. Pure data so the timer and its tests cannot disagree about which dot
+/// belongs to which set.
+struct SetMapLayout: Equatable {
+    struct Row: Equatable, Identifiable {
+        let movementIndex: Int
+        /// One-based round of that movement.
+        let round: Int
+        /// The 0-based run-order index of the row's first set in the block.
+        let firstSet: Int
+        /// A gap separates the movements, so the first row of every movement
+        /// after the first carries one above it.
+        let hasGapAbove: Bool
+
+        var id: Int { firstSet }
+    }
+
+    /// Dots, not data: above these limits the block is drawn as a bar.
+    static let maxRows = 12
+    static let maxSetsPerRow = 12
+    static let maxDots = 72
+
+    let rows: [Row]
+    let setsPerRow: Int
+    let totalSets: Int
+    /// The index into `rows` of the current set's row; nil in done, and on a bar.
+    let activeRow: Int?
+    let usesDots: Bool
+
+    init(block: WorkoutBlock, position: WorkoutPosition, phase: SessionPhase) {
+        let sets = max(block.setsPerRound, 1)
+        let rounds = max(block.rounds, 1)
+        let movementCount = block.movements.count
+        let rowCount = safeProduct(movementCount, rounds)
+        let total = safeProduct(rowCount, sets)
+
+        setsPerRow = sets
+        totalSets = total
+        usesDots = movementCount > 0
+            && rowCount <= Self.maxRows
+            && sets <= Self.maxSetsPerRow
+            && total <= Self.maxDots
+
+        guard usesDots else {
+            rows = []
+            activeRow = nil
+            return
+        }
+
+        var built: [Row] = []
+        built.reserveCapacity(rowCount)
+        for movementIndex in 0..<movementCount {
+            for round in 1...rounds {
+                let firstSet = safeProduct(
+                    safeSum(safeProduct(movementIndex, rounds), round - 1),
+                    sets
+                )
+                built.append(
+                    Row(
+                        movementIndex: movementIndex,
+                        round: round,
+                        firstSet: firstSet,
+                        hasGapAbove: movementIndex > 0 && round == 1
+                    )
+                )
+            }
+        }
+        rows = built
+
+        if phase == .done {
+            activeRow = nil
+        } else {
+            let movementIndex = min(max(position.movementIndex, 0), max(movementCount - 1, 0))
+            let round = min(max(position.round, 1), rounds)
+            activeRow = built.firstIndex {
+                $0.movementIndex == movementIndex && $0.round == round
+            }
+        }
+    }
+}
+
 struct SetMap: View {
     let snapshot: SessionSnapshot
-
-    /// Presentation limits, not data limits: above 72 dots the block is a bar.
-    private let maxRounds = 12
-    private let maxPerRound = 12
-    private let maxDots = 72
 
     private var block: WorkoutBlock { snapshot.currentBlock }
     private var position: WorkoutPosition { snapshot.position }
@@ -21,21 +97,13 @@ struct SetMap: View {
         min(max(snapshot.doneSets - blockStart, 0), block.totalSets)
     }
 
-    private var setsPerRound: Int { max(block.setsPerRound, 1) }
-
-    private var perRound: Int {
-        max(block.movements.count, 1) * setsPerRound
-    }
-
-    private var usesDots: Bool {
-        block.rounds <= maxRounds &&
-            perRound <= maxPerRound &&
-            block.totalSets <= maxDots
+    private var layout: SetMapLayout {
+        SetMapLayout(block: block, position: position, phase: snapshot.phase)
     }
 
     var body: some View {
         VStack(spacing: 9) {
-            if usesDots {
+            if layout.usesDots {
                 dotGrid
             } else {
                 progressBar
@@ -53,14 +121,17 @@ struct SetMap: View {
 
     private var dotGrid: some View {
         VStack(spacing: 7) {
-            ForEach(1...max(block.rounds, 1), id: \.self) { round in
+            ForEach(Array(layout.rows.enumerated()), id: \.element.id) { index, row in
+                if row.hasGapAbove {
+                    gap
+                }
                 HStack(spacing: 6) {
-                    Text("R\(round)")
+                    Text("R\(row.round)")
                         .font(Theme.TypeScale.micro)
                         .tracking(0.2)
                         .monospacedDigit()
                         .foregroundStyle(
-                            round == position.round && snapshot.phase != .done
+                            index == layout.activeRow
                                 ? .white.opacity(0.72)
                                 : Theme.tertiaryText.opacity(0.85)
                         )
@@ -68,13 +139,8 @@ struct SetMap: View {
                         .frame(minWidth: 27, alignment: .trailing)
 
                     HStack(spacing: 3) {
-                        ForEach(Array(block.movements.enumerated()), id: \.element.id) { index, _ in
-                            if index > 0 {
-                                gap
-                            }
-                            ForEach(1...setsPerRound, id: \.self) { step in
-                                dot(round: round, movementIndex: index, step: step)
-                            }
+                        ForEach(1...layout.setsPerRow, id: \.self) { step in
+                            dot(order: row.firstSet + step - 1)
                         }
                     }
                 }
@@ -82,13 +148,13 @@ struct SetMap: View {
         }
     }
 
+    /// The gap between two movements.
     private var gap: some View {
         Color.clear
-            .frame(width: 5, height: 1)
+            .frame(height: 6)
     }
 
-    private func dot(round: Int, movementIndex: Int, step: Int) -> some View {
-        let order = (round - 1) * perRound + movementIndex * setsPerRound + (step - 1)
+    private func dot(order: Int) -> some View {
         let isDone = order < doneInBlock
         let isCurrent = order == doneInBlock && snapshot.phase != .done
 

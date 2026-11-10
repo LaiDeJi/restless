@@ -3,8 +3,9 @@ import Foundation
 /// One storage location shared by the app and the widget extension.
 enum SessionStore {
     static let appGroup = "group.com.whc.restless"
-    private static let key = "restless.session.v4"
+    private static let key = "restless.session.v5"
     private static let legacyKeys = [
+        "restless.session.v4",
         "restless.session.v3",
         "restless.session.v2",
         "restless.session.v1"
@@ -15,9 +16,10 @@ enum SessionStore {
     }
 
     static func load() -> SessionSnapshot? {
-        // The v3 snapshot encoded the kind/count block plan, the v2 snapshot the
-        // part plan and the v1 snapshot the old single-part shape. None can be
-        // read as a running session; start ready at the active session instead.
+        // A v4 snapshot counted completed sets under the round-major order, so
+        // the same count points at a different set now. It, like the v3
+        // kind/count plan, the v2 part plan and the v1 single-part shape, cannot
+        // be read as a running session; start ready at the active session.
         for legacy in legacyKeys {
             defaults.removeObject(forKey: legacy)
         }

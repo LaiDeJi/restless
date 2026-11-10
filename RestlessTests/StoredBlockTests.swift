@@ -105,7 +105,9 @@ func legacyCircuitDecodes() throws {
     #expect(blocks[0].rounds == 3)
     #expect(blocks[0].setsPerRound == 1)
     #expect(blocks[0].totalSets == 6)
-    #expect(blocks[0].totalRest == 330)
+    // Movement-major: no set rests at one set per round, 2 round rests per
+    // movement plus the switch, all at 120.
+    #expect(blocks[0].totalRest == 600)
 }
 
 @Test("Four adjacent duplicate circuit rows collapse to one movement with four sets per round")

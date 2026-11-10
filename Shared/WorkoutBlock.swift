@@ -178,7 +178,8 @@ struct WorkoutBlock: Codable, Hashable, Identifiable, Sendable {
         try container.encode(movements, forKey: .movements)
     }
 
-    /// Sets in one round across every movement.
+    /// Sets in one round across every movement. The order runs movement-major,
+    /// so this is no longer a run-order block; it stays for totals and copy.
     var perRoundSets: Int {
         guard !movements.isEmpty else { return 0 }
         return safeProduct(max(setsPerRound, 1), movements.count)
@@ -190,14 +191,23 @@ struct WorkoutBlock: Codable, Hashable, Identifiable, Sendable {
     }
 
     /// Rest the block contributes, including its transition to the next block.
+    /// Each movement runs all of its rounds, so a set rest separates only sets
+    /// inside a round and every round boundary, movement switch, and block
+    /// transition takes the round rest.
     func totalRest(hasNextBlock: Bool) -> Int {
         guard !movements.isEmpty else { return 0 }
+        let movementCount = max(movements.count, 1)
+        let roundCount = max(rounds, 1)
+        let setCount = max(setsPerRound, 1)
         let setRests = safeProduct(
-            safeProduct(max(rounds, 1), max(perRoundSets - 1, 0)),
+            safeProduct(safeProduct(movementCount, roundCount), max(setCount - 1, 0)),
             setRest
         )
         let roundRests = safeProduct(
-            safeSum(max(rounds - 1, 0), hasNextBlock ? 1 : 0),
+            safeSum(
+                safeProduct(movementCount, max(roundCount - 1, 0)),
+                safeSum(max(movementCount - 1, 0), hasNextBlock ? 1 : 0)
+            ),
             roundRest
         )
         return safeSum(setRests, roundRests)

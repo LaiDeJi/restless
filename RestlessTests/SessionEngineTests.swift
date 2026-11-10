@@ -72,7 +72,7 @@ func activationGate() {
 }
 
 @MainActor
-@Test("A v4 snapshot round-trips through the store")
+@Test("A v5 snapshot round-trips through the store")
 func snapshotRoundTrip() {
     SessionStore.clear()
     var snapshot = SessionSnapshot.initial(timed, now: .now)
@@ -105,17 +105,40 @@ func v3SnapshotIsDiscardedAndGateOpens() {
     SessionStore.clear()
 }
 
-@Test("The v1, v2, and v3 snapshot keys are discarded")
+@Test("The v1, v2, v3, and v4 snapshot keys are discarded")
 func legacySnapshotsAreDiscarded() {
     let defaults = UserDefaults(suiteName: SessionStore.appGroup) ?? .standard
+    defaults.set(Data([1, 2, 3]), forKey: "restless.session.v4")
     defaults.set(Data([1, 2, 3]), forKey: "restless.session.v3")
     defaults.set(Data([1, 2, 3]), forKey: "restless.session.v2")
     defaults.set(Data([4, 5, 6]), forKey: "restless.session.v1")
 
     #expect(SessionStore.load() == nil)
+    #expect(defaults.object(forKey: "restless.session.v4") == nil)
     #expect(defaults.object(forKey: "restless.session.v3") == nil)
     #expect(defaults.object(forKey: "restless.session.v2") == nil)
     #expect(defaults.object(forKey: "restless.session.v1") == nil)
+}
+
+@MainActor
+@Test("A v4 run is cleared so the movement-major order opens at the gate")
+func v4SnapshotOpensTheGate() throws {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+    let defaults = UserDefaults(suiteName: SessionStore.appGroup) ?? .standard
+
+    // A v4 body that would decode: the count now points at a different set.
+    var snapshot = SessionSnapshot.initial(timed, now: .now)
+    snapshot.doneSets = 1
+    snapshot.phase = .resting
+    snapshot.restKind = .set
+    snapshot.duration = 45
+    snapshot.deadline = .now.addingTimeInterval(30)
+    let encoded = try JSONEncoder().encode(snapshot)
+    defaults.set(encoded, forKey: "restless.session.v4")
+
+    #expect(SessionStore.load() == nil)
+    #expect(defaults.object(forKey: "restless.session.v4") == nil)
 }
 
 @MainActor
@@ -159,7 +182,7 @@ func storedRepsSnapshotLoads() throws {
         raw.replaceSubrange(range, with: "\"endCondition\":\"reps\",\"target\":10")
     }
     let defaults = UserDefaults(suiteName: SessionStore.appGroup) ?? .standard
-    defaults.set(Data(raw.utf8), forKey: "restless.session.v4")
+    defaults.set(Data(raw.utf8), forKey: "restless.session.v5")
 
     let loaded = try #require(SessionStore.load())
     #expect(loaded.preset.id == preset.id)

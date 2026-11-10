@@ -23,7 +23,7 @@ A session SHALL have a stable identifier, a name, and one or more ordered blocks
 
 ### Requirement: Block structure has no arrangement mode
 
-A block SHALL define its schedule only by rounds, sets per round, and its ordered movements. It SHALL NOT store or expose a straight/circuit arrangement. One movement SHALL repeat that movement; two or more movements SHALL run each movement's sets-per-round sets in order within each round. A sequential pair SHALL be two blocks.
+A block SHALL define its schedule only by rounds, sets per round, and its ordered movements. It SHALL NOT store or expose a straight/circuit arrangement. One movement SHALL repeat that movement across its rounds. Two or more movements SHALL run in the order listed, and each movement SHALL complete all of its rounds, with its sets per round in each round, before the next movement starts. A sequential pair SHALL be two blocks.
 
 #### Scenario: One movement, four rounds of four sets
 
@@ -35,13 +35,19 @@ A block SHALL define its schedule only by rounds, sets per round, and its ordere
 
 - **GIVEN** a block with Biceps and Triceps, rounds 2, sets per round 1
 - **WHEN** the block runs
-- **THEN** each round runs Biceps then Triceps and the block reports 4 sets
+- **THEN** Biceps runs round 1 and round 2, then Triceps runs round 1 and round 2, and the block reports 4 sets
 
 #### Scenario: Sequential pair
 
 - **GIVEN** a user wants Biceps three sets followed by Triceps three sets
 - **WHEN** they build the plan
 - **THEN** it is two blocks, each with rounds 1 and sets per round 3
+
+#### Scenario: Two movements, three rounds of two sets each
+
+- **GIVEN** a block with Biceps and Triceps, rounds 3, sets per round 2
+- **WHEN** the block runs
+- **THEN** Biceps runs its three rounds of two sets, then Triceps runs its three rounds of two sets, and the block reports 12 sets
 
 ### Requirement: Rounds and sets have no upper limit
 
@@ -263,9 +269,9 @@ The session editor's RESTART SESSION action SHALL open the same confirmation as 
 - **WHEN** the session editor is shown
 - **THEN** no RESTART SESSION action is offered
 
-### Requirement: One-tap add from the movement library
+### Requirement: Library movements append to a block
 
-The block editor SHALL show an `ADD FROM LIBRARY` list of library movements that are not already in the block. Tapping one SHALL append that movement with MANUAL and no target in one edit, keep the add-movement sheet closed, and apply the existing two-movement rounds rule. The list SHALL be hidden while editing is locked and absent when no unused movement remains. The add-movement sheet SHALL remain for several movements, custom ends and targets, and typed names.
+The block editor SHALL show an `ADD FROM LIBRARY` list of library movements that are not already in the block. Tapping one SHALL append that movement with MANUAL and no target in one edit, keep the add-movement sheet closed, and leave ROUNDS and SETS PER ROUND unchanged. The list SHALL be hidden while editing is locked and absent when no unused movement remains. The add-movement sheet SHALL remain for several movements, custom ends and targets, and typed names.
 
 #### Scenario: One tap adds a movement
 
@@ -286,11 +292,11 @@ The block editor SHALL show an `ADD FROM LIBRARY` list of library movements that
 - **WHEN** the block editor is shown
 - **THEN** no ADD FROM LIBRARY list is offered
 
-#### Scenario: A second movement raises rounds
+#### Scenario: A second movement keeps the rounds
 
 - **GIVEN** a one-round block with one movement
 - **WHEN** the user adds a second movement from the library
-- **THEN** the block has two movements and rounds becomes 2
+- **THEN** the block has two movements and rounds stays 1
 
 #### Scenario: The sheet still batches several movements
 

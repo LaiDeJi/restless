@@ -140,15 +140,15 @@ func lastItemGuard() {
 }
 
 @MainActor
-@Test("Appending a movement bumps a one-round block to two")
-func appendMovementBumpsRounds() {
+@Test("Appending a movement leaves a one-round block at one")
+func appendMovementKeepsOneRound() {
     let first = Movement(name: "Chest")
     let second = Movement(name: "Cable Fly")
     let block = draftBlock("Chest", movementIDs: [first.id])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(store.appendMovement(second, toBlock: block.id, condition: .time, target: 10))
-    #expect(store.session.blocks[0].rounds == 2)
+    #expect(store.session.blocks[0].rounds == 1)
     #expect(store.session.blocks[0].movements.count == 2)
     #expect(store.session.blocks[0].movements[1].movementId == second.id)
     #expect(store.session.blocks[0].movements[1].endCondition == .time)
@@ -218,8 +218,8 @@ func appendMovementsBatchOrder() {
 }
 
 @MainActor
-@Test("A batch that brings an empty block to two movements raises rounds once")
-func appendMovementsBumpsEmptyBlock() {
+@Test("A batch that brings an empty block to two movements keeps its one round")
+func appendMovementsKeepsEmptyBlockRounds() {
     let block = draftBlock("Chest", movementIDs: [])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
@@ -228,18 +228,18 @@ func appendMovementsBumpsEmptyBlock() {
         toBlock: block.id
     ))
     #expect(store.session.blocks[0].movements.count == 2)
-    #expect(store.session.blocks[0].rounds == 2)
+    #expect(store.session.blocks[0].rounds == 1)
 }
 
 @MainActor
-@Test("A batch that brings a one-movement block to two movements raises rounds once")
-func appendMovementsBumpsSingleMovementBlock() {
+@Test("A batch that brings a one-movement block to two movements keeps its one round")
+func appendMovementsKeepsSingleMovementBlockRounds() {
     let block = draftBlock("Chest", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(store.appendMovements([addition("Cable Fly")], toBlock: block.id))
     #expect(store.session.blocks[0].movements.count == 2)
-    #expect(store.session.blocks[0].rounds == 2)
+    #expect(store.session.blocks[0].rounds == 1)
 }
 
 @MainActor
@@ -312,14 +312,14 @@ func appendBlockKeepsSettings() {
 }
 
 @MainActor
-@Test("A two-movement block appended with one round rises to two")
-func appendBlockBumpsRounds() {
+@Test("A two-movement block appended with one round keeps its round")
+func appendBlockKeepsOneRound() {
     let first = draftBlock("Chest", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [first]))
     let block = draftBlock("Arms", movementIDs: [UUID(), UUID()])
 
     #expect(store.appendBlock(block))
-    #expect(store.session.blocks[1].rounds == 2)
+    #expect(store.session.blocks[1].rounds == 1)
     #expect(store.session.blocks[1].movements.count == 2)
 }
 
@@ -510,15 +510,15 @@ func stagedMovementEditsStayOutOfTheSession() throws {
 }
 
 @MainActor
-@Test("A staged block that gains a second movement commits at two rounds")
-func stagedBlockRisesToTwoRounds() {
+@Test("A staged block that gains a second movement commits at one round")
+func stagedBlockKeepsOneRound() {
     let previous = restedBlock(name: "Chest")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     store.beginStagedBlock(after: previous)
     #expect(store.appendMovements([addition("Curl"), addition("Pushdown")], to: .staged))
-    #expect(store.stagedBlock?.rounds == 2)
+    #expect(store.stagedBlock?.rounds == 1)
 
     #expect(store.commitStagedBlock())
-    #expect(store.session.blocks.last?.rounds == 2)
+    #expect(store.session.blocks.last?.rounds == 1)
     #expect(store.session.blocks.last?.movements.count == 2)
 }

@@ -76,8 +76,8 @@ func movementSwitchCopy() {
             )
         ]
     )
-    let alert = CompletionAlertCopy.restFinished(ready(preset, doneSets: 1), movementNames: curlNames)
-    #expect(alert.title == "SET REST OVER")
+    let alert = CompletionAlertCopy.restFinished(ready(preset, doneSets: 2), movementNames: curlNames)
+    #expect(alert.title == "ROUND REST OVER")
     #expect(alert.body == "AFTER CURL · NEXT PUSHDOWN · NEXT ROUND 1 OF 2")
 }
 
@@ -207,7 +207,7 @@ func longMovementNameCopy() {
         ]
     )
     let alert = CompletionAlertCopy.restFinished(
-        ready(preset, doneSets: 1),
+        ready(preset, doneSets: 2),
         movementNames: [longID: name, pushdownID: "Pushdown"]
     )
     #expect(alert.body.contains(name.uppercased()))

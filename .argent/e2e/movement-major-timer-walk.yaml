@@ -1,0 +1,477 @@
+# Movement-major rest walk: author a two-movement block (Biceps, Triceps) at
+# 2 rounds × 2 sets and 60/120, then walk one movement's rounds and the switch.
+# Every checkpoint is read from the accessibility tree: the movement name, the
+# rest kicker, the rest context, and the block map's completed-set count.
+#
+# The run starts from a reinstall and leaves the created "Arms" session and the
+# Biceps/Triceps library movements behind; reinstall before a second run. The
+# first countdown asks for notification permission, so the Allow tap is part of
+# the tape; without the prompt it lands on the ring, which changes nothing.
+steps:
+  - launch: com.whc.restless
+  # Return a running or rested session to the start gate.
+  - tool: open-url
+    args:
+      url: restless://restart
+    delayMs: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  # A new session draft copies the active block; its own block is authoring work.
+  - tap:
+      id: list.bullet.rectangle.fill
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 5000
+  - tool: gesture-tap
+    args:
+      x: 0.892
+      y: 0.125
+    delayMs: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: USE THIS SESSION
+      timeoutMs: 5000
+  - tool: gesture-tap
+    args:
+      x: 0.436
+      y: 0.377
+    delayMs: 700
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ROUNDS
+      timeoutMs: 5000
+  # ROUNDS 1 -> 2, then SETS PER ROUND 9 -> 2.
+  - tool: gesture-tap
+    args:
+      x: 0.8505
+      y: 0.335
+    delayMs: 200
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: gesture-tap
+    args:
+      x: 0.7265
+      y: 0.4
+    delayMs: 120
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 MOVEMENT · 2 ROUNDS · 2 SETS EACH · 4 SETS · 4:00 REST
+      timeoutMs: 4000
+  # Two named movements through the add-movement sheet.
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8005
+    delayMs: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ADD MOVEMENT
+      timeoutMs: 4000
+  # The sheet's animation settles before the field takes the keyboard.
+  - wait: 700
+  - tap:
+      text: Movement name
+  - tool: keyboard
+    args:
+      text: Biceps
+    delayMs: 400
+  - tool: keyboard
+    args:
+      key: enter
+    delayMs: 400
+  - tap:
+      text: Movement name
+  - tool: keyboard
+    args:
+      text: Triceps
+    delayMs: 400
+  - tool: keyboard
+    args:
+      key: enter
+    delayMs: 400
+  - tool: gesture-tap
+    args:
+      x: 0.848
+      y: 0.11
+    delayMs: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 3 MOVEMENTS · 2 ROUNDS · 2 SETS EACH · 12 SETS · 16:00 REST
+      timeoutMs: 5000
+  # The copied Chest movement goes, leaving Biceps then Triceps.
+  - tool: gesture-tap
+    args:
+      x: 0.8905
+      y: 0.656
+    delayMs: 300
+  - tool: gesture-tap
+    args:
+      x: 0.8905
+      y: 0.656
+    delayMs: 500
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 MOVEMENTS · 2 ROUNDS · 2 SETS EACH · 8 SETS · 10:00 REST
+      timeoutMs: 5000
+  # Name the block and the session "Arms".
+  - tool: gesture-tap
+    args:
+      x: 0.5005
+      y: 0.203
+    delayMs: 300
+  - tool: run-sequence
+    args:
+      steps:
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+    delayMs: 300
+  - tool: keyboard
+    args:
+      text: Arms
+    delayMs: 400
+  - tool: gesture-tap
+    args:
+      x: 0.848
+      y: 0.103
+    delayMs: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 BLOCK · 8 SETS · 10:00 TOTAL REST
+      timeoutMs: 5000
+  - tool: gesture-tap
+    args:
+      x: 0.5005
+      y: 0.203
+    delayMs: 300
+  - tool: run-sequence
+    args:
+      steps:
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+        - tool: keyboard
+          args:
+            key: backspace
+    delayMs: 300
+  - tool: keyboard
+    args:
+      text: Arms
+    delayMs: 400
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.5655
+    delayMs: 900
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 6000
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8745
+    delayMs: 700
+  # Biceps round 1 set 1.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BICEPS
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 0 OF 8 SETS
+      timeoutMs: 4000
+  # Set 1 -> set rest. The first countdown raises the permission prompt.
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8745
+    delayMs: 1000
+  - tool: gesture-tap
+    args:
+      x: 0.684
+      y: 0.5925
+    delayMs: 900
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET REST
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: AFTER SET 1
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 OF 8 SETS
+      timeoutMs: 4000
+  - tool: gesture-tap
+    args:
+      x: 0.868
+      y: 0.8745
+    delayMs: 700
+  # Biceps round 1 set 2.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET DONE
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 OF 8 SETS
+      timeoutMs: 4000
+  # Set 2 -> the round rest between Biceps' rounds.
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8745
+    delayMs: 700
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ROUND REST
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: AFTER ROUND 1
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 OF 8 SETS
+      timeoutMs: 4000
+  - tool: gesture-tap
+    args:
+      x: 0.868
+      y: 0.8745
+    delayMs: 700
+  # Biceps round 2 set 1.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET DONE
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 OF 8 SETS
+      timeoutMs: 4000
+  # Set 3 -> the set rest inside Biceps' second round.
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8745
+    delayMs: 700
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET REST
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: AFTER SET 1
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 3 OF 8 SETS
+      timeoutMs: 4000
+  - tool: gesture-tap
+    args:
+      x: 0.868
+      y: 0.8745
+    delayMs: 700
+  # Biceps round 2 set 2.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET DONE
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 3 OF 8 SETS
+      timeoutMs: 4000
+  # Set 4 is Biceps' last: the switch takes the round rest, not the set rest.
+  - tool: gesture-tap
+    args:
+      x: 0.5
+      y: 0.8745
+    delayMs: 700
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ROUND REST
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: AFTER BICEPS · NEXT TRICEPS
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 4 OF 8 SETS
+      timeoutMs: 4000
+  - tool: gesture-tap
+    args:
+      x: 0.868
+      y: 0.8745
+    delayMs: 700
+  # Triceps round 1 set 1.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: TRICEPS
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 4 OF 8 SETS
+      timeoutMs: 4000

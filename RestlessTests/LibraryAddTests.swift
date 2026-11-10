@@ -73,8 +73,8 @@ func singleLibraryAddToStagedBlock() {
 }
 
 @MainActor
-@Test("A second library movement raises a one-round block to two rounds")
-func secondLibraryAddRaisesRounds() {
+@Test("A second library movement leaves the rounds alone")
+func secondLibraryAddKeepsRounds() {
     let existing = Movement(name: "Chest")
     let added = Movement(name: "Bench press")
     let saved = block(name: "Chest", movementIDs: [existing.id], rounds: 1)
@@ -83,7 +83,7 @@ func secondLibraryAddRaisesRounds() {
     #expect(store.appendMovements([addition(added)], toBlock: saved.id))
 
     #expect(store.session.blocks[0].movements.count == 2)
-    #expect(store.session.blocks[0].rounds == 2)
+    #expect(store.session.blocks[0].rounds == 1)
 }
 
 @MainActor

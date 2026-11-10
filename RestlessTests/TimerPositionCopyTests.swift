@@ -124,12 +124,12 @@ func oneByOne() {
     #expect(groups(copy.leading) == ["CHEST", "BENCH PRESS"])
 }
 
-@Test("A multi-movement first round names the movement and both segments")
+@Test("A later movement names the movement and both segments")
 func multiMovementPosition() {
     var multi = block(name: "Arms", rounds: 2, setsPerRound: 2)
     multi.movements.append(BlockMovement(movementId: curlID, endCondition: .manual))
     let copy = TimerPositionCopy(
-        snapshot: snapshot([multi], doneSets: 2),
+        snapshot: snapshot([multi], doneSets: 4),
         movementName: "Curl"
     )
 

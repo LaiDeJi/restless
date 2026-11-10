@@ -225,9 +225,8 @@ final class SessionDraftStore {
         order.count == ids.count && Set(order) == Set(ids)
     }
 
-    /// Appends a library movement with the picker's set end and target. A second
-    /// movement raises a one-round block to two rounds, the same rule the picker
-    /// has always applied. Returns false when the block is gone.
+    /// Appends a library movement with the picker's set end and target. ROUNDS
+    /// keeps the value the user typed. Returns false when the block is gone.
     @discardableResult
     func appendMovement(
         _ movement: Movement,
@@ -242,9 +241,8 @@ final class SessionDraftStore {
     }
 
     /// Appends a batch of movements in the given order with one draft edit, so
-    /// the picker's DONE commits once. The rounds rule runs against the final
-    /// count: a block with fewer than two movements that reaches two rises to
-    /// at least two rounds. Returns false for a missing block or an empty batch.
+    /// the picker's DONE commits once. ROUNDS is left as it was. Returns false
+    /// for a missing block or an empty batch.
     @discardableResult
     func appendMovements(_ additions: [MovementAddition], toBlock blockID: UUID) -> Bool {
         guard !additions.isEmpty,
@@ -258,19 +256,13 @@ final class SessionDraftStore {
             ).clamped()
         }
         edit { session in
-            let before = session.blocks[blockIndex].movements.count
             session.blocks[blockIndex].movements.append(contentsOf: appended)
-            if before < 2,
-               session.blocks[blockIndex].movements.count >= 2,
-               session.blocks[blockIndex].rounds < 2 {
-                session.blocks[blockIndex].rounds = 2
-            }
         }
         return true
     }
 
-    /// Appends queued movements to the addressed block. A staged block keeps
-    /// the rounds rule but never marks the draft dirty or schedules a save.
+    /// Appends queued movements to the addressed block. A staged block never
+    /// marks the draft dirty or schedules a save, and ROUNDS is left as it was.
     @discardableResult
     func appendMovements(_ additions: [MovementAddition], to target: BlockEditingTarget) -> Bool {
         switch target {
@@ -278,7 +270,6 @@ final class SessionDraftStore {
             return appendMovements(additions, toBlock: blockID)
         case .staged:
             guard !additions.isEmpty, var block = stagedBlock else { return false }
-            let before = block.movements.count
             block.movements.append(contentsOf: additions.map {
                 BlockMovement(
                     movementId: $0.movement.id,
@@ -286,18 +277,14 @@ final class SessionDraftStore {
                     target: $0.target
                 ).clamped()
             })
-            if before < 2, block.movements.count >= 2, block.rounds < 2 {
-                block.rounds = 2
-            }
             stagedBlock = block
             return true
         }
     }
 
     /// Appends one block in a single draft edit. An empty movement list is
-    /// rejected so the add-block flow cannot save an empty block; two or more
-    /// movements raise the block to at least two rounds. Other blocks are left
-    /// untouched.
+    /// rejected so the add-block flow cannot save an empty block. Other blocks
+    /// are left untouched, and ROUNDS keeps the value the block carried.
     @discardableResult
     func appendBlock(_ block: WorkoutBlock) -> Bool {
         guard !block.movements.isEmpty else { return false }
@@ -305,9 +292,6 @@ final class SessionDraftStore {
         appended.rounds = max(appended.rounds, 1)
         appended.setsPerRound = max(appended.setsPerRound, 1)
         appended.movements = appended.movements.map { $0.clamped() }
-        if appended.movements.count > 1 {
-            appended.rounds = max(appended.rounds, 2)
-        }
         edit { $0.blocks.append(appended) }
         return true
     }

@@ -38,3 +38,44 @@ func attributesRoundTrip() {
     #expect(rebuilt.upcomingRest == snapshot.upcomingRest)
     #expect(attributes.movementName(benchID) == "BENCH PRESS")
 }
+
+@Test("A movement switch reads as a round rest on the island's snapshot")
+func movementSwitchOnIsland() {
+    let curlID = UUID()
+    let pushdownID = UUID()
+    let preset = WorkoutPreset(
+        name: "Arms",
+        blocks: [
+            WorkoutBlock(
+                name: "Arms",
+                rounds: 2,
+                setsPerRound: 1,
+                setRest: 30,
+                roundRest: 120,
+                movements: [
+                    BlockMovement(movementId: curlID, endCondition: .manual),
+                    BlockMovement(movementId: pushdownID, endCondition: .manual)
+                ]
+            )
+        ]
+    )
+    var snapshot = SessionSnapshot.initial(preset)
+    snapshot.startSession()
+    snapshot.doneSets = 2
+    snapshot.phase = .resting
+    snapshot.restKind = .round
+    snapshot.duration = 120
+    snapshot.deadline = snapshot.startedAt.addingTimeInterval(120)
+
+    let attributes = RestlessActivityAttributes(
+        snapshot,
+        movementNames: [curlID: "Biceps", pushdownID: "Triceps"]
+    )
+    let rebuilt = attributes.snapshot(RestlessActivityAttributes.ContentState(snapshot))
+
+    #expect(rebuilt.kicker == "ROUND REST")
+    #expect(rebuilt.isRoundAccent)
+    #expect(rebuilt.restContext { attributes.movementName($0) } == "AFTER BICEPS · NEXT TRICEPS")
+    #expect(rebuilt.position.movementIndex == 1)
+    #expect(rebuilt.position.round == 1)
+}

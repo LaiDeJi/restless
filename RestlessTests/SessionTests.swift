@@ -209,28 +209,28 @@ func restEndsAtDeadline() {
     #expect(snapshot.doneSets == 1)
 }
 
-@Test("A movement switch inside a round is a set rest")
+@Test("A movement switch is a round rest")
 func movementTransition() {
     var snapshot = ready(superset)
+    completeSets(1, in: &snapshot)
     snapshot.setDone(now: start)
 
-    #expect(snapshot.doneSets == 1)
+    #expect(snapshot.doneSets == 2)
     #expect(snapshot.phase == .resting)
-    #expect(snapshot.restKind == .set)
-    #expect(snapshot.duration == 30)
+    #expect(snapshot.restKind == .round)
+    #expect(snapshot.duration == 120)
     #expect(snapshot.restTransition == .movement)
     #expect(snapshot.restContext { id in
         id == curlID ? "Curl" : "Pushdown"
     } == "AFTER CURL · NEXT PUSHDOWN")
 }
 
-@Test("A round rest follows the last movement of a non-final round")
-func circuitRoundRest() {
+@Test("A round rest follows a movement's earlier round")
+func firstRoundRest() {
     var snapshot = ready(superset)
-    completeSets(1, in: &snapshot)
     snapshot.setDone(now: start)
 
-    #expect(snapshot.doneSets == 2)
+    #expect(snapshot.doneSets == 1)
     #expect(snapshot.phase == .resting)
     #expect(snapshot.restKind == .round)
     #expect(snapshot.duration == 120)
@@ -362,6 +362,7 @@ func oneBlockCopy() {
 @Test("A movement switch falls back to the block when names are unavailable")
 func movementSwitchFallback() {
     var snapshot = ready(superset)
+    completeSets(1, in: &snapshot)
     snapshot.setDone(now: start)
 
     #expect(snapshot.restContext == "AFTER ARMS · NEXT MOVEMENT")

@@ -28,9 +28,9 @@ A session SHALL execute every set of one block before the first set of the next 
 - **WHEN** the session starts
 - **THEN** the total set count is 16
 
-### Requirement: Rest within a block
+### Requirement: Rest after each set follows the run order
 
-After a set that is not the last set of its round, the next rest SHALL be the block's set rest. After the last set of a round that is not the block's last round, the next rest SHALL be the block's round rest. A movement switch inside a round SHALL use the set rest and MUST NOT start a round rest.
+After a set that is not the last set of its movement's round, the next rest SHALL be the block's set rest. After the last set of a round that is not the movement's last round, the next rest SHALL be the block's round rest. After the last set of a movement's last round when another movement follows in the block, the next rest SHALL be the block's round rest and MUST NOT be the set rest.
 
 #### Scenario: Set rest inside a round
 
@@ -44,11 +44,17 @@ After a set that is not the last set of its round, the next rest SHALL be the bl
 - **WHEN** set 4 of round 1 is completed
 - **THEN** a 120 second round rest starts
 
-#### Scenario: Movement switch in a superset
+#### Scenario: Round rest between rounds of one movement
 
-- **GIVEN** a block with Biceps and Triceps, 2 rounds, 1 set per round, and set rest 30
+- **GIVEN** a block with Biceps and Triceps, 2 rounds, 1 set per round, set rest 30, and round rest 120
 - **WHEN** the Biceps set of round 1 is completed
-- **THEN** a 30 second set rest starts before Triceps, and no round rest starts
+- **THEN** a 120 second round rest starts and Biceps round 2 is next
+
+#### Scenario: Movement switch is a round rest
+
+- **GIVEN** a block with Biceps and Triceps, 2 rounds, 1 set per round, set rest 30, and round rest 120
+- **WHEN** the Biceps set of round 2 is completed
+- **THEN** a 120 second round rest starts, Triceps round 1 is next, and no 30 second set rest starts
 
 #### Scenario: Zero set rest
 
@@ -90,7 +96,7 @@ After the last set of the last part, no rest SHALL follow. The session SHALL ent
 
 ### Requirement: Total rest counts block transitions
 
-Session total rest SHALL include every set rest, every round rest after a non-final round, and the round rest after each block followed by another block. It SHALL exclude only the final set of the last block.
+Session total rest SHALL include every set rest, every round rest between rounds of a movement, the round rest at each movement switch, and the round rest after each block followed by another block. It SHALL exclude only the final set of the last block.
 
 #### Scenario: Four rounds of four sets
 
@@ -109,6 +115,12 @@ Session total rest SHALL include every set rest, every round rest after a non-fi
 - **GIVEN** the last set of the last block
 - **WHEN** total rest is calculated
 - **THEN** the rest after that set is excluded
+
+#### Scenario: Two movements, three rounds, two sets
+
+- **GIVEN** one block with Biceps and Triceps, 3 rounds, 2 sets per round, set rest 60, and round rest 120
+- **WHEN** total rest is calculated without a following block
+- **THEN** it is 960 seconds: 6 set rests and 5 round rests, one of them at the movement switch
 
 ### Requirement: Session start gate
 
@@ -188,7 +200,7 @@ Rest remaining SHALL be derived from a stored deadline rather than a decrementin
 
 ### Requirement: Block-aware position
 
-The current position SHALL include the block index, block name, round, set, and movement index, all one-based where applicable. Position SHALL clamp to the last set for invalid indexes. The done state SHALL present the whole session as complete.
+The current position SHALL include the block index, block name, movement index, round, and set, all one-based where applicable. Within a block each movement SHALL run all of its rounds, in order, before the next movement starts. Position SHALL clamp to the last set for invalid indexes. The done state SHALL present the whole session as complete.
 
 #### Scenario: Position at a block boundary
 
@@ -206,7 +218,19 @@ The current position SHALL include the block index, block name, round, set, and 
 
 - **GIVEN** completed sets equals total sets
 - **WHEN** position is requested
-- **THEN** it clamps to the last block's last round and set
+- **THEN** it clamps to the last block's last movement, last round, and last set
+
+#### Scenario: Position across movements
+
+- **GIVEN** a block with Biceps and Triceps, 3 rounds, and 2 sets per round
+- **WHEN** completed sets is 6
+- **THEN** the position is Triceps, round 1, set 1
+
+#### Scenario: Position in a later round of the first movement
+
+- **GIVEN** a block with Biceps and Triceps, 3 rounds, and 2 sets per round
+- **WHEN** completed sets is 4
+- **THEN** the position is Biceps, round 3, set 1
 
 ### Requirement: Timer presentation includes the block
 
@@ -349,7 +373,7 @@ When a rest or timed work countdown reaches zero, the timer SHALL apply the matc
 
 ### Requirement: Adaptive block map
 
-A block SHALL be drawn as a dot grid when rounds ≤ 12, movements × sets per round ≤ 12, and total dots ≤ 72. The grid SHALL draw one row per round and one dot per set in the round, grouped by movement. A larger block SHALL be drawn as a progress bar showing completed and total sets. The timer MUST NOT draw more than 72 set dots.
+A block SHALL be drawn as a dot grid when it has at most 12 rows, at most 12 sets per row, and at most 72 set dots in total. Its rows SHALL be the movements' rounds in run order: one row per round of each movement, with a gap between movements, and one dot per set in that round. A larger block SHALL be drawn as a progress bar showing completed and total sets. The timer MUST NOT draw more than 72 set dots.
 
 #### Scenario: Four rounds of four sets
 
@@ -361,13 +385,19 @@ A block SHALL be drawn as a dot grid when rounds ≤ 12, movements × sets per r
 
 - **GIVEN** a block with 2 movements, 2 rounds, and 1 set per round
 - **WHEN** the timer draws the map
-- **THEN** it draws 2 rows of 2 dots, grouped by movement
+- **THEN** it draws 4 rows of 1 dot, two rows for each movement, with a gap between the movements
 
 #### Scenario: Large block uses a bar
 
 - **GIVEN** a block with 20 rounds and 30 sets per round
 - **WHEN** the timer draws the map
 - **THEN** it draws a progress bar instead of dots and shows completed and total sets
+
+#### Scenario: Two movements in run order
+
+- **GIVEN** a block with Biceps and Triceps, 3 rounds, and 2 sets per round
+- **WHEN** the timer draws the map
+- **THEN** it draws 6 rows of 2 dots, Biceps' three rows above Triceps' three rows, with a gap between them
 
 ### Requirement: Editing is locked during rest
 
@@ -403,7 +433,7 @@ Committing a change to the active session's plan SHALL reset the session to not 
 
 ### Requirement: Rest copy names what finished
 
-During a rest, the timer SHALL state what finished: `AFTER SET n` for a set rest, `AFTER ROUND n` for a round rest inside a block, `AFTER <finished movement> · NEXT <next movement>` for a movement switch inside a round, and `AFTER <finished block> · NEXT <next block>` for a block transition. The kicker SHALL be `SET REST`, `ROUND REST`, or `PAUSED`.
+During a rest, the timer SHALL state what finished: `AFTER SET n` for a set rest, `AFTER ROUND n` for a round rest between rounds of one movement, `AFTER <finished movement> · NEXT <next movement>` for a movement switch, and `AFTER <finished block> · NEXT <next block>` for a block transition. The kicker SHALL be `SET REST` for a set rest, `ROUND REST` for every other rest, or `PAUSED`.
 
 #### Scenario: Set rest copy
 
@@ -413,13 +443,13 @@ During a rest, the timer SHALL state what finished: `AFTER SET n` for a set rest
 
 #### Scenario: Movement switch copy
 
-- **GIVEN** a set rest after Biceps inside a superset round, with Triceps next
+- **GIVEN** a round rest after Biceps' last round, with Triceps next
 - **WHEN** the timer rests
-- **THEN** the subtitle is AFTER BICEPS · NEXT TRICEPS
+- **THEN** the kicker is ROUND REST and the subtitle is AFTER BICEPS · NEXT TRICEPS
 
 #### Scenario: Round rest copy
 
-- **GIVEN** a round rest after round 2
+- **GIVEN** a round rest after round 2 of one movement
 - **WHEN** the timer rests
 - **THEN** the subtitle is AFTER ROUND 2
 

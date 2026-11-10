@@ -108,13 +108,19 @@ Restless SHALL schedule one local notification for the deadline when it moves to
 
 ### Requirement: The completion alert names what finished
 
-A completion alert SHALL state what finished and what comes next: the rest kind or work set, the finished set or round, and the next movement or session completion. The system surface decides whether that copy is split across a title and body.
+A completion alert SHALL state what finished and what comes next: the rest kind or work set, the finished set, round, or movement, and the next set, movement, block, or session completion. The system surface decides whether that copy is split across a title and body.
 
 #### Scenario: A set rest ends
 
-- **GIVEN** a set rest after set 2 of a block whose next movement is Bench Press
+- **GIVEN** a set rest after set 2 inside a round, with set 3 next
 - **WHEN** the alert is raised
-- **THEN** it names the set rest and Bench Press as next, with the next round and set
+- **THEN** it reads SET REST OVER, names AFTER SET 2 as what finished, and names the next round and set
+
+#### Scenario: A movement switch ends
+
+- **GIVEN** a round rest after Biceps' last round, with Triceps next
+- **WHEN** the alert is raised
+- **THEN** it reads ROUND REST OVER, names Biceps as finished, and names Triceps as next
 
 #### Scenario: A timed work set ends
 

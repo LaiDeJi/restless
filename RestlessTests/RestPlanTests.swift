@@ -46,6 +46,20 @@ private let superset = WorkoutPreset(
     ]
 )
 
+private let twoByThreeByTwo = WorkoutPreset(
+    name: "Arms",
+    blocks: [
+        block(
+            rounds: 3,
+            setsPerRound: 2,
+            setRest: 60,
+            roundRest: 120,
+            movements: [curlID, pushdownID],
+            name: "Arms"
+        )
+    ]
+)
+
 private let partsExample = WorkoutPreset(
     name: "Arms",
     blocks: [
@@ -69,11 +83,11 @@ private let zeroSetRest = WorkoutPreset(
     blocks: [
         block(
             rounds: 2,
-            setsPerRound: 1,
+            setsPerRound: 2,
             setRest: 0,
             roundRest: 120,
-            movements: [curlID, pushdownID],
-            name: "Arms"
+            movements: [benchID],
+            name: "Bench"
         )
     ]
 )
@@ -123,14 +137,34 @@ func fourByFourTotals() {
     #expect(fourByFour.totalRest == 1080)
 }
 
-@Test("A 2 × 2 superset switches movement with set rest and rounds with round rest")
+@Test("A movement's rounds and the switch that follows are all round rests")
 func supersetRestSequence() {
     #expect(superset.totalSets == 4)
-    #expect(superset.rest(after: 0) == rest(.set, 30, .movement))
-    #expect(superset.rest(after: 1) == rest(.round, 120, .round))
-    #expect(superset.rest(after: 2) == rest(.set, 30, .movement))
+    // Biceps round 1, the switch to Triceps, then Triceps round 1.
+    #expect(superset.rest(after: 0) == rest(.round, 120, .round))
+    #expect(superset.rest(after: 1) == rest(.round, 120, .movement))
+    #expect(superset.rest(after: 2) == rest(.round, 120, .round))
     #expect(superset.rest(after: 3) == nil)
-    #expect(superset.totalRest == 180)
+    #expect(superset.totalRest == 360)
+}
+
+@Test("A 2 × 3 × 2 block rests after every round of each movement", arguments: 0...11)
+func twoByThreeByTwoRestSequence(index: Int) {
+    let expected: RestOption? = switch index {
+    case 11: nil
+    case 1, 3, 7, 9: rest(.round, 120, .round)
+    case 5: rest(.round, 120, .movement)
+    default: rest(.set, 60, .set)
+    }
+    #expect(twoByThreeByTwo.rest(after: index) == expected)
+}
+
+@Test("A 2 × 3 × 2 block is 12 sets and 960 seconds of rest")
+func twoByThreeByTwoTotals() {
+    #expect(twoByThreeByTwo.totalSets == 12)
+    // 6 set rests × 60 + 5 round rests × 120: two inside each movement's
+    // rounds and one at the switch.
+    #expect(twoByThreeByTwo.totalRest == 960)
 }
 
 @Test("One round of three sets has only set rest")
@@ -151,11 +185,13 @@ func manyRoundsRestSequence() {
     #expect(manyRounds.totalRest == 360)
 }
 
-@Test("A zero set rest is a zero-duration set rest and never becomes a state")
+@Test("A zero set rest is skipped inside a round and a round rest still follows")
 func zeroSetRestSequence() {
-    #expect(zeroSetRest.rest(after: 0) == rest(.set, 0, .movement))
+    #expect(zeroSetRest.totalSets == 4)
+    #expect(zeroSetRest.rest(after: 0) == rest(.set, 0, .set))
     #expect(zeroSetRest.rest(after: 1) == rest(.round, 120, .round))
-    #expect(zeroSetRest.rest(after: 2) == rest(.set, 0, .movement))
+    #expect(zeroSetRest.rest(after: 2) == rest(.set, 0, .set))
+    #expect(zeroSetRest.rest(after: 3) == nil)
     #expect(zeroSetRest.totalRest == 120)
 }
 
@@ -197,26 +233,54 @@ func fourByFourPositions() {
     #expect(nextRound.set == 1)
 }
 
-@Test("A superset position walks movements inside the round before the next round")
-func supersetPositions() {
+@Test("A movement runs all of its rounds before the next movement starts")
+func movementMajorPositions() {
     let first = superset.position(at: 0)
     #expect(first.movementIndex == 0)
     #expect(first.round == 1)
     #expect(first.set == 1)
 
-    let second = superset.position(at: 1)
-    #expect(second.movementIndex == 1)
-    #expect(second.round == 1)
-    #expect(second.set == 1)
+    let secondRound = superset.position(at: 1)
+    #expect(secondRound.movementIndex == 0)
+    #expect(secondRound.round == 2)
+    #expect(secondRound.set == 1)
 
-    let nextRound = superset.position(at: 2)
-    #expect(nextRound.movementIndex == 0)
-    #expect(nextRound.round == 2)
-    #expect(nextRound.set == 1)
+    let switched = superset.position(at: 2)
+    #expect(switched.movementIndex == 1)
+    #expect(switched.round == 1)
+    #expect(switched.set == 1)
 
     let last = superset.position(at: 3)
     #expect(last.movementIndex == 1)
     #expect(last.round == 2)
+}
+
+@Test("The 2 × 3 × 2 block walks Biceps' six sets before Triceps' six")
+func twoByThreeByTwoPositions() {
+    let firstRound = twoByThreeByTwo.position(at: 1)
+    #expect(firstRound.movementIndex == 0)
+    #expect(firstRound.round == 1)
+    #expect(firstRound.set == 2)
+
+    let bicepsLast = twoByThreeByTwo.position(at: 5)
+    #expect(bicepsLast.movementIndex == 0)
+    #expect(bicepsLast.round == 3)
+    #expect(bicepsLast.set == 2)
+
+    let switchMovement = twoByThreeByTwo.position(at: 6)
+    #expect(switchMovement.movementIndex == 1)
+    #expect(switchMovement.round == 1)
+    #expect(switchMovement.set == 1)
+
+    let tricepsLast = twoByThreeByTwo.position(at: 11)
+    #expect(tricepsLast.movementIndex == 1)
+    #expect(tricepsLast.round == 3)
+    #expect(tricepsLast.set == 2)
+
+    let clamped = twoByThreeByTwo.position(at: 99)
+    #expect(clamped.movementIndex == 1)
+    #expect(clamped.round == 3)
+    #expect(clamped.set == 2)
 }
 
 @Test("A second block starts at its first set")
@@ -336,7 +400,10 @@ func overflowSafeTotals() {
 func roundSetCopyStates() {
     #expect(fourByFour.position(at: 5).roundSetCopy(in: fourByFour.blocks[0]).text == "ROUND 2 OF 4 · SET 2 OF 4")
 
-    #expect(superset.position(at: 1).roundSetCopy(in: superset.blocks[0]).text == "ROUND 1 OF 2")
+    let twoByThreeCopy = twoByThreeByTwo.position(at: 6)
+        .roundSetCopy(in: twoByThreeByTwo.blocks[0])
+    #expect(twoByThreeCopy.text == "ROUND 1 OF 3 · SET 1 OF 2")
+    #expect(superset.position(at: 1).roundSetCopy(in: superset.blocks[0]).text == "ROUND 2 OF 2")
     #expect(oneRound.position(at: 1).roundSetCopy(in: oneRound.blocks[0]).text == "SET 2 OF 3")
 
     let single = WorkoutPreset(
@@ -351,7 +418,7 @@ func blockCopy() {
     let twoMovements = superset.blocks[0]
     #expect(blockNumbers(twoMovements) == "2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS")
     #expect(blockMeta(twoMovements).hasPrefix("2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS · SET 0:30 · ROUND 2:00"))
-    #expect(blockSummary(twoMovements) == "2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS · 3:00 REST")
+    #expect(blockSummary(twoMovements) == "2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS · 6:00 REST")
     #expect(blockRoundSetCopy(twoMovements) == "2 ROUNDS · 1 SET EACH")
 
     let heavy = fourByFour.blocks[0]

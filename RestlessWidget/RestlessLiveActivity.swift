@@ -27,9 +27,13 @@ struct RestlessLiveActivity: Widget {
                             .foregroundStyle(.white.opacity(0.62))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
-                        Text(positionLabel(context))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.45))
+                        if !snapshot.isResting {
+                            Text(positionLabel(context))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.45))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
                     }
                     .padding(.leading, 4)
                 }
@@ -42,7 +46,15 @@ struct RestlessLiveActivity: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 8) {
+                        if let rest = restLine(context) {
+                            Text(rest)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.62))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+
                         RestProgressBar(context: context)
 
                         ActivityButtons(context: context)
@@ -104,6 +116,16 @@ private func positionLabel(_ context: ActivityViewContext<RestlessActivityAttrib
     let snapshot = context.attributes.snapshot(context.state)
     guard snapshot.phase != .done else { return "SESSION COMPLETE" }
     return snapshot.roundSetCopy.text
+}
+
+/// The expanded island's rest line: what just finished, shown full width above
+/// the progress bar. A movement switch reads `AFTER BICEPS · NEXT TRICEPS`
+/// under the round-rest kicker. Nil outside a rest.
+private func restLine(_ context: ActivityViewContext<RestlessActivityAttributes>) -> String? {
+    let snapshot = context.attributes.snapshot(context.state)
+    guard snapshot.isResting else { return nil }
+    let copy = restCopy(context)
+    return copy.isEmpty ? nil : copy
 }
 
 /// The rest subtitle names the finished movement or block and what follows.

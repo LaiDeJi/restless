@@ -109,20 +109,22 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         indexInBlock: Int
     ) -> WorkoutPosition {
         let sets = max(block.setsPerRound, 1)
-        let perRound = max(block.perRoundSets, 1)
-        let round = indexInBlock / perRound + 1
-        let withinRound = indexInBlock % perRound
-        let movementIndex = min(withinRound / sets, max(block.movements.count - 1, 0))
+        let rounds = max(block.rounds, 1)
+        let perMovement = max(safeProduct(rounds, sets), 1)
+        let movementCount = max(block.movements.count, 1)
+        // Movement-major: each movement runs all of its rounds before the next.
+        let movementIndex = min(indexInBlock / perMovement, movementCount - 1)
+        let withinMovement = indexInBlock % perMovement
         let movement = block.movements.isEmpty
             ? BlockMovement(movementId: UUID())
-            : block.movements[movementIndex]
+            : block.movements[min(movementIndex, block.movements.count - 1)]
         return WorkoutPosition(
             blockIndex: blockIndex,
             blockName: block.name,
             movementIndex: movementIndex,
             movementId: movement.movementId,
-            round: round,
-            set: withinRound % sets + 1
+            round: withinMovement / sets + 1,
+            set: withinMovement % sets + 1
         )
     }
 
@@ -138,11 +140,11 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         if position.set < sets {
             return RestOption(kind: .set, duration: block.setRest, transition: .set)
         }
-        if position.movementIndex < block.movements.count - 1 {
-            return RestOption(kind: .set, duration: block.setRest, transition: .movement)
-        }
-        if position.round < block.rounds {
+        if position.round < max(block.rounds, 1) {
             return RestOption(kind: .round, duration: block.roundRest, transition: .round)
+        }
+        if position.movementIndex < block.movements.count - 1 {
+            return RestOption(kind: .round, duration: block.roundRest, transition: .movement)
         }
         guard position.blockIndex < blocks.count - 1 else { return nil }
         return RestOption(kind: .round, duration: block.roundRest, transition: .block)
@@ -202,9 +204,11 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
 struct WorkoutPosition: Hashable, Sendable {
     let blockIndex: Int
     let blockName: String
+    /// One-based position of the movement in the block's order. Each movement
+    /// runs all of the block's rounds before the next one starts.
     let movementIndex: Int
     let movementId: UUID
-    /// One-based round within the block.
+    /// One-based round of that movement.
     let round: Int
     /// One-based set within the movement's round.
     let set: Int
@@ -275,8 +279,9 @@ enum RestTransition: String, Codable, Hashable, Sendable {
     case round
     case block
 
-    /// The accent is the set-rest green only for an inside-round set rest;
-    /// every transition is the round-rest amber.
+    /// The accent is the set-rest green only for a set rest inside a movement's
+    /// round. A movement switch is a round rest, so it takes the round-rest
+    /// amber like every other transition.
     var isSetAccent: Bool { self == .set }
 }
 

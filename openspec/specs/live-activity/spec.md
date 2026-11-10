@@ -80,7 +80,7 @@ Expanded content SHALL identify the active block and the current round and set. 
 
 ### Requirement: Rest copy names the transition
 
-During a rest the island SHALL show the rest kind, remaining time, and progress. A set rest and an in-block round rest SHALL state what finished. A movement switch inside a round SHALL name the finished and next movements. A rest between blocks SHALL name the finished and next blocks.
+During a rest the island SHALL show the rest kind, remaining time, and progress. A set rest and a round rest between rounds of one movement SHALL state what finished. A movement switch after a movement's last round SHALL name the finished and next movements. A rest between blocks SHALL name the finished and next blocks.
 
 #### Scenario: Set rest on the island
 
@@ -89,9 +89,9 @@ During a rest the island SHALL show the rest kind, remaining time, and progress.
 
 #### Scenario: Movement switch on the island
 
-- **GIVEN** a set rest after Biceps inside a superset round, with Triceps next
+- **GIVEN** a round rest after Biceps' last round, with Triceps next
 - **WHEN** the island shows the rest
-- **THEN** it shows SET REST and AFTER BICEPS · NEXT TRICEPS
+- **THEN** it shows ROUND REST and AFTER BICEPS · NEXT TRICEPS
 
 #### Scenario: Block transition on the island
 

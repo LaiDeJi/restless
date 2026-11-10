@@ -57,8 +57,9 @@ struct SessionsScreen: View {
                 librarySection
 
                 Text(
-                    "Each round runs every movement in order for its sets-per-round sets. "
-                        + "A set rest follows each set; a round rest follows each round."
+                    "Each movement runs all of its rounds before the next. "
+                        + "A set rest follows each set inside a round; a round rest follows each round, "
+                        + "each movement switch, and each block."
                 )
                     .font(Theme.TypeScale.meta)
                     .foregroundStyle(Theme.tertiaryText)

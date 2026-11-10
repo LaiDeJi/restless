@@ -140,10 +140,10 @@ struct BlockEditorScreen: View {
                 value: Binding(
                     get: { block.rounds },
                     set: { newValue in
-                        edit { $0.rounds = max(newValue, Self.minimumRounds($0)) }
+                        edit { $0.rounds = max(newValue, 1) }
                     }
                 ),
-                minimum: Self.minimumRounds(block),
+                minimum: 1,
                 locked: isLocked
             )
 
@@ -407,12 +407,6 @@ struct BlockEditorScreen: View {
     }
 
     // MARK: Actions
-
-    /// A block with two or more movements keeps at least two rounds, so a
-    /// superset is not authored as a single pass by accident.
-    private static func minimumRounds(_ block: WorkoutBlock) -> Int {
-        block.movements.count > 1 ? 2 : 1
-    }
 
     private func edit(_ mutate: @escaping (inout WorkoutBlock) -> Void) {
         draft.editBlock(target, mutate)
