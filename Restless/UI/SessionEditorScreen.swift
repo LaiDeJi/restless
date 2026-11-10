@@ -25,6 +25,7 @@ struct SessionEditorScreen: View {
     @State private var armedBlockID: UUID?
     @State private var draggingID: UUID?
     @State private var dropTargetID: UUID?
+    @State private var dragOrder: [UUID]?
     @State private var nameFieldFrame: CGRect = .zero
     @State private var showingNewBlock = false
     @State private var showingRestartConfirmation = false
@@ -118,9 +119,10 @@ struct SessionEditorScreen: View {
 
                 kicker("BLOCKS")
 
+                let blocks = displayedBlocks(draft)
                 VStack(spacing: 8) {
-                    ForEach(Array(draft.session.blocks.enumerated()), id: \.element.id) { index, block in
-                        blockRow(block, index: index, count: draft.session.blocks.count, draft: draft)
+                    ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
+                        blockRow(block, index: index, count: blocks.count, draft: draft)
                     }
                 }
 
@@ -132,6 +134,16 @@ struct SessionEditorScreen: View {
             .padding(.bottom, 30)
         }
         .scrollIndicators(.hidden)
+        .scrollDisabled(draggingID != nil)
+        .planEdgeDropZones(
+            rowIDs: displayedBlocks(draft).map(\.id),
+            draggingID: $draggingID,
+            dropTargetID: $dropTargetID,
+            onReorder: { source, target in
+                reorder(source, onto: target, draft: draft)
+            },
+            onDropEnded: { commitDrag(draft) }
+        )
         .scrollDismissesKeyboard(.interactively)
     }
 
@@ -200,10 +212,13 @@ struct SessionEditorScreen: View {
             onMoveDown: { move(block.id, by: 1, draft: draft) },
             onDelete: { deleteBlock(block.id, draft: draft) },
             onReorder: { source, target in
-                guard !isLocked else { return }
-                draft.moveBlock(source, onto: target)
+                reorder(source, onto: target, draft: draft)
             },
-            onDropEnded: { draft.flush() },
+            onDropEnded: { commitDrag(draft) },
+            onDragBegan: { beginDrag(draft) },
+            onDragEnded: { completed in
+                endDrag(completed: completed, draft: draft)
+            },
             content: {
                 blockContent(block, index: index, armed: armed)
             },
@@ -211,6 +226,14 @@ struct SessionEditorScreen: View {
                 BlockEditorScreen(draft: draft, target: .saved(block.id))
             }
         )
+    }
+
+    /// The provisional order while a drag is down; the model order otherwise.
+    private func displayedBlocks(_ draft: SessionDraftStore) -> [WorkoutBlock] {
+        let blocks = draft.session.blocks
+        guard let dragOrder else { return blocks }
+        let byID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
+        return dragOrder.compactMap { byID[$0] }
     }
 
     private func blockContent(_ block: WorkoutBlock, index: Int, armed: Bool) -> some View {
@@ -327,23 +350,6 @@ struct SessionEditorScreen: View {
         .padding(.top, 8)
     }
 
-    private func footerButtonLabel(_ title: String, prominent: Bool) -> some View {
-        Text(title)
-            .font(Theme.TypeScale.action)
-            .tracking(0.6)
-            .foregroundStyle(prominent ? Theme.ink : (isLocked ? .white.opacity(0.2) : .white.opacity(0.7)))
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 52)
-            .background(
-                Capsule().fill(
-                    prominent
-                        ? (isLocked ? Color.white.opacity(0.1) : Theme.setAccent)
-                        : Color.white.opacity(0.07)
-                )
-            )
-            .contentShape(Capsule())
-    }
-
     // MARK: Actions
 
     private func load() {
@@ -423,11 +429,6 @@ struct SessionEditorScreen: View {
         flushAll()
     }
 
-    private func clearDrag() {
-        draggingID = nil
-        dropTargetID = nil
-    }
-
     private func close() {
         if isDraft {
             dismiss()
@@ -498,6 +499,77 @@ struct SessionEditorScreen: View {
             engine.use(next.preset)
         }
         router.sessionsPath.removeAll()
+    }
+}
+
+// MARK: - Drag
+
+private extension SessionEditorScreen {
+    func clearDrag() {
+        draggingID = nil
+        dropTargetID = nil
+        dragOrder = nil
+        draft?.endDrag()
+    }
+
+    /// Captures the model order and suspends the draft's debounce for the
+    /// gesture. A pending edit is flushed once when the drag ends.
+    func beginDrag(_ draft: SessionDraftStore) {
+        guard !isLocked, dragOrder == nil else { return }
+        dragOrder = draft.session.blocks.map(\.id)
+        draft.beginDrag()
+    }
+
+    /// A crossing only permutes the provisional array; nothing reaches the
+    /// draft, SwiftData, the engine, or the Live Activity while the finger is
+    /// down. The rows animate to their new slots like a native list.
+    func reorder(_ source: UUID, onto target: UUID, draft: SessionDraftStore) {
+        guard !isLocked else { return }
+        if dragOrder == nil { beginDrag(draft) }
+        guard let order = dragOrder,
+              let from = order.firstIndex(of: source),
+              let to = order.firstIndex(of: target),
+              from != to
+        else { return }
+        var moved = order
+        let id = moved.remove(at: from)
+        moved.insert(id, at: to)
+        withAnimation(.smooth(duration: 0.26)) { dragOrder = moved }
+    }
+
+    func commitDrag(_ draft: SessionDraftStore) {
+        guard let order = dragOrder else { return }
+        dragOrder = nil
+        if order != draft.session.blocks.map(\.id) {
+            draft.reorderBlocks(to: order)
+        }
+        draft.endDrag()
+    }
+
+    func endDrag(completed: Bool, draft: SessionDraftStore) {
+        if completed {
+            commitDrag(draft)
+        } else {
+            withAnimation(.smooth(duration: 0.26)) { dragOrder = nil }
+            draft.endDrag()
+        }
+    }
+
+    func footerButtonLabel(_ title: String, prominent: Bool) -> some View {
+        Text(title)
+            .font(Theme.TypeScale.action)
+            .tracking(0.6)
+            .foregroundStyle(prominent ? Theme.ink : (isLocked ? .white.opacity(0.2) : .white.opacity(0.7)))
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 52)
+            .background(
+                Capsule().fill(
+                    prominent
+                        ? (isLocked ? Color.white.opacity(0.1) : Theme.setAccent)
+                        : Color.white.opacity(0.07)
+                )
+            )
+            .contentShape(Capsule())
     }
 }
 

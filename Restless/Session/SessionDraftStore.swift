@@ -29,6 +29,7 @@ final class SessionDraftStore {
     private(set) var stagedBlock: WorkoutBlock?
 
     @ObservationIgnored private var pending: Task<Void, Never>?
+    @ObservationIgnored private var isDragging = false
     @ObservationIgnored private let delay: Duration
     @ObservationIgnored var commit: (@MainActor (WorkoutPreset) -> Void)?
 
@@ -41,6 +42,26 @@ final class SessionDraftStore {
         mutate(&session)
         isDirty = true
         schedule()
+    }
+
+    // MARK: Drag
+
+    /// Suspends the debounce for a drag gesture. An edit already waiting stays
+    /// dirty and is committed by `endDrag()`; nothing is saved while the finger
+    /// is down.
+    func beginDrag() {
+        guard !isDragging else { return }
+        isDragging = true
+        pending?.cancel()
+        pending = nil
+    }
+
+    /// Ends a drag and flushes once, so the dropped order and any edit that was
+    /// waiting when the drag began are saved together.
+    func endDrag() {
+        guard isDragging else { return }
+        isDragging = false
+        flush()
     }
 
     // MARK: Staged block
@@ -152,6 +173,56 @@ final class SessionDraftStore {
             stagedBlock = block
             return true
         }
+    }
+
+    /// Replaces the block order in one draft edit. `order` must be a
+    /// permutation of the current block ids; anything else leaves the session
+    /// untouched so a stale provisional order cannot drop a block.
+    @discardableResult
+    func reorderBlocks(to order: [UUID]) -> Bool {
+        let ids = session.blocks.map(\.id)
+        guard Self.isPermutation(order, of: ids) else { return false }
+        guard order != ids else { return true }
+        edit { session in
+            let byID = Dictionary(uniqueKeysWithValues: session.blocks.map { ($0.id, $0) })
+            session.blocks = order.compactMap { byID[$0] }
+        }
+        return true
+    }
+
+    /// Replaces a block's movement order in one edit. A staged block is written
+    /// directly and never dirties the draft or schedules a save.
+    @discardableResult
+    func reorderMovements(in target: BlockEditingTarget, to order: [UUID]) -> Bool {
+        switch target {
+        case .saved(let blockID):
+            guard let blockIndex = session.blocks.firstIndex(where: { $0.id == blockID }) else {
+                return false
+            }
+            let ids = session.blocks[blockIndex].movements.map(\.id)
+            guard Self.isPermutation(order, of: ids) else { return false }
+            guard order != ids else { return true }
+            edit { session in
+                let byID = Dictionary(
+                    uniqueKeysWithValues: session.blocks[blockIndex].movements.map { ($0.id, $0) }
+                )
+                session.blocks[blockIndex].movements = order.compactMap { byID[$0] }
+            }
+            return true
+        case .staged:
+            guard var block = stagedBlock else { return false }
+            let ids = block.movements.map(\.id)
+            guard Self.isPermutation(order, of: ids) else { return false }
+            guard order != ids else { return true }
+            let byID = Dictionary(uniqueKeysWithValues: block.movements.map { ($0.id, $0) })
+            block.movements = order.compactMap { byID[$0] }
+            stagedBlock = block
+            return true
+        }
+    }
+
+    private static func isPermutation(_ order: [UUID], of ids: [UUID]) -> Bool {
+        order.count == ids.count && Set(order) == Set(ids)
     }
 
     /// Appends a library movement with the picker's set end and target. A second
@@ -268,16 +339,19 @@ final class SessionDraftStore {
     }
 
     /// Applies any pending edit now. Called on dismissal, Done, and background.
+    /// A drag in progress keeps its edit dirty until `endDrag()`.
     func flush() {
         pending?.cancel()
         pending = nil
-        guard isDirty else { return }
+        guard !isDragging, isDirty else { return }
         isDirty = false
         commit?(session)
     }
 
     private func schedule() {
         pending?.cancel()
+        pending = nil
+        guard !isDragging else { return }
         let delay = delay
         pending = Task { [weak self] in
             try? await Task.sleep(for: delay)

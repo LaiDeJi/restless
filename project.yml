@@ -32,6 +32,7 @@ targets:
         CFBundleDisplayName: Restless
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
+        CADisableMinimumFrameDurationOnPhone: true
         NSSupportsLiveActivities: true
         UILaunchScreen:
           UIColorName: LaunchBackground

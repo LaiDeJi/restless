@@ -1,0 +1,395 @@
+# Drag reordering: session card, block, and movement drags plus a cancelled
+# movement drag. The runner has no native-devtools tree on this simulator, so
+# this is a fragment: it restarts the app with a raw tool step, waits are raw
+# `tool: await-ui-element` steps, and the drags use coordinates. Screens are
+# scrolled to the bottom before a control is tapped so its position does not
+# depend on the content height, and the picker queues the library's only
+# movement so the library never grows.
+executionPrerequisite: Restless is installed on the simulator and the test creates and deletes its own session.
+steps:
+  - tool: restart-app
+    args:
+      bundleId: com.whc.restless
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  - wait: 800
+  - tap:
+      x: 0.607
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SESSIONS
+  - wait: 800
+  - tap:
+      x: 0.89
+      y: 0.125
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BLOCKS
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SESSIONS
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+  - wait: 800
+  # Session card: drag the second card above the first.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.888
+          y: 0.33
+        - type: Move
+          x: 0.888
+          y: 0.33
+          delayMs: 900
+        - type: Move
+          x: 0.888
+          y: 0.28
+          delayMs: 250
+        - type: Move
+          x: 0.888
+          y: 0.22
+          delayMs: 250
+        - type: Up
+          x: 0.888
+          y: 0.22
+          delayMs: 500
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+  - wait: 800
+  # Open the now-first card and add a second block with one movement.
+  - tap:
+      x: 0.4
+      y: 0.21
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BLOCKS
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.481
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ADD FROM LIBRARY
+  - wait: 800
+  # Bottom of the staged block: the + ADD MOVEMENT button is the last element.
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.7
+      toX: 0.5
+      toY: 0.3
+      durationMs: 400
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.7
+      toX: 0.5
+      toY: 0.3
+      durationMs: 400
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.843
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET END
+  - wait: 800
+  # Queue the library's only movement, then commit the picker and the block.
+  - tap:
+      x: 0.5
+      y: 0.799
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.11
+  - wait: 1200
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 BLOCKS
+  - wait: 800
+  # Block drag: move block 02 above block 01.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.757
+          y: 0.535
+        - type: Move
+          x: 0.757
+          y: 0.535
+          delayMs: 900
+        - type: Move
+          x: 0.757
+          y: 0.47
+          delayMs: 250
+        - type: Move
+          x: 0.757
+          y: 0.4
+          delayMs: 250
+        - type: Up
+          x: 0.757
+          y: 0.4
+          delayMs: 500
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 BLOCKS
+  - wait: 800
+  # Open the first block and add a second movement through the picker.
+  - tap:
+      x: 0.4
+      y: 0.387
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: MOVEMENTS
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.7
+      toX: 0.5
+      toY: 0.3
+      durationMs: 400
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.7
+      toX: 0.5
+      toY: 0.3
+      durationMs: 400
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.77
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SET END
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.799
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.11
+  - wait: 1200
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 MOVEMENTS
+  - wait: 800
+  # Back to the top before the drags.
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  # Movement drag: move the second movement above the first.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.757
+          y: 0.743
+        - type: Move
+          x: 0.757
+          y: 0.743
+          delayMs: 900
+        - type: Move
+          x: 0.757
+          y: 0.7
+          delayMs: 250
+        - type: Move
+          x: 0.757
+          y: 0.64
+          delayMs: 250
+        - type: Up
+          x: 0.757
+          y: 0.64
+          delayMs: 500
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 MOVEMENTS
+  - wait: 800
+  # Back to the top before the cancelled drag.
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  # Cancelled drag: cross the first row, then release outside every row.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.757
+          y: 0.743
+        - type: Move
+          x: 0.757
+          y: 0.743
+          delayMs: 900
+        - type: Move
+          x: 0.757
+          y: 0.68
+          delayMs: 250
+        - type: Move
+          x: 0.757
+          y: 0.55
+          delayMs: 250
+        - type: Move
+          x: 0.757
+          y: 0.3
+          delayMs: 300
+        - type: Up
+          x: 0.757
+          y: 0.3
+          delayMs: 500
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 MOVEMENTS
+  - wait: 800
+  # Back to the top, then back to the session.
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.3
+      toX: 0.5
+      toY: 0.9
+      durationMs: 400
+  - wait: 800
+  - tap:
+      x: 0.18
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BLOCKS
+  - wait: 800
+  - tap:
+      x: 0.18
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+  - wait: 800
+  - tap:
+      x: 0.4
+      y: 0.21
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: DELETE SESSION
+  - wait: 800
+  - tap:
+      x: 0.2
+      y: 0.806
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: TAP AGAIN TO DELETE
+  - wait: 800
+  - tap:
+      x: 0.2
+      y: 0.806
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: New session

@@ -2,6 +2,14 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// The row card's latest on-screen rect, written by the row's geometry callback.
+/// A reference box rather than state: the handle reads it at lift and on drop,
+/// and a write during an animated reorder must not re-evaluate the row.
+/// Written and read on the main actor only.
+final class PlanCardMetrics: @unchecked Sendable {
+    var rect: CGRect = .zero
+}
+
 /// One reorderable plan row. The card opens its editor, the trailing grip is the
 /// drag source, and the trailing trash arms on the first tap. The same row is
 /// used by the session editor's blocks and the block editor's movements.
@@ -18,11 +26,16 @@ struct PlanListRow<Destination: View, Content: View>: View {
     let onDelete: () -> Void
     let onReorder: (UUID, UUID) -> Void
     let onDropEnded: () -> Void
+    let onDragBegan: () -> Void
+    let onDragEnded: (Bool) -> Void
     @ViewBuilder let content: () -> Content
     @ViewBuilder let destination: () -> Destination
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var rowSize: CGSize = .zero
+    /// The card's own on-screen rect, not the row's: the floating card is the
+    /// size of the card it lifts and starts from that card's position, so it
+    /// stays where the finger grabbed it while the list moves underneath.
+    @State private var cardMetrics = PlanCardMetrics()
 
     private var isDragSource: Bool { !isLocked && draggingID == itemID }
     private var isDropTarget: Bool {
@@ -65,8 +78,12 @@ struct PlanListRow<Destination: View, Content: View>: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(isDropTarget ? Theme.setAccent.opacity(0.55) : .clear, lineWidth: 1)
                 )
-                .opacity(isDragSource ? 0.35 : 1)
                 .contentShape(Rectangle())
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .global)
+                } action: { frame in
+                    cardMetrics.rect = frame
+                }
             }
             .buttonStyle(.plain)
             .disabled(isLocked)
@@ -76,20 +93,24 @@ struct PlanListRow<Destination: View, Content: View>: View {
             .accessibilityAction(named: "Move down") {
                 if !isLocked { onMoveDown() }
             }
+            // Hide the card, not the row's container: the empty slot must stay
+            // hit-testable so dropping back onto it commits the provisional
+            // order instead of cancelling (UIKit skips alpha-0 drop targets).
+            .opacity(isDragSource ? 0 : 1)
 
             grip
+                .opacity(isDragSource ? 0 : 1)
 
             if canDelete {
                 trash
+                    .opacity(isDragSource ? 0 : 1)
             }
         }
-        .onGeometryChange(for: CGSize.self) { proxy in
-            proxy.size
-        } action: { size in
-            rowSize = size
-        }
+        // The hidden slot still needs a hit area: drop targeting follows the
+        // container's content shape, not its invisible children.
+        .contentShape(Rectangle())
         .onDrop(
-            of: [.text],
+            of: [.planRow],
             delegate: PlanDropDelegate(
                 targetID: itemID,
                 draggingID: $draggingID,
@@ -109,10 +130,13 @@ struct PlanListRow<Destination: View, Content: View>: View {
                 .overlay {
                     PlanDragHandle(
                         itemID: itemID,
-                        previewSize: rowSize,
+                        metrics: cardMetrics,
+                        previewCornerRadius: 16,
                         trailingInset: 0,
                         draggingID: $draggingID,
                         dropTargetID: $dropTargetID,
+                        onDragBegan: onDragBegan,
+                        onDragEnded: onDragEnded,
                         preview: { size in dragPreview(size: size) }
                     )
                     .frame(width: 44, height: 44)
@@ -121,10 +145,7 @@ struct PlanListRow<Destination: View, Content: View>: View {
     }
 
     private func dragPreview(size: CGSize) -> some View {
-        ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Theme.background)
-
+        PlanDragCard {
             HStack(spacing: 12) {
                 content()
 
@@ -134,15 +155,8 @@ struct PlanListRow<Destination: View, Content: View>: View {
                     .font(Theme.TypeScale.body.weight(.semibold))
                     .foregroundStyle(Theme.tertiaryText)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
         }
-        .frame(width: max(size.width, 320), height: max(size.height, 68))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.white.opacity(0.14), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.7), radius: 26, x: 0, y: 16)
+        .frame(width: previewWidth(size), height: previewHeight(size))
     }
 
     private var gripDots: some View {
@@ -192,10 +206,41 @@ struct PlanGripDots: View {
     }
 }
 
+/// The floating card shared by the session, block, and movement drags: one
+/// chrome, so the three lists lift the same way.
+struct PlanDragCard<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(13)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Theme.background)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(.white.opacity(0.14), lineWidth: 1)
+            )
+    }
+}
+
+/// The lift card is the size of the card it lifts, so it covers the row exactly
+/// while the list moves underneath it. The fallback only covers a row that has
+/// not measured itself yet, where the grip's 44 pt box is not a card.
+private func previewWidth(_ size: CGSize) -> CGFloat {
+    size.width > 120 ? size.width : 320
+}
+
+private func previewHeight(_ size: CGSize) -> CGFloat {
+    size.height > 1 ? size.height : 68
+}
+
 /// A SESSIONS card with the same trailing grip and drop target as a plan row.
 /// The card keeps its own tap action; the grip is a sibling, never the button.
 struct SessionDragRow<Content: View>: View {
     let itemID: UUID
+    let isActive: Bool
     let isLocked: Bool
     @Binding var draggingID: UUID?
     @Binding var dropTargetID: UUID?
@@ -203,10 +248,12 @@ struct SessionDragRow<Content: View>: View {
     let onMoveDown: () -> Void
     let onReorder: (UUID, UUID) -> Void
     let onDropEnded: () -> Void
+    let onDragBegan: () -> Void
+    let onDragEnded: (Bool) -> Void
     let onOpen: () -> Void
     @ViewBuilder let content: () -> Content
 
-    @State private var rowSize: CGSize = .zero
+    @State private var cardMetrics = PlanCardMetrics()
 
     private var isDragSource: Bool { !isLocked && draggingID == itemID }
     private var isDropTarget: Bool {
@@ -217,13 +264,28 @@ struct SessionDragRow<Content: View>: View {
         HStack(spacing: 4) {
             Button(action: onOpen) {
                 content()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(.white.opacity(isActive ? 0.075 : 0.04))
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(isDropTarget ? Theme.setAccent.opacity(0.55) : .clear, lineWidth: 1)
+                            .stroke(
+                                isDropTarget
+                                    ? Theme.setAccent.opacity(0.55)
+                                    : (isActive ? Theme.setAccent.opacity(0.28) : .white.opacity(0.055)),
+                                lineWidth: 1
+                            )
                     )
-                    .opacity(isDragSource ? 0.35 : 1)
                     .contentShape(Rectangle())
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .global)
+                    } action: { frame in
+                        cardMetrics.rect = frame
+                    }
             }
             .buttonStyle(.plain)
             .accessibilityAction(named: "Move up") {
@@ -232,16 +294,18 @@ struct SessionDragRow<Content: View>: View {
             .accessibilityAction(named: "Move down") {
                 if !isLocked { onMoveDown() }
             }
+            // Keep the row container hit-testable while its card is hidden, so
+            // dropping back on the empty slot commits instead of cancelling.
+            .opacity(isDragSource ? 0 : 1)
 
             grip
+                .opacity(isDragSource ? 0 : 1)
         }
-        .onGeometryChange(for: CGSize.self) { proxy in
-            proxy.size
-        } action: { size in
-            rowSize = size
-        }
+        // The hidden slot still needs a hit area: drop targeting follows the
+        // container's content shape, not its invisible children.
+        .contentShape(Rectangle())
         .onDrop(
-            of: [.text],
+            of: [.planRow],
             delegate: PlanDropDelegate(
                 targetID: itemID,
                 draggingID: $draggingID,
@@ -261,10 +325,13 @@ struct SessionDragRow<Content: View>: View {
                 .overlay {
                     PlanDragHandle(
                         itemID: itemID,
-                        previewSize: rowSize,
+                        metrics: cardMetrics,
+                        previewCornerRadius: 16,
                         trailingInset: 0,
                         draggingID: $draggingID,
                         dropTargetID: $dropTargetID,
+                        onDragBegan: onDragBegan,
+                        onDragEnded: onDragEnded,
                         preview: { size in dragPreview(size: size) }
                     )
                     .frame(width: 44, height: 44)
@@ -273,226 +340,7 @@ struct SessionDragRow<Content: View>: View {
     }
 
     private func dragPreview(size: CGSize) -> some View {
-        ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Theme.background)
-
-            content()
-        }
-        .frame(width: max(size.width, 320), height: max(size.height, 72))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.14), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.7), radius: 26, x: 0, y: 16)
-    }
-}
-
-/// The grip's 44 × 44 area catches the drag; the floating preview is drawn
-/// separately so it is not clipped to the grip. The hit test is bounded on both
-/// axes: an x-only check would claim a vertical strip and steal taps from the
-/// steppers and header actions above and below the row.
-private final class PlanDragSurfaceView: UIView {
-    var trailingInset: CGFloat = 0
-
-    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        let gripMaxX = bounds.width - trailingInset
-        return point.x >= gripMaxX - 44
-            && point.x <= gripMaxX
-            && point.y >= 0
-            && point.y <= bounds.height
-    }
-}
-
-/// Reorders as the dragged row enters another row, so the list follows the
-/// finger instead of waiting for the drop. The handler receives stable ids, and
-/// each screen looks up the live indexes, so a fast drag cannot use stale ones.
-struct PlanDropDelegate: DropDelegate {
-    let targetID: UUID
-    @Binding var draggingID: UUID?
-    @Binding var dropTargetID: UUID?
-    let onReorder: (UUID, UUID) -> Void
-    let onDropEnded: () -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let source = draggingID, source != targetID else { return }
-        dropTargetID = targetID
-        onReorder(source, targetID)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        if draggingID != nil {
-            dropTargetID = targetID
-        }
-        return DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        if dropTargetID == targetID {
-            dropTargetID = nil
-        }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggingID = nil
-        dropTargetID = nil
-        onDropEnded()
-        return true
-    }
-}
-
-/// The grip's drag source. A UIKit drag interaction is the one place that
-/// reports both ends of the session, so the lifted source clears even when the
-/// drop lands outside every row.
-struct PlanDragHandle<Preview: View>: UIViewRepresentable {
-    let itemID: UUID
-    let previewSize: CGSize
-    let trailingInset: CGFloat
-    @Binding var draggingID: UUID?
-    @Binding var dropTargetID: UUID?
-    @ViewBuilder let preview: (CGSize) -> Preview
-
-    func makeUIView(context: Context) -> UIView {
-        let view = PlanDragSurfaceView()
-        view.backgroundColor = .clear
-        view.trailingInset = trailingInset
-        let interaction = UIDragInteraction(delegate: context.coordinator)
-        interaction.isEnabled = true
-        view.addInteraction(interaction)
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        (uiView as? PlanDragSurfaceView)?.trailingInset = trailingInset
-        context.coordinator.parent = self
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    final class Coordinator: NSObject, UIDragInteractionDelegate {
-        var parent: PlanDragHandle
-        private var previewLayer: CALayer?
-        private var sourceWindow: UIWindow?
-        private var dragSession: UIDragSession?
-        private var displayLink: CADisplayLink?
-
-        init(_ parent: PlanDragHandle) {
-            self.parent = parent
-        }
-
-        func dragInteraction(
-            _ interaction: UIDragInteraction,
-            itemsForBeginning session: UIDragSession
-        ) -> [UIDragItem] {
-            let item = UIDragItem(
-                itemProvider: NSItemProvider(object: parent.itemID.uuidString as NSString)
-            )
-            item.previewProvider = {
-                let view = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-                view.backgroundColor = .clear
-                let parameters = UIDragPreviewParameters()
-                parameters.backgroundColor = .clear
-                parameters.visiblePath = UIBezierPath(rect: view.bounds)
-                return UIDragPreview(view: view, parameters: parameters)
-            }
-            return [item]
-        }
-
-        func dragInteraction(
-            _ interaction: UIDragInteraction,
-            previewForLifting item: UIDragItem,
-            session: UIDragSession
-        ) -> UITargetedDragPreview? {
-            guard let source = interaction.view else { return nil }
-            let view = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-            view.backgroundColor = .clear
-            let parameters = UIDragPreviewParameters()
-            parameters.backgroundColor = .clear
-            parameters.visiblePath = UIBezierPath(rect: view.bounds)
-            let target = UIDragPreviewTarget(container: source, center: session.location(in: source))
-            return UITargetedDragPreview(view: view, parameters: parameters, target: target)
-        }
-
-        func dragInteraction(
-            _ interaction: UIDragInteraction,
-            sessionWillBegin session: UIDragSession
-        ) {
-            parent.dropTargetID = nil
-            parent.draggingID = parent.itemID
-            guard let source = interaction.view,
-                  let window = source.window,
-                  let image = makePreviewImage()
-            else { return }
-            dragSession = session
-            sourceWindow = window
-
-            let layer = CALayer()
-            layer.contents = image.cgImage
-            layer.contentsScale = image.scale
-            layer.bounds = CGRect(origin: .zero, size: image.size)
-            layer.opacity = 1
-            window.layer.addSublayer(layer)
-            previewLayer = layer
-            positionPreview(at: session.location(in: window), in: window)
-
-            let link = CADisplayLink(target: self, selector: #selector(tick))
-            link.add(to: .main, forMode: .common)
-            displayLink = link
-        }
-
-        @objc private func tick() {
-            MainActor.assumeIsolated {
-                guard let session = dragSession,
-                      let window = sourceWindow,
-                      previewLayer != nil
-                else { return }
-                positionPreview(at: session.location(in: window), in: window)
-            }
-        }
-
-        private func positionPreview(at point: CGPoint, in window: UIWindow) {
-            guard let previewLayer else { return }
-            let halfWidth = previewLayer.bounds.width / 2
-            let halfHeight = previewLayer.bounds.height / 2
-            let x = min(max(point.x, halfWidth), window.bounds.width - halfWidth)
-            let y = min(max(point.y - halfHeight - 12, halfHeight), window.bounds.height - halfHeight)
-            previewLayer.position = CGPoint(x: x, y: y)
-        }
-
-        private func makePreviewImage() -> UIImage? {
-            let size = CGSize(
-                width: max(parent.previewSize.width, 320),
-                height: max(parent.previewSize.height, 68)
-            )
-            let inset: CGFloat = 30
-            let renderSize = CGSize(
-                width: size.width + inset * 2,
-                height: size.height + inset * 2
-            )
-            let renderer = ImageRenderer(
-                content: parent.preview(size)
-                    .padding(inset)
-                    .frame(width: renderSize.width, height: renderSize.height)
-            )
-            renderer.scale = 3
-            return renderer.uiImage
-        }
-
-        func dragInteraction(
-            _ interaction: UIDragInteraction,
-            session: UIDragSession,
-            didEndWith operation: UIDropOperation
-        ) {
-            displayLink?.invalidate()
-            displayLink = nil
-            previewLayer?.removeFromSuperlayer()
-            previewLayer = nil
-            dragSession = nil
-            sourceWindow = nil
-            parent.draggingID = nil
-            parent.dropTargetID = nil
-        }
+        PlanDragCard { content() }
+            .frame(width: previewWidth(size), height: previewHeight(size))
     }
 }

@@ -15,6 +15,7 @@ struct BlockEditorScreen: View {
     @State private var armedMovementID: UUID?
     @State private var draggingID: UUID?
     @State private var dropTargetID: UUID?
+    @State private var dragOrder: [UUID]?
     @State private var nameFieldFrame: CGRect = .zero
     @State private var showPicker = false
     @FocusState private var nameFocused: Bool
@@ -97,9 +98,10 @@ struct BlockEditorScreen: View {
                         .foregroundStyle(Theme.tertiaryText)
                 }
 
+                let rows = displayedMovements(block)
                 VStack(spacing: 8) {
-                    ForEach(Array(block.movements.enumerated()), id: \.element.id) { index, movement in
-                        movementRow(movement, index: index, count: block.movements.count, block: block)
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, movement in
+                        movementRow(movement, index: index, count: rows.count, block: block)
                     }
                 }
 
@@ -119,6 +121,14 @@ struct BlockEditorScreen: View {
             .padding(.bottom, 30)
         }
         .scrollIndicators(.hidden)
+        .scrollDisabled(draggingID != nil)
+        .planEdgeDropZones(
+            rowIDs: displayedMovements(block).map(\.id),
+            draggingID: $draggingID,
+            dropTargetID: $dropTargetID,
+            onReorder: { source, target in reorder(source, onto: target) },
+            onDropEnded: { commitDrag() }
+        )
         .scrollDismissesKeyboard(.interactively)
     }
 
@@ -252,10 +262,13 @@ struct BlockEditorScreen: View {
             onMoveDown: { move(movement.id, by: 1, block: block) },
             onDelete: { deleteMovement(movement.id, block: block) },
             onReorder: { source, destination in
-                guard !isLocked else { return }
-                draft.moveMovement(source, in: target, onto: destination)
+                reorder(source, onto: destination)
             },
-            onDropEnded: { draft.flush() },
+            onDropEnded: { commitDrag() },
+            onDragBegan: { beginDrag() },
+            onDragEnded: { completed in
+                endDrag(completed: completed)
+            },
             content: {
                 movementContent(movement, index: index, armed: armed)
             },
@@ -427,6 +440,55 @@ struct BlockEditorScreen: View {
     private func clearDrag() {
         draggingID = nil
         dropTargetID = nil
+        dragOrder = nil
+        draft.endDrag()
+    }
+
+    /// The provisional order while a drag is down; the block's order otherwise.
+    private func displayedMovements(_ block: WorkoutBlock) -> [BlockMovement] {
+        guard let dragOrder else { return block.movements }
+        let byID = Dictionary(uniqueKeysWithValues: block.movements.map { ($0.id, $0) })
+        return dragOrder.compactMap { byID[$0] }
+    }
+
+    private func beginDrag() {
+        guard !isLocked, dragOrder == nil, let block = draft.block(target) else { return }
+        dragOrder = block.movements.map(\.id)
+        draft.beginDrag()
+    }
+
+    /// A crossing only permutes the provisional array. A saved block reaches
+    /// the draft once on drop; a staged block is written directly, no flush.
+    private func reorder(_ source: UUID, onto targetID: UUID) {
+        guard !isLocked else { return }
+        if dragOrder == nil { beginDrag() }
+        guard let order = dragOrder,
+              let from = order.firstIndex(of: source),
+              let to = order.firstIndex(of: targetID),
+              from != to
+        else { return }
+        var moved = order
+        let id = moved.remove(at: from)
+        moved.insert(id, at: to)
+        withAnimation(.smooth(duration: 0.26)) { dragOrder = moved }
+    }
+
+    private func commitDrag() {
+        guard let order = dragOrder else { return }
+        dragOrder = nil
+        if let block = draft.block(target), order != block.movements.map(\.id) {
+            draft.reorderMovements(in: target, to: order)
+        }
+        draft.endDrag()
+    }
+
+    private func endDrag(completed: Bool) {
+        if completed {
+            commitDrag()
+        } else {
+            withAnimation(.smooth(duration: 0.26)) { dragOrder = nil }
+            draft.endDrag()
+        }
     }
 
     private func close() {

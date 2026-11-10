@@ -10,9 +10,18 @@ struct SessionsScreen: View {
     @Query(sort: \MovementRecord.createdAt) private var movements: [MovementRecord]
     @State private var draggingID: UUID?
     @State private var dropTargetID: UUID?
+    @State private var dragOrder: [UUID]?
 
     private var isLocked: Bool { engine.snapshot.isLocked }
     private var orderedRecords: [PresetRecord] { PresetRepository.ordered(records) }
+
+    /// The provisional order while a drag is down; the saved order otherwise.
+    private var displayedRecords: [PresetRecord] {
+        let ordered = orderedRecords
+        guard let dragOrder else { return ordered }
+        let byID = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0) })
+        return dragOrder.compactMap { byID[$0] }
+    }
 
     var body: some View {
         ScrollView {
@@ -23,20 +32,25 @@ struct SessionsScreen: View {
                     EditingLockBanner()
                 }
 
-                ForEach(orderedRecords) { record in
+                ForEach(displayedRecords) { record in
                     SessionDragRow(
                         itemID: record.id,
+                        isActive: record.id == ActivePresetStore.id,
                         isLocked: isLocked,
                         draggingID: $draggingID,
                         dropTargetID: $dropTargetID,
                         onMoveUp: { move(record, by: -1) },
                         onMoveDown: { move(record, by: 1) },
                         onReorder: { source, target in
-                            move(source, onto: target)
+                            reorder(source, onto: target)
                         },
-                        onDropEnded: persistOrder,
+                        onDropEnded: { commitDrag() },
+                        onDragBegan: { beginDrag() },
+                        onDragEnded: { completed in
+                            endDrag(completed: completed)
+                        },
                         onOpen: { open(record) },
-                        content: { card(record) }
+                        content: { cardContent(record) }
                     )
                 }
 
@@ -57,18 +71,22 @@ struct SessionsScreen: View {
             .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
+        .scrollDisabled(draggingID != nil)
+        .planEdgeDropZones(
+            rowIDs: displayedRecords.map(\.id),
+            draggingID: $draggingID,
+            dropTargetID: $dropTargetID,
+            onReorder: { source, target in reorder(source, onto: target) },
+            onDropEnded: { commitDrag() }
+        )
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .onChange(of: isLocked) { _, locked in
-            if locked {
-                draggingID = nil
-                dropTargetID = nil
-            }
+            if locked { clearDrag() }
         }
         .onDisappear {
-            draggingID = nil
-            dropTargetID = nil
+            clearDrag()
         }
     }
 
@@ -106,7 +124,7 @@ struct SessionsScreen: View {
         }
     }
 
-    private func card(_ record: PresetRecord) -> some View {
+    private func cardContent(_ record: PresetRecord) -> some View {
         let active = record.id == ActivePresetStore.id
         let total = record.preset
 
@@ -134,16 +152,6 @@ struct SessionsScreen: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.white.opacity(active ? 0.075 : 0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(active ? Theme.setAccent.opacity(0.28) : .white.opacity(0.055), lineWidth: 1)
-        )
     }
 
     private func cardText(_ record: PresetRecord, total: WorkoutPreset) -> some View {
@@ -236,17 +244,54 @@ struct SessionsScreen: View {
         router.sessionsPath.append(.session(record.id))
     }
 
-    /// Drag entry: move the in-memory order and assign contiguous indexes. The
-    /// store is written once on drop end, not on every row entered.
-    private func move(_ sourceID: UUID, onto targetID: UUID) {
+    /// Drag entry: permute the provisional order only. The store is written
+    /// once on drop, not on every row entered. The cards are animated to their
+    /// new slots, the way a native list opens the gap under the pointer.
+    private func reorder(_ sourceID: UUID, onto targetID: UUID) {
         guard !isLocked else { return }
-        var list = orderedRecords
-        guard let from = list.firstIndex(where: { $0.id == sourceID }),
-              let to = list.firstIndex(where: { $0.id == targetID }),
-              from != to else { return }
-        let record = list.remove(at: from)
-        list.insert(record, at: to)
-        applyOrder(list)
+        if dragOrder == nil { beginDrag() }
+        guard let order = dragOrder,
+              let from = order.firstIndex(of: sourceID),
+              let to = order.firstIndex(of: targetID),
+              from != to
+        else { return }
+        var moved = order
+        let id = moved.remove(at: from)
+        moved.insert(id, at: to)
+        withAnimation(.smooth(duration: 0.26)) {
+            dragOrder = moved
+        }
+    }
+
+    private func beginDrag() {
+        guard !isLocked, dragOrder == nil else { return }
+        dragOrder = orderedRecords.map(\.id)
+    }
+
+    /// Assigns contiguous `sortIndex` values once and saves once, on drop.
+    private func commitDrag() {
+        guard let order = dragOrder else { return }
+        dragOrder = nil
+        guard !isLocked else { return }
+        let current = orderedRecords
+        guard order != current.map(\.id) else { return }
+        let byID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
+        applyOrder(order.compactMap { byID[$0] })
+        persistOrder()
+    }
+
+    private func endDrag(completed: Bool) {
+        if completed {
+            commitDrag()
+        } else {
+            withAnimation(.smooth(duration: 0.26)) { dragOrder = nil }
+        }
+    }
+
+    private func clearDrag() {
+        draggingID = nil
+        dropTargetID = nil
+        dragOrder = nil
     }
 
     /// Accessibility Move up/down is one discrete action, so it persists at once.
