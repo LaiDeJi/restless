@@ -110,26 +110,61 @@ final class SystemCountdownAlertScheduler: CountdownAlertScheduler {
     }
 }
 
+/// What a tapped notification asks of the app. Deliberately not a
+/// `SessionAction`: a tap only shows the TIMER tab and reconciles the stored
+/// session, so it can never complete a set, skip a rest, or raise an alert.
+enum CountdownAlertTap: Equatable, Sendable {
+    case showTimer
+    case ignore
+
+    init(identifier: String) {
+        let isCountdown = identifier.hasPrefix(SystemCountdownAlertScheduler.notificationPrefix)
+            || identifier == SystemCountdownAlertScheduler.legacyNotificationID
+        self = isCountdown ? .showTimer : .ignore
+    }
+}
+
+/// Carries the notification centre's completion handler across the main-actor
+/// hop. The block comes from Objective-C with no concurrency annotation.
+private final class NotificationCompletion: @unchecked Sendable {
+    private let handler: () -> Void
+
+    init(_ handler: @escaping () -> Void) {
+        self.handler = handler
+    }
+
+    func call() {
+        handler()
+    }
+}
+
 /// Suppresses the foreground banner (the haptic already fired) and routes a
-/// tapped notification to the timer.
+/// tapped notification to the timer. UIKit continues a response on the thread
+/// that calls the completion handler, so every path completes on the main
+/// actor; the async delegate methods resume on a cooperative queue and were
+/// what aborted the app during the response's state-restoration work.
 private final class CountdownNotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        []
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([])
     }
 
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
         let identifier = response.notification.request.identifier
-        let isCountdown = identifier.hasPrefix(SystemCountdownAlertScheduler.notificationPrefix)
-            || identifier == SystemCountdownAlertScheduler.legacyNotificationID
-        guard isCountdown else { return }
+        let tap = CountdownAlertTap(identifier: identifier)
+        let completion = NotificationCompletion(completionHandler)
         Task { @MainActor in
-            NotificationCenter.default.post(name: .countdownAlertOpened, object: nil)
+            if tap == .showTimer {
+                NotificationCenter.default.post(name: .countdownAlertOpened, object: nil)
+            }
+            completion.call()
         }
     }
 }
