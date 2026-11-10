@@ -5,7 +5,6 @@ import SwiftUI
 struct RestlessApp: App {
     private let container: ModelContainer
     @State private var engine: SessionEngine
-    @State private var watchLink: WatchLink
 
     init() {
         do {
@@ -21,8 +20,6 @@ struct RestlessApp: App {
                 MovementRepository.names(in: context)
             }
             _engine = State(initialValue: engine)
-            _watchLink = State(initialValue: WatchLink(transport: WatchSessionTransport.shared))
-            WatchSessionTransport.shared.activate()
         } catch {
             fatalError("Could not open the preset store: \(error)")
         }
@@ -32,7 +29,6 @@ struct RestlessApp: App {
         WindowGroup {
             RootView()
                 .environment(engine)
-                .environment(watchLink)
         }
         .modelContainer(container)
     }

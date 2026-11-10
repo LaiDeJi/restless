@@ -4,7 +4,6 @@ import SwiftUI
 struct TimerScreen: View {
     @Environment(SessionEngine.self) private var engine
     @Environment(AppRouter.self) private var router
-    @Environment(WatchLink.self) private var watchLink
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query(sort: \MovementRecord.createdAt) private var movements: [MovementRecord]
 
@@ -42,9 +41,6 @@ struct TimerScreen: View {
                         SetMap(snapshot: snapshot)
                             .timerStageRole(.map)
 
-                        watchStrip(snapshot)
-                            .timerStageRole(.watch)
-
                         actions(snapshot)
                             .timerStageRole(.actions)
                     }
@@ -57,12 +53,6 @@ struct TimerScreen: View {
         .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.4), value: snapshot.phase)
         .animation(.easeInOut(duration: 0.4), value: snapshot.restKind)
-        .onChange(of: armKey(snapshot), initial: true) { _, _ in
-            syncArm(snapshot)
-        }
-        .onChange(of: snapshot.preset) { _, _ in
-            syncArm(snapshot)
-        }
         .onChange(of: snapshot.phase) { _, _ in
             showingRestartConfirmation = false
         }
@@ -361,83 +351,6 @@ struct TimerScreen: View {
 
     private func countdownSize(_ snapshot: SessionSnapshot) -> CGFloat {
         snapshot.usesSmallHero ? min(smallCountdown, 68) : min(largeCountdown, 96)
-    }
-
-    // MARK: Watch
-
-    @ViewBuilder
-    private func watchStrip(_ snapshot: SessionSnapshot) -> some View {
-        if snapshot.phase == .ready,
-           let movement = snapshot.currentBlockMovement,
-           movement.endCondition == .reps {
-            let profile = movements.first { $0.id == movement.movementId }?.movement.profile
-            let usableProfile = profile?.usesForearmSignal == true
-            let armed = watchLink.armed
-            let isArmed = armed != nil
-            let connected = watchLink.reachable && isArmed
-
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(isArmed ? Theme.setAccent : .white.opacity(0.22))
-                    .frame(width: 7, height: 7)
-                Text(isArmed ? "WATCH ARMED" : "WATCH UNAVAILABLE")
-                    .font(Theme.TypeScale.micro.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(isArmed ? Theme.setAccent : .white.opacity(0.5))
-                if let armed {
-                    Text(connected
-                         ? "\(watchLink.reps) OF \(armed.target) REPS"
-                         : "WRIST DOWN · RAISE TO COUNT")
-                        .font(Theme.TypeScale.micro)
-                        .tracking(0.4)
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.62))
-                } else {
-                    Text(usableProfile ? "SET DONE STILL WORKS" : "NO PROFILE · SET DONE STILL WORKS")
-                        .font(Theme.TypeScale.micro)
-                        .tracking(0.4)
-                        .foregroundStyle(.white.opacity(0.35))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isArmed ? Theme.setAccent.opacity(0.055) : .white.opacity(0.035))
-            )
-        }
-    }
-
-    // MARK: Watch link
-
-    private func armKey(_ snapshot: SessionSnapshot) -> String {
-        let movement = snapshot.currentBlockMovement
-        return [
-            snapshot.preset.id.uuidString,
-            snapshot.phase.rawValue,
-            String(snapshot.doneSets),
-            movement?.id.uuidString ?? "",
-            movement?.movementId.uuidString ?? "",
-            String(movement?.target ?? 0),
-            String(movements.count)
-        ].joined(separator: "|")
-    }
-
-    private func syncArm(_ snapshot: SessionSnapshot) {
-        guard snapshot.phase == .ready,
-              let movement = snapshot.currentBlockMovement,
-              movement.endCondition == .reps,
-              let profile = movements.first(where: { $0.id == movement.movementId })?.movement.profile,
-              profile.usesForearmSignal else {
-            watchLink.disarm()
-            return
-        }
-        watchLink.arm(
-            movementID: movement.movementId,
-            profile: profile,
-            target: movement.target ?? 1
-        )
     }
 
     // MARK: Actions

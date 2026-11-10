@@ -8,7 +8,6 @@ import UIKit
 final class CompletionAlertCenter {
     private let scheduler: any CountdownAlertScheduler
     private let haptic: () -> Void
-    private let watchAlert: () -> Void
     private let movementNames: () -> [UUID: String]
 
     private var isActive = true
@@ -21,13 +20,11 @@ final class CompletionAlertCenter {
     init(
         scheduler: any CountdownAlertScheduler = NoopCountdownAlertScheduler(),
         movementNames: @escaping () -> [UUID: String],
-        haptic: (() -> Void)? = nil,
-        watchAlert: @escaping () -> Void
+        haptic: (() -> Void)? = nil
     ) {
         self.scheduler = scheduler
         self.movementNames = movementNames
         self.haptic = haptic ?? { CompletionAlertCenter.systemHaptic() }
-        self.watchAlert = watchAlert
     }
 
     static func systemHaptic() {
@@ -72,7 +69,6 @@ final class CompletionAlertCenter {
             scheduledDeadline = nil
             await scheduler.cancel()
             haptic()
-            watchAlert()
             reconcile(snapshot, isActive: true)
             return
         }

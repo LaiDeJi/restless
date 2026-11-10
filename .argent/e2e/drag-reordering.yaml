@@ -10,6 +10,11 @@ steps:
   - tool: restart-app
     args:
       bundleId: com.whc.restless
+  # Return any running session to the start gate so the fixture starts clean.
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
   - tool: await-ui-element
     args:
       condition: visible

@@ -24,31 +24,21 @@ func seedCreatesChest() throws {
     #expect(MovementRepository.fetchAll(context).count == 1)
     #expect(first[0].id == Movement.chestID)
     #expect(first[0].name == "Chest")
-    #expect(first[0].profile == nil)
 }
 
 @MainActor
-@Test("A movement can be added and renamed")
+@Test("A movement is added, renamed, and keeps its name only")
 func movementCRUD() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    let profile = MovementProfile(axis: .y, rise: 33, fall: 27, minPeriod: 0.9)
-    let added = MovementRepository.add(
-        Movement(name: "Curl", profile: profile),
-        in: context
-    )
+    let added = MovementRepository.add(Movement(name: "Curl"), in: context)
 
     #expect(MovementRepository.fetchAll(context).count == 1)
     #expect(added.name == "Curl")
-    #expect(added.profile == profile)
 
     let renamed = MovementRepository.rename(added.id, to: "Hammer curl", in: context)
     #expect(renamed?.name == "Hammer curl")
-
-    let updated = MovementProfile(axis: .y, rise: 40, fall: 30, minPeriod: 1.1)
-    let recorded = MovementRepository.reRecord(added.id, profile: updated, in: context)
-    #expect(recorded?.profile == updated)
-    #expect(recorded?.name == "Hammer curl")
+    #expect(MovementRepository.find(added.id, in: context)?.movement.name == "Hammer curl")
 }
 
 @MainActor
@@ -86,11 +76,7 @@ func deleteUsedMovementIsRefused() throws {
 func deleteUnusedMovement() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    let profile = MovementProfile(axis: .y, rise: 30, fall: 25, minPeriod: 1.0)
-    let movement = MovementRepository.add(
-        Movement(name: "Face pull", profile: profile),
-        in: context
-    )
+    let movement = MovementRepository.add(Movement(name: "Face pull"), in: context)
 
     try MovementRepository.delete(movement.id, in: context)
 
@@ -131,7 +117,6 @@ func addOrReuseMovement() throws {
 
     let created = try #require(MovementRepository.addOrReuse(name: "  Cable Fly  ", in: context))
     #expect(created.name == "Cable Fly")
-    #expect(created.profile == nil)
     #expect(MovementRepository.fetchAll(context).count == 1)
 
     let reused = try #require(MovementRepository.addOrReuse(name: "cable fly", in: context))
@@ -142,8 +127,32 @@ func addOrReuseMovement() throws {
         MovementRepository.addOrReuse(name: "  Cable fly variation  ", in: context)
     )
     #expect(capped.name == "Cable fly variation")
-    #expect(capped.profile == nil)
 
     #expect(MovementRepository.addOrReuse(name: "   ", in: context) == nil)
     #expect(MovementRepository.fetchAll(context).count == 2)
+}
+
+@MainActor
+@Test("A legacy store with profile columns still opens name-only")
+func legacyProfileColumnsAreDormant() throws {
+    let container = try memoryContainer()
+    let context = ModelContext(container)
+    let legacy = MovementRecord(Movement(name: "Curl"))
+    legacy.axisRaw = "Y"
+    legacy.rise = 33
+    legacy.fall = 27
+    legacy.minPeriod = 0.9
+    legacy.group = "Biceps"
+    context.insert(legacy)
+    try context.save()
+
+    let opened = try #require(MovementRepository.find(legacy.id, in: context))
+    #expect(opened.movement.name == "Curl")
+    #expect(opened.axisRaw == "Y")
+
+    let renamed = MovementRepository.rename(legacy.id, to: "Hammer curl", in: context)
+    #expect(renamed?.name == "Hammer curl")
+    // Legacy columns are never rewritten.
+    #expect(opened.axisRaw == "Y")
+    #expect(opened.rise == 33)
 }

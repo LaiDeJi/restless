@@ -1,14 +1,13 @@
 import SwiftUI
 
 /// Marks a timer child so `TimerStageLayout` can place it by role instead of by
-/// index. The block strip and watch strip come and go, so an index would drift.
+/// index. The block strip comes and goes, so an index would drift.
 enum TimerStageRole: LayoutValueKey {
     case header
     case blockStrip
     case positionStrip
     case hero
     case map
-    case watch
     case actions
 
     static let defaultValue: TimerStageRole? = nil
@@ -18,8 +17,8 @@ enum TimerStageRole: LayoutValueKey {
 /// tests can cover a one-row and a three-row map, a wrapping position strip, a
 /// tall map, and a short viewport.
 struct TimerStageMetrics: Equatable {
-    /// The gap between the ring and the map, the map and the watch strip, and
-    /// the content and the actions.
+    /// The gap between the ring and the map, the map and the actions, and the
+    /// chrome and the ring.
     static let gap: CGFloat = 22
     /// The ring is never closer than this to the top chrome.
     static let chromeGap: CGFloat = 10
@@ -28,7 +27,6 @@ struct TimerStageMetrics: Equatable {
     let chromeHeight: CGFloat
     let heroSide: CGFloat
     let mapHeight: CGFloat
-    let watchHeight: CGFloat
     let actionsHeight: CGFloat
 
     /// The ring centre at the viewport's middle, clamped below the chrome when
@@ -41,18 +39,8 @@ struct TimerStageMetrics: Equatable {
 
     var mapTopY: CGFloat { heroTopY + heroSide + Self.gap }
 
-    var watchTopY: CGFloat {
-        watchHeight > 0 ? mapTopY + mapHeight + Self.gap : mapTopY + mapHeight
-    }
-
-    var belowBottomY: CGFloat {
-        watchHeight > 0 ? watchTopY + watchHeight : mapTopY + mapHeight
-    }
-
-    /// The actions sit at the bottom when they fit and below the below-ring
-    /// content when the map is too tall.
     var actionsTopY: CGFloat {
-        max(belowBottomY + Self.gap, viewportHeight - actionsHeight)
+        max(mapTopY + mapHeight + Self.gap, viewportHeight - actionsHeight)
     }
 
     var totalHeight: CGFloat {
@@ -60,9 +48,9 @@ struct TimerStageMetrics: Equatable {
     }
 }
 
-/// Places the timer's chrome, ring, map, watch strip, and actions against one
-/// fixed ring centre. Its height is at least the viewport, so a tall map makes
-/// the enclosing ScrollView scroll instead of moving the ring.
+/// Places the timer's chrome, ring, map, and actions against one fixed ring
+/// centre. Its height is at least the viewport, so a tall map makes the
+/// enclosing ScrollView scroll instead of moving the ring.
 struct TimerStageLayout: Layout {
     let viewportHeight: CGFloat
     let heroSide: CGFloat
@@ -104,14 +92,6 @@ struct TimerStageLayout: Layout {
             )
         }
 
-        if let watch = subview(.watch, in: subviews), metrics.watchHeight > 0 {
-            watch.place(
-                at: CGPoint(x: x, y: bounds.minY + metrics.watchTopY),
-                anchor: .top,
-                proposal: ProposedViewSize(width: width, height: metrics.watchHeight)
-            )
-        }
-
         if let actions = subview(.actions, in: subviews) {
             actions.place(
                 at: CGPoint(x: x, y: bounds.minY + metrics.actionsTopY),
@@ -126,7 +106,6 @@ struct TimerStageLayout: Layout {
         let blockStrip = size(of: .blockStrip, width: width, subviews: subviews)
         let positionStrip = size(of: .positionStrip, width: width, subviews: subviews)
         let map = size(of: .map, width: width, subviews: subviews)
-        let watch = size(of: .watch, width: width, subviews: subviews)
         let actions = size(of: .actions, width: width, subviews: subviews)
 
         let chrome = header.height + blockStrip.height + positionStrip.height
@@ -136,7 +115,6 @@ struct TimerStageLayout: Layout {
             chromeHeight: chrome,
             heroSide: heroSide,
             mapHeight: map.height,
-            watchHeight: watch.height,
             actionsHeight: actions.height
         )
     }

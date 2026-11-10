@@ -501,16 +501,8 @@ func restartClearsTimedSet() {
     #expect(snapshot.setDeadline == nil)
 }
 
-@Test("The editors list MANUAL, TIME, REPS in that order")
+@Test("The editors list MANUAL, TIME in that order")
 func endConditionEditorOrder() {
-    #expect(EndCondition.editorOrder == [.manual, .time, .reps])
-    #expect(EndCondition.editorOrder.map(\.label) == ["MANUAL", "TIME", "REPS"])
-}
-
-@Test("Only REPS needs a watch profile")
-func endConditionRequiresWatchProfile() {
-    #expect(EndCondition.reps.requiresWatchProfile)
-    #expect(!EndCondition.manual.requiresWatchProfile)
-    #expect(!EndCondition.time.requiresWatchProfile)
-    #expect(EndCondition.allCases.filter(\.requiresWatchProfile) == [.reps])
+    #expect(EndCondition.editorOrder == [.manual, .time])
+    #expect(EndCondition.editorOrder.map(\.label) == ["MANUAL", "TIME"])
 }

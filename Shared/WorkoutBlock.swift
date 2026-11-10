@@ -1,98 +1,60 @@
 import Foundation
 
-/// How a set ends. The condition belongs to the block movement, with a default
-/// from the library movement.
-enum EndCondition: String, Codable, Hashable, Sendable, CaseIterable {
-    case reps
+/// How a set ends. Only a phone countdown or a manual tap; the removed `reps`
+/// condition decodes as `manual` so older plans keep opening.
+enum EndCondition: String, Hashable, Sendable, CaseIterable, Codable {
     case time
     case manual
 
     /// The order the editors list the choices in. MANUAL leads because a new
-    /// movement has no profile yet and a manual set needs none.
-    static let editorOrder: [EndCondition] = [.manual, .time, .reps]
-
-    /// REPS needs a recorded profile for the watch to count; MANUAL and TIME
-    /// end on the tap or the countdown.
-    var requiresWatchProfile: Bool { self == .reps }
+    /// movement starts with a manual set.
+    static let editorOrder: [EndCondition] = [.manual, .time]
 
     var label: String {
         switch self {
-        case .reps: "REPS"
         case .time: "TIME"
         case .manual: "MANUAL"
         }
     }
-}
 
-enum MovementAxis: String, Codable, Hashable, Sendable, CaseIterable {
-    case x
-    case y
-    case z
-
-    var label: String { rawValue.uppercased() }
-}
-
-/// The four numbers the watch applies to count a movement. The signal is the
-/// forearm elevation: the angle between gravity and the watch's +Y axis, which
-/// runs along the forearm. Rotating the watch face around the forearm does not
-/// change it. `rise` and `fall` are degrees; `minPeriod` is seconds.
-struct MovementProfile: Codable, Hashable, Sendable {
-    var axis: MovementAxis
-    var rise: Double
-    var fall: Double
-    var minPeriod: Double
-
-    init(axis: MovementAxis, rise: Double, fall: Double, minPeriod: Double) {
-        self.axis = axis
-        self.rise = rise
-        self.fall = fall
-        self.minPeriod = minPeriod
+    /// Total on purpose: a throw here would drop a stored block and could
+    /// return the whole plan to the seed. Unknown stored values are MANUAL.
+    init(from decoder: Decoder) throws {
+        let raw = (try? decoder.singleValueContainer().decode(String.self)) ?? ""
+        self = EndCondition(rawValue: raw) ?? .manual
     }
 
-    func clamped() -> MovementProfile {
-        var copy = self
-        copy.rise = min(max(rise, 0), 180)
-        copy.fall = min(max(fall, 0), 180)
-        copy.minPeriod = min(max(minPeriod, 0.01), 10)
-        return copy
-    }
-
-    var usesForearmSignal: Bool {
-        rise >= 5 && fall >= 4
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 }
 
-/// A reusable library movement: a name and an optional recorded profile. The
-/// end condition and target belong to the block that uses it, not to the
-/// library entry.
+/// A reusable library movement: a name and nothing else. The end condition and
+/// target belong to the block that uses it, not to the library entry.
 struct Movement: Codable, Hashable, Identifiable, Sendable {
     /// Stable id of the seeded `Chest` movement, shared by the seeded session.
     static let chestID = UUID(uuidString: "00000000-0000-0000-0000-00000000C4E5")!
 
     var id: UUID
     var name: String
-    var profile: MovementProfile?
 
     init(
         id: UUID = UUID(),
-        name: String,
-        profile: MovementProfile? = nil
+        name: String
     ) {
         self.id = id
         self.name = name
-        self.profile = profile
     }
 
     static let chest = Movement(
         id: chestID,
-        name: "Chest",
-        profile: nil
+        name: "Chest"
     )
 
     func clamped() -> Movement {
         var copy = self
         copy.name = WorkoutPreset.clampedName(name, fallback: "Untitled movement")
-        copy.profile = profile?.clamped()
         return copy
     }
 }
@@ -138,7 +100,6 @@ struct BlockMovement: Codable, Hashable, Identifiable, Sendable {
     }
 
     var isTimed: Bool { endCondition == .time }
-    var isCounted: Bool { endCondition == .reps }
 }
 
 /// One ordered block in a session. A schedule is two numbers: `rounds` and
@@ -391,7 +352,6 @@ extension EndCondition {
     func clampedTarget(_ target: Int?) -> Int? {
         switch self {
         case .manual: nil
-        case .reps: max(target ?? 1, 1)
         case .time: WorkoutPreset.clampedSetDuration(target ?? 60)
         }
     }

@@ -117,3 +117,60 @@ func legacySnapshotsAreDiscarded() {
     #expect(defaults.object(forKey: "restless.session.v2") == nil)
     #expect(defaults.object(forKey: "restless.session.v1") == nil)
 }
+
+@MainActor
+@Test("A saved running snapshot with a REPS row loads at the same position")
+func storedRepsSnapshotLoads() throws {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+
+    let preset = WorkoutPreset(
+        name: "Full",
+        blocks: [
+            WorkoutBlock(
+                name: "Chest",
+                rounds: 1,
+                setsPerRound: 2,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            ),
+            WorkoutBlock(
+                name: "Arms",
+                rounds: 1,
+                setsPerRound: 2,
+                setRest: 30,
+                roundRest: 90,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            )
+        ]
+    )
+    var snapshot = SessionSnapshot.initial(preset, now: .now)
+    snapshot.doneSets = 3
+    snapshot.phase = .resting
+    snapshot.restKind = .set
+    snapshot.duration = 30
+    snapshot.deadline = .now.addingTimeInterval(20)
+
+    // Write the previous build's shape: the first movement carried REPS 10.
+    let encoded = try JSONEncoder().encode(snapshot)
+    var raw = try #require(String(bytes: encoded, encoding: .utf8))
+    if let range = raw.range(of: "\"endCondition\":\"manual\"") {
+        raw.replaceSubrange(range, with: "\"endCondition\":\"reps\",\"target\":10")
+    }
+    let defaults = UserDefaults(suiteName: SessionStore.appGroup) ?? .standard
+    defaults.set(Data(raw.utf8), forKey: "restless.session.v4")
+
+    let loaded = try #require(SessionStore.load())
+    #expect(loaded.preset.id == preset.id)
+    #expect(loaded.preset.blocks.count == 2)
+    #expect(loaded.preset.blocks[0].movements[0].endCondition == .manual)
+    #expect(loaded.preset.blocks[0].movements[0].target == nil)
+    #expect(loaded.doneSets == 3)
+    #expect(loaded.phase == .resting)
+
+    let engine = SessionEngine(preset: preset)
+    #expect(engine.snapshot.doneSets == 3)
+    #expect(engine.snapshot.position.blockIndex == 1)
+    #expect(engine.snapshot.position.set == 2)
+}

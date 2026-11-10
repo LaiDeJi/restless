@@ -33,7 +33,7 @@ func queueRejectsDuplicateName() {
     var list = PendingMovementList()
 
     let first = list.queue(name: "Cable Fly", condition: .manual, target: nil)
-    let duplicate = list.queue(name: "cable fly", condition: .reps, target: 10)
+    let duplicate = list.queue(name: "cable fly", condition: .time, target: 45)
     #expect(first)
     #expect(!duplicate)
     #expect(list.count == 1)
@@ -44,11 +44,11 @@ func toggleLibraryMovement() {
     let movement = Movement(name: "Bench Press")
     var list = PendingMovementList()
 
-    list.toggle(movement, condition: .reps, target: 10)
+    list.toggle(movement, condition: .time, target: 45)
     #expect(list.count == 1)
     #expect(list.contains(movementID: movement.id))
-    #expect(list.items[0].condition == .reps)
-    #expect(list.items[0].target == 10)
+    #expect(list.items[0].condition == .time)
+    #expect(list.items[0].target == 45)
 
     list.toggle(movement, condition: .manual, target: nil)
     #expect(list.isEmpty)
@@ -61,7 +61,7 @@ func toggleRejectsDuplicateName() {
 
     let queued = list.queue(name: "bench press", condition: .manual, target: nil)
     #expect(queued)
-    list.toggle(movement, condition: .reps, target: 10)
+    list.toggle(movement, condition: .time, target: 45)
     #expect(list.count == 1)
     #expect(list.items[0].movementID == nil)
 }
@@ -70,7 +70,7 @@ func toggleRejectsDuplicateName() {
 func removeKeepsOrder() {
     var list = PendingMovementList()
     list.queue(name: "Cable Fly", condition: .manual, target: nil)
-    list.queue(name: "Bench Press", condition: .reps, target: 10)
+    list.queue(name: "Bench Press", condition: .time, target: 45)
     list.queue(name: "Curl", condition: .time, target: 45)
     let removed = list.items[1].id
 

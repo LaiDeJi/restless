@@ -1,8 +1,9 @@
 import Foundation
 import SwiftData
 
-/// A reusable movement in the library. The legacy muscle-group and profile
-/// columns are kept for store compatibility; only the name is used.
+/// A reusable movement in the library. The legacy muscle-group, profile and
+/// default-condition columns are kept for store compatibility; only the name is
+/// read or written.
 @Model
 final class MovementRecord {
     var id: UUID
@@ -20,38 +21,25 @@ final class MovementRecord {
         id = movement.id
         name = movement.name
         group = ""
-        axisRaw = movement.profile?.axis.rawValue
-        rise = movement.profile?.rise
-        fall = movement.profile?.fall
-        minPeriod = movement.profile?.minPeriod
+        axisRaw = nil
+        rise = nil
+        fall = nil
+        minPeriod = nil
         defaultConditionRaw = EndCondition.manual.rawValue
         defaultTarget = nil
         createdAt = .now
     }
 
     var movement: Movement {
-        let profile: MovementProfile? = {
-            guard let axisRaw,
-                  let axis = MovementAxis(rawValue: axisRaw),
-                  let rise,
-                  let fall,
-                  let minPeriod else { return nil }
-            return MovementProfile(axis: axis, rise: rise, fall: fall, minPeriod: minPeriod).clamped()
-        }()
-        return Movement(
+        Movement(
             id: id,
-            name: name,
-            profile: profile
+            name: name
         ).clamped()
     }
 
     func apply(_ movement: Movement) {
         let clean = movement.clamped()
         name = clean.name
-        axisRaw = clean.profile?.axis.rawValue
-        rise = clean.profile?.rise
-        fall = clean.profile?.fall
-        minPeriod = clean.profile?.minPeriod
     }
 }
 
@@ -138,20 +126,6 @@ enum MovementRepository {
         guard let record = find(id, in: context) else { return nil }
         var movement = record.movement
         movement.name = WorkoutPreset.clampedName(name, fallback: "Untitled movement")
-        record.apply(movement)
-        try? context.save()
-        return record.movement
-    }
-
-    @discardableResult
-    static func reRecord(
-        _ id: UUID,
-        profile: MovementProfile,
-        in context: ModelContext
-    ) -> Movement? {
-        guard let record = find(id, in: context) else { return nil }
-        var movement = record.movement
-        movement.profile = profile.clamped()
         record.apply(movement)
         try? context.save()
         return record.movement

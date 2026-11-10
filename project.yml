@@ -4,7 +4,6 @@ options:
   bundleIdPrefix: com.whc
   deploymentTarget:
     iOS: "18.0"
-    watchOS: "11.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
@@ -42,8 +41,6 @@ targets:
           - CFBundleURLName: com.whc.restless
             CFBundleURLSchemes:
               - restless
-        UIFileSharingEnabled: true
-        LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless
@@ -55,8 +52,6 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: NO
     dependencies:
       - target: RestlessWidgetExtension
-        embed: true
-      - target: RestlessWatch
         embed: true
     postCompileScripts:
       - name: SwiftLint
@@ -71,41 +66,6 @@ targets:
           else
             echo "warning: swiftlint is not installed — run: brew install swiftlint"
           fi
-
-  RestlessWatch:
-    type: application
-    platform: watchOS
-    sources:
-      - path: RestlessWatch
-        excludes:
-          - README.md
-      - path: Shared/WorkoutPreset.swift
-      - path: Shared/WorkoutBlock.swift
-      - path: Shared/MovementProfileDerivation.swift
-      - path: Shared/ProfileRepCounter.swift
-      - path: Shared/WatchMessage.swift
-      - path: Shared/SessionSnapshot.swift
-      - path: Shared/Theme.swift
-    entitlements:
-      path: RestlessWatch/RestlessWatch.entitlements
-    info:
-      path: RestlessWatch/Info.plist
-      properties:
-        CFBundleDisplayName: Restless
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
-        WKApplication: true
-        WKCompanionAppBundleIdentifier: com.whc.restless
-        WKBackgroundModes:
-          - workout-processing
-        NSMotionUsageDescription: Restless reads wrist motion to count reps.
-        NSHealthShareUsageDescription: Restless reads workout data to keep a set running while your wrist is down.
-        NSHealthUpdateUsageDescription: Restless starts a workout session while a set is counting.
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.watchkitapp
-        TARGETED_DEVICE_FAMILY: "4"
-        SKIP_INSTALL: YES
 
   RestlessWidgetExtension:
     type: app-extension
@@ -146,7 +106,6 @@ schemes:
       targets:
         Restless: all
         RestlessWidgetExtension: all
-        RestlessWatch: all
         RestlessTests: [test]
     run:
       config: Debug
@@ -155,9 +114,3 @@ schemes:
       gatherCoverageData: true
       targets:
         - RestlessTests
-  RestlessWatch:
-    build:
-      targets:
-        RestlessWatch: all
-    run:
-      config: Debug

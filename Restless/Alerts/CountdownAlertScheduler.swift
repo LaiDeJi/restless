@@ -38,7 +38,7 @@ final class NoopCountdownAlertScheduler: CountdownAlertScheduler {
 /// One local notification per countdown deadline. It is the only background
 /// alert: the app schedules it before it leaves the foreground, and the system
 /// delivers it at the deadline whether the app is still executing or suspended.
-/// iOS mirrors it to the paired watch, so no watch message is needed.
+/// iOS mirrors it to a paired watch, so the app sends no separate watch alert.
 @MainActor
 final class SystemCountdownAlertScheduler: CountdownAlertScheduler {
     nonisolated static let notificationPrefix = "restless.countdown-alert."

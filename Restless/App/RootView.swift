@@ -3,7 +3,6 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SessionEngine.self) private var engine
-    @Environment(WatchLink.self) private var watchLink
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var router = AppRouter()
@@ -50,12 +49,6 @@ struct RootView: View {
         }
         .task {
             engine.setActive(scenePhase == .active)
-            engine.foregroundWatchAlert = { [watchLink] in
-                watchLink.alertIfReachable()
-            }
-            watchLink.onComplete = { [engine] in
-                engine.perform(.setDone)
-            }
         }
     }
 }

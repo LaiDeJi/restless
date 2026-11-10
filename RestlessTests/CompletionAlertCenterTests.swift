@@ -67,7 +67,6 @@ private func ready(now: Date = start) -> SessionSnapshot {
 @MainActor
 private final class Recorder {
     var haptics = 0
-    var watchAlerts = 0
 }
 
 @MainActor
@@ -84,8 +83,7 @@ private func makeCenter() -> CenterHarness {
     let center = CompletionAlertCenter(
         scheduler: scheduler,
         movementNames: { [benchID: "Bench press"] },
-        haptic: { recorder.haptics += 1 },
-        watchAlert: { recorder.watchAlerts += 1 }
+        haptic: { recorder.haptics += 1 }
     )
     return CenterHarness(center: center, scheduler: scheduler, recorder: recorder)
 }
@@ -124,7 +122,6 @@ func foregroundRestIsHapticOnly() async {
     let cancels = scheduler.cancels
     await center.countdownReached(ready(), alert: expectedRestAlert(), isActive: true)
     #expect(recorder.haptics == 1)
-    #expect(recorder.watchAlerts == 1)
     #expect(scheduler.cancels > cancels)
 }
 
@@ -243,7 +240,6 @@ func backgroundDeadlineLeavesTheNotification() async {
     await drain()
 
     #expect(recorder.haptics == 0)
-    #expect(recorder.watchAlerts == 0)
     #expect(scheduler.cancels == cancels)
     #expect(scheduler.scheduled.count == 1)
 }
@@ -277,7 +273,6 @@ func lateReconcileIsSilent() async {
     center.setActive(true, snapshot: ready())
 
     #expect(recorder.haptics == 0)
-    #expect(recorder.watchAlerts == 0)
 }
 
 @MainActor

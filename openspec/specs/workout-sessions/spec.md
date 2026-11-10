@@ -265,7 +265,7 @@ The session editor's RESTART SESSION action SHALL open the same confirmation as 
 
 ### Requirement: One-tap add from the movement library
 
-The block editor SHALL show an `ADD FROM LIBRARY` list of recorded movements that are not already in the block. Tapping one SHALL append that movement with MANUAL and no target in one edit, keep the add-movement sheet closed, and apply the existing two-movement rounds rule. The list SHALL be hidden while editing is locked and absent when no unused movement remains. The add-movement sheet SHALL remain for several movements, custom ends and targets, and typed names.
+The block editor SHALL show an `ADD FROM LIBRARY` list of library movements that are not already in the block. Tapping one SHALL append that movement with MANUAL and no target in one edit, keep the add-movement sheet closed, and apply the existing two-movement rounds rule. The list SHALL be hidden while editing is locked and absent when no unused movement remains. The add-movement sheet SHALL remain for several movements, custom ends and targets, and typed names.
 
 #### Scenario: One tap adds a movement
 
@@ -302,7 +302,7 @@ The block editor SHALL show an `ADD FROM LIBRARY` list of recorded movements tha
 
 - **GIVEN** a movement added from the library with MANUAL
 - **WHEN** the user opens its row
-- **THEN** its end condition and target can be changed to TIME or REPS
+- **THEN** its end condition and target can be changed to TIME
 
 #### Scenario: Locked block editor
 
@@ -485,6 +485,28 @@ Stored plans SHALL read into the new block shape without losing sets or rest. A 
 - **GIVEN** a stored circuit block with Biceps and Triceps, count 3
 - **WHEN** it is read
 - **THEN** it has rounds 3 and sets per round 1
+
+### Requirement: Stored REPS sets become MANUAL
+
+A stored block movement whose end condition is the removed `reps` value SHALL decode as `manual` with no target. Decoding SHALL preserve its movement id, order, block, rounds, sets, and rests, so a saved session and a saved running snapshot remain usable.
+
+#### Scenario: A stored REPS row decodes as MANUAL
+
+- **GIVEN** a stored block movement with `endCondition` set to `reps` and target 10
+- **WHEN** the block is decoded
+- **THEN** its end condition is MANUAL and its target is empty
+
+#### Scenario: A saved session keeps all blocks
+
+- **GIVEN** a stored session whose second block contains a REPS movement
+- **WHEN** the session is opened
+- **THEN** both blocks, every movement, rounds, sets, and rests remain, and the REPS movement is MANUAL
+
+#### Scenario: A running snapshot survives
+
+- **GIVEN** a saved running snapshot whose plan contains a REPS movement
+- **WHEN** the app launches
+- **THEN** the snapshot loads at the same position with the REPS movement shown as MANUAL
 
 ### Requirement: Duplicate movement rows collapse
 
@@ -702,16 +724,13 @@ movement. The picker SHALL stay open while movements are queued.
 
 ### Requirement: DONE commits the add-movement queue
 
-DONE SHALL create or reuse the typed library movements, append every queued
-movement to the block in the displayed order, flush the plan, and close the
-picker. CANCEL SHALL close without changing the block or the library. A created
-movement SHALL carry no watch profile.
+DONE SHALL create or reuse the typed library movements, append every queued movement to the block in the displayed order, flush the plan, and close the picker. CANCEL SHALL close without changing the block or the library.
 
 #### Scenario: Creating a movement and appending it
 
-- **GIVEN** the picker has pending Cable Fly with MANUAL and Bench Press with REPS 10, and the library has Bench Press
+- **GIVEN** the picker has pending Cable Fly with MANUAL and Bench Press with TIME 0:45, and the library has Bench Press
 - **WHEN** the user taps DONE
-- **THEN** the library gains Cable Fly with no profile, the block appends Cable Fly then Bench Press in that order, the plan is flushed, and the picker closes
+- **THEN** the library gains Cable Fly, the block appends Cable Fly then Bench Press in that order, the plan is flushed, and the picker closes
 
 #### Scenario: Cancel discards the pending movements
 
@@ -721,9 +740,31 @@ movement SHALL carry no watch profile.
 
 #### Scenario: A new movement has no profile
 
-- **GIVEN** a block movement created from a typed name with REPS selected
+- **GIVEN** a block movement created from a typed name
 - **WHEN** the block movement editor is shown
-- **THEN** it reports that the movement has no profile and the watch cannot count it
+- **THEN** the movement is usable with MANUAL or TIME and no profile warning or watch prompt is shown
+
+### Requirement: The movement library is name-only
+
+The movement library SHALL store only a movement's name. It SHALL NOT store, derive, display, or request a motion profile, recording state, or watch count. A movement SHALL still be created by typing its name in the add-movement picker and SHALL be managed from `MOVEMENTS`.
+
+#### Scenario: A new typed movement is name-only
+
+- **GIVEN** the add-movement picker with MANUAL selected
+- **WHEN** the user types Cable Fly and commits it
+- **THEN** the library lists Cable Fly with its name and provides no profile or recording action
+
+#### Scenario: The library has no recording controls
+
+- **GIVEN** a library containing Chest and Curl
+- **WHEN** the user opens MOVEMENTS
+- **THEN** each row offers only rename and delete, and the page has no record, re-record, profile, or watch control
+
+#### Scenario: An empty library points to the picker
+
+- **GIVEN** a library with no movements
+- **WHEN** the user opens MOVEMENTS
+- **THEN** the page explains that movements are added from a block's add-movement picker and offers no recording control
 
 ### Requirement: Typed movement names are validated
 
@@ -775,40 +816,25 @@ duplicate.
 
 ### Requirement: Set-end choices start with MANUAL
 
-The add-movement picker SHALL list MANUAL, TIME, REPS in that order and SHALL
-start with MANUAL selected. The block movement editor SHALL list the same order.
+The add-movement picker and the block movement editor SHALL list MANUAL and TIME in that order and SHALL start with MANUAL selected. The block movement editor SHALL select the movement's stored condition. Neither page SHALL offer a REPS condition or a rep target.
 
 #### Scenario: The picker opens on MANUAL
 
 - **GIVEN** the add-movement picker is opened
 - **WHEN** the set-end control is shown
-- **THEN** MANUAL is selected and the order is MANUAL, TIME, REPS
+- **THEN** MANUAL is selected and the order is MANUAL, TIME
 
 #### Scenario: The movement editor uses the same order
 
 - **GIVEN** a block movement in the movement editor
 - **WHEN** the set-end control is shown
-- **THEN** the order is MANUAL, TIME, REPS with the movement's stored condition selected
+- **THEN** the order is MANUAL, TIME with the movement's stored condition selected
 
-### Requirement: The no-profile warning follows the set end
+#### Scenario: No rep condition is offered
 
-The add-movement page SHALL show the warning that a new movement cannot be
-counted without a profile only while REPS is selected. With MANUAL or TIME
-selected it SHALL show no profile warning. The existing PROFILE or NO PROFILE
-tag on a library movement row SHALL remain.
-
-#### Scenario: REPS shows the warning
-
-- **GIVEN** the add-movement picker with REPS selected
-- **WHEN** a new movement name is typed
-- **THEN** the page warns that the watch cannot count the movement until it is recorded
-
-#### Scenario: MANUAL and TIME hide the warning
-
-- **GIVEN** the add-movement picker with MANUAL selected
-- **WHEN** a new movement name is typed
-- **THEN** the page shows the manual tap-to-finish copy and no profile warning
-- **AND** selecting TIME instead also hides the profile warning
+- **GIVEN** either the add-movement picker or the block movement editor
+- **WHEN** the set-end control is shown
+- **THEN** no REPS choice or rep target is present
 
 ### Requirement: Dragged plan rows show a lifted card
 

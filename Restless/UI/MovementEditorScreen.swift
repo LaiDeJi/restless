@@ -11,7 +11,6 @@ struct MovementEditorScreen: View {
 
     @State private var name = ""
     @State private var deleteArmed = false
-    @State private var showRecording = false
     @State private var loaded = false
     @State private var saveTask: Task<Void, Never>?
     @State private var nameFieldFrame: CGRect = .zero
@@ -48,15 +47,9 @@ struct MovementEditorScreen: View {
                 saveNow()
             }
         }
-        .onChange(of: showRecording) { _, shown in
-            if !shown { load(); saveNow() }
-        }
         .onDisappear {
             saveTask?.cancel()
             saveNow()
-        }
-        .sheet(isPresented: $showRecording) {
-            RecordingSheet(movementID: movementID)
         }
     }
 
@@ -76,13 +69,6 @@ struct MovementEditorScreen: View {
                     EditingLockBanner()
                 }
 
-                kicker("PROFILE")
-                Text(profileText)
-                    .font(Theme.TypeScale.body)
-                    .foregroundStyle(Theme.secondaryText)
-                    .lineSpacing(3)
-
-                reRecordButton
                 deleteButton
             }
             .padding(.horizontal, 22)
@@ -139,33 +125,6 @@ struct MovementEditorScreen: View {
                 }
                 scheduleSave()
             }
-    }
-
-    private var profileText: String {
-        guard let profile = record?.movement.profile, profile.usesForearmSignal else {
-            return "NO PROFILE · RE-RECORD TO ENABLE THE WATCH COUNT."
-        }
-        return "FOREARM ANGLE · RISE \(String(format: "%.0f", profile.rise))° · FALL \(String(format: "%.0f", profile.fall))° · MIN PERIOD \(String(format: "%.2f", profile.minPeriod)) s"
-    }
-
-    private var reRecordButton: some View {
-        Button {
-            guard !isLocked else { return }
-            saveNow()
-            showRecording = true
-        } label: {
-            Text("RE-RECORD ON WATCH")
-                .font(Theme.TypeScale.action)
-                .tracking(0.6)
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 52)
-                .background(Capsule().fill(isLocked ? Color.white.opacity(0.1) : Theme.setAccent))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(isLocked)
-        .padding(.top, 4)
     }
 
     @ViewBuilder

@@ -1,14 +1,26 @@
+# Session start and draggable lists: the start gate, the start action, a new
+# session draft, the one-tap library add, and a block drag. The runner exposes
+# no stable text tree on this simulator, so every wait is a raw
+# `await-ui-element` and every control is tapped by coordinate. The test starts
+# at the start gate and deletes the session it creates.
 steps:
   - launch: com.whc.restless
+  # Return a running or rested session to the start gate, so the test begins
+  # from the same state every run.
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
   - tool: await-ui-element
     args:
       condition: visible
       selector:
         text: START SESSION
       timeoutMs: 8000
+  - wait: 800
   - tap:
       x: 0.5
-      y: 0.861
+      y: 0.869
   - tool: await-ui-element
     args:
       condition: visible
@@ -17,140 +29,152 @@ steps:
       timeoutMs: 5000
   - tool: await-ui-element
     args:
-      condition: text
+      condition: exists
       selector:
         text: 0 OF 9 SETS
-      expectedText: 0 OF 9 SETS
       timeoutMs: 4000
   - tap:
-      id: list.bullet.rectangle.fill
-  - tap:
-      x: 0.5
-      y: 0.212
-  - tap:
-      x: 0.5
-      y: 0.49
-  - tool: gesture-custom
-    args:
-      events:
-        - type: Down
-          x: 0.757
-          y: 0.393
-        - type: Move
-          x: 0.757
-          y: 0.393
-          delayMs: 900
-        - type: Move
-          x: 0.757
-          y: 0.47
-          delayMs: 350
-        - type: Move
-          x: 0.757
-          y: 0.55
-          delayMs: 350
-        - type: Up
-          x: 0.757
-          y: 0.55
-          delayMs: 300
+      x: 0.607
+      y: 0.941
   - tool: await-ui-element
     args:
-      condition: exists
+      condition: visible
       selector:
-        text: 01, Untitled block
-      timeoutMs: 3000
-  - tap:
-      x: 0.888
-      y: 0.393
-  - tap:
-      x: 0.888
-      y: 0.372
-  - tool: await-ui-element
-    args:
-      condition: exists
-      selector:
-        text: 1 BLOCK · 9 SETS
-      timeoutMs: 3000
-  - tap:
-      x: 0.35
-      y: 0.39
-  - tap:
-      x: 0.5
-      y: 0.865
+        text: WORKOUTS
+      timeoutMs: 5000
   - wait: 800
   - tap:
-      x: 0.5
-      y: 0.606
-  - wait: 800
-  - tool: gesture-custom
-    args:
-      events:
-        - type: Down
-          x: 0.757
-          y: 0.718
-        - type: Move
-          x: 0.757
-          y: 0.718
-          delayMs: 900
-        - type: Move
-          x: 0.757
-          y: 0.77
-          delayMs: 350
-        - type: Move
-          x: 0.757
-          y: 0.81
-          delayMs: 350
-        - type: Up
-          x: 0.757
-          y: 0.81
-          delayMs: 300
-  - tool: await-ui-element
-    args:
-      condition: exists
-      selector:
-        text: 01, Chest, 10 REPS
-      timeoutMs: 3000
-  - tap:
-      x: 0.888
-      y: 0.718
-  - tap:
-      x: 0.888
-      y: 0.728
-  - tool: await-ui-element
-    args:
-      condition: exists
-      selector:
-        text: 1 MOVEMENT
-      timeoutMs: 3000
-  - tap:
-      x: 0.845
-      y: 0.1
-  - tap:
-      x: 0.845
-      y: 0.1
-  - tap:
-      x: 0.888
+      x: 0.89
       y: 0.125
   - tool: await-ui-element
     args:
       condition: visible
       selector:
-        text: DELETE SESSION
-      timeoutMs: 3000
+        text: BLOCKS
+      timeoutMs: 5000
+  - tool: await-ui-element
+    args:
+      condition: exists
+      selector:
+        text: 1 BLOCK · 9 SETS · 8:00 TOTAL REST
+      timeoutMs: 4000
+  - wait: 800
   - tap:
-      x: 0.244
-      y: 0.65
+      x: 0.5
+      y: 0.481
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ADD FROM LIBRARY
+      timeoutMs: 5000
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.701
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 MOVEMENT
+      timeoutMs: 4000
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 BLOCKS
+      timeoutMs: 4000
+  - wait: 800
+  # Block drag: move block 02 above block 01 by its trailing grip.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.757
+          y: 0.535
+        - type: Move
+          x: 0.757
+          y: 0.535
+          delayMs: 900
+        - type: Move
+          x: 0.757
+          y: 0.47
+          delayMs: 250
+        - type: Move
+          x: 0.757
+          y: 0.4
+          delayMs: 250
+        - type: Up
+          x: 0.757
+          y: 0.4
+          delayMs: 500
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 2 BLOCKS
+      timeoutMs: 4000
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 5000
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+      timeoutMs: 4000
+  - wait: 800
+  - tap:
+      x: 0.4
+      y: 0.33
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: DELETE SESSION
+      timeoutMs: 5000
+  - wait: 800
+  - tap:
+      x: 0.24
+      y: 0.806
   - tool: await-ui-element
     args:
       condition: visible
       selector:
         text: TAP AGAIN TO DELETE
-      timeoutMs: 3000
+      timeoutMs: 4000
+  - wait: 800
   - tap:
-      x: 0.244
-      y: 0.65
+      x: 0.24
+      y: 0.806
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 5000
   - tool: await-ui-element
     args:
       condition: exists
       selector:
-        text: Chest, 1 BLOCK · 9 SETS
-      timeoutMs: 3000
+        text: 1 BLOCK · 9 SETS · 8:00 REST
+      timeoutMs: 4000
+  - tool: await-ui-element
+    args:
+      condition: exists
+      selector:
+        text: Chest
+      timeoutMs: 4000

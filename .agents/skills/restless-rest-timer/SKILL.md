@@ -1,6 +1,6 @@
 ---
 name: restless-rest-timer
-description: Domain rules for the Restless workout rest timer — sessions made of ordered blocks of library movements, rounds and sets per round, per-set end conditions (reps, time, or a tap), the performing work countdown, set/round/movement/block rests, local-first editing, the tokenized watch link, and the Live Activity/Dynamic Island contract. Use when writing, reviewing, or testing any code that decides which rest comes next, counts sets or rounds, starts or ends a timed set, arms the watch, advances a block or movement, pauses a rest, ends a session, records or files a movement, persists or migrates sessions, debounces an edit, or renders timer state on the Lock Screen or Dynamic Island.
+description: Domain rules for the Restless workout rest timer — sessions made of ordered blocks of library movements, rounds and sets per round, per-set end conditions (time or a tap), the performing work countdown, set/round/movement/block rests, local-first editing, and the Live Activity/Dynamic Island contract. Use when writing, reviewing, or testing any code that decides which rest comes next, counts sets or rounds, starts or ends a timed set, advances a block or movement, pauses a rest, ends a session, adds, renames or deletes a movement, persists or migrates sessions, debounces an edit, or renders timer state on the Lock Screen or Dynamic Island.
 ---
 
 # Restless rest timer
@@ -10,21 +10,20 @@ The prototype `prototype-workout-timer.html` is the behaviour reference; this sk
 ## Vocabulary
 
 - A **session** is an ordered list of **blocks**.
-- A **movement** is a reusable library entry: a name and an optional recorded profile. It carries no muscle group and no default end condition or target.
-- A **block** holds a name, **rounds**, **sets per round**, a set rest, a round rest, and ordered **block movements**. A block movement references a library movement and carries its own end condition and target, so the same movement can be counted in one block and timed in another.
+- A **movement** is a reusable, name-only library entry. Its name is the whole entry: no muscle group, no profile, and no default end condition or target.
+- A **block** holds a name, **rounds**, **sets per round**, a set rest, a round rest, and ordered **block movements**. A block movement references a library movement and carries its own end condition and target, so the same movement can be timed in one block and manual in another.
 - The plan unit is **BLOCK**. A block has a user-chosen name, rounds, sets per round, and one or more movements. There is no arrangement mode and no straight/superset/circuit label. The block name is independent of its movements.
-- A set ends on **REPS** (a target the watch counts, or SET DONE), **TIME** (a phone countdown), or **MANUAL** (SET DONE).
+- A set ends on **TIME** (a phone countdown) or **MANUAL** (SET DONE).
 - A timed set runs a **performing** phase before its rest. It is work, not rest.
 
 ## Model
 
 ```swift
-enum EndCondition { case reps, time, manual }
+enum EndCondition { case time, manual }
 
 struct Movement {
     var id: UUID
-    var name: String        // trimmed, 40 characters
-    var profile: MovementProfile?   // nil until recorded
+    var name: String        // trimmed, 40 characters; nothing else
 }
 
 struct BlockMovement {
@@ -53,14 +52,14 @@ struct WorkoutPreset {
 
 One order: **round → movement → set**. In every round the block runs its movements in order, and each movement runs `setsPerRound` sets. A block with one movement is that movement repeated across its rounds; a block with two or more movements repeats the whole group. A sequential pair is two blocks, not one header over two movements.
 
-Ranges: rounds and sets per round are any integer 1 or more. Reps targets are 1 or more. Time targets are seconds; the editor uses 15–600 in 15 s steps. A block's set rest may be 0; a round rest is 15–600. Only rests clamp, and a rest stepper never wraps. Every product and sum clamps at `Int.max` instead of trapping; a typed value that would overflow keeps its previous value. The editor keeps a multi-movement block at rounds ≥ 2: adding a second movement to a one-round block raises rounds to 2, and the rounds stepper will not go below 2 while two or more movements are present. The model still reads a one-round multi-movement block as a single pass with set rests.
+Ranges: rounds and sets per round are any integer 1 or more. Time targets are seconds; the editor uses 15–600 in 15 s steps. A block's set rest may be 0; a round rest is 15–600. Only rests clamp, and a rest stepper never wraps. Every product and sum clamps at `Int.max` instead of trapping; a typed value that would overflow keeps its previous value. The editor keeps a multi-movement block at rounds ≥ 2: adding a second movement to a one-round block raises rounds to 2, and the rounds stepper will not go below 2 while two or more movements are present. The model still reads a one-round multi-movement block as a single pass with set rests.
 
 Defaults:
 
-- The app fallback is one session `Chest` with one block `Chest`, one manual movement `Chest`, **rounds 1, sets per round 9**, set rest 60, round rest 120. The movement has no profile. The active session survives.
+- The app fallback is one session `Chest` with one block `Chest`, one manual movement `Chest`, **rounds 1, sets per round 9**, set rest 60, round rest 120. The active session survives.
 - A new session copies the active session's first block and opens as an unsaved draft named `New session`; it is created and opened, not activated. DONE saves exactly one session with the edited name and blocks and leaves it inactive; USE THIS SESSION saves it and activates it; back or swipe-back discards it. The list, the active session, and the timer do not change until it is saved. The default name gets its lowest free suffix (`New session 2`, `New session 3`, …) at save time, not when the draft opens.
 - `+ ADD BLOCK` opens a new block in the same editor layout used to edit a saved block: block name, summary, rounds, sets per round, set rest, round rest, movement list, order preview, and `+ ADD MOVEMENT`. The new block starts as `Untitled block` with rounds 1, sets per round 3, the previous block's set and round rests, and no movements. It is staged outside `session.blocks`: the session keeps its original blocks while it is authored. DONE appends the staged block and flushes the plan, and stays disabled until the block has at least one movement. Back or cancel discards it and adds nothing; backgrounding and a save flush never append it. `+ ADD BLOCK` creates one staged block at a time.
-- The add-movement picker lists MANUAL, TIME, REPS and starts on MANUAL. ADD MOVEMENT or a library row queues a movement with the selected end condition and target; tapping the row again unqueues it; DONE creates or reuses the typed library movements, appends every queued movement to the block in the displayed order, flushes the plan, and closes; CANCEL and swipe-down discard the queue without changing the block or the library. A name is queued at most once, ignoring case. The no-profile warning appears only for REPS; MANUAL and TIME do not need a profile. The same order applies in the block movement editor. The picker only queues movements for a saved or staged block; it has no new-block mode, and DONE with an empty queue simply closes.
+- The add-movement picker lists MANUAL and TIME and starts on MANUAL. ADD MOVEMENT or a library row queues a movement with the selected end condition and target; tapping the row again unqueues it; DONE creates or reuses the typed library movements, appends every queued movement to the block in the displayed order, flushes the plan, and closes; CANCEL and swipe-down discard the queue without changing the block or the library. A name is queued at most once, ignoring case. The same order applies in the block movement editor. The picker only queues movements for a saved or staged block; it has no new-block mode, and DONE with an empty queue simply closes.
 - The prototype seeds three demo sessions (Chest 4 × 4, Arms 2 rounds × 1 set as a superset, Core 1 round × 3 sets) and seven movements so every flow can be walked. That demo data is not the app seed.
 
 Derived, never stored:
@@ -156,7 +155,7 @@ Transitions and the guards that matter:
 
 - **Start session** is valid only in `notStarted`. It enters `ready` at block 1, set 1 with `doneSets = 0`; it never completes a set. Applying it again in `ready` is ignored.
 - **Set done** is valid in `ready` and `performing`. Ignore it in every other state, including `notStarted` — the island button is easy to double-tap, and a second call must not consume a second set, including at a block boundary.
-- **Start set** is valid only in `ready` and only when the current block movement's end condition is `time`. It enters `performing`; it never starts a reps or manual set.
+- **Start set** is valid only in `ready` and only when the current block movement's end condition is `time`. It enters `performing`; it never starts a manual set.
 - **Set done during performing** ends the timed set early and starts the same rest as any other set. **Expiry** at `setDeadline` applies the same transition. Clear `setDuration` and `setDeadline` on every exit from `performing`.
 - **Set done with no rest** ends the session: `doneSets = totalSets`, state `done`, clear rest fields. A zero set rest does the same except it lands in `ready` at the next set.
 - **Rest end**, **Skip rest**, and **Finish rest** land in `ready` at the next set — block 2, round 1, set 1 when the rest was a block transition — and clear `restKind`, `duration`, `remaining`, `deadline`.
@@ -166,8 +165,8 @@ Transitions and the guards that matter:
 - **Restart session** in the editor returns to the start gate at block 1 with zero completed sets.
 - A committed edit to the **active** session's plan resets the session to `notStarted` with zero completed sets, no rest, and no running set. Editing another session never touches the running one.
 - Launch, and an install with no saved run, opens in `notStarted`. A restored snapshot keeps the phase it stored, so an in-flight `ready`/`resting` session from before a start gate continues rather than being interrupted.
-- Every mutation goes through one entry point (`SessionTransitions.apply`) so the button, the island link and the URL handler cannot drift. The reps completion from the watch uses the same `.setDone`.
-- No rest starts for a reps set unless a target completion or a manual set done arrives. Progress alone never starts a rest.
+- Every mutation goes through one entry point (`SessionTransitions.apply`) so the button, the island link and the URL handler cannot drift.
+- Only SET DONE starts a rest. Progress or elapsed time alone never does.
 
 ## Time
 
@@ -185,37 +184,31 @@ Use `Text(timerInterval:pauses:countsDown:)` for the rest and work countdowns on
 
 ## Editing
 
-- **Locked while performing, resting, or paused.** The timer hides `EDIT`; SESSIONS and every editor are read-only with an amber `EDITING LOCKED DURING A SET OR REST · SWITCH TO TIMER TO SET DONE OR PAUSE` banner. Add, delete, reorder, activate, record, and every field are disabled. Lock returns to available when the session is ready or done, without leaving the tab. Switching tabs never changes the running set or rest.
+- **Locked while performing, resting, or paused.** The timer hides `EDIT`; SESSIONS and every editor are read-only with an amber `EDITING LOCKED DURING A SET OR REST · SWITCH TO TIMER TO SET DONE OR PAUSE` banner. Add, delete, reorder, activate, and every field are disabled. Lock returns to available when the session is ready or done, without leaving the tab. Switching tabs never changes the running set or rest.
 - **Local-first.** A stepper tap or keystroke mutates the in-memory draft only, so the number leads the finger. Persistence, session reset and Live Activity refresh are coalesced after 350 ms of idle and applied once per burst. Live Activity is never requested per tap.
-- **One-tap library add.** A block editor lists `ADD FROM LIBRARY` under its movements: every recorded movement not already in the block, one 44 pt row each with its profile tag and a `+`. A tap appends that movement with `MANUAL` and no target in one draft edit and flushes once; no sheet opens and the row appears in the same frame. The same list appears for a staged block, so `ADD BLOCK` → tap a movement → `DONE` creates a one-movement block and nothing reaches `session.blocks` before DONE. The list is hidden while editing is locked and absent when every library movement is already in the block. The add-movement sheet remains for several movements, custom ends or targets, and typed names, and a second movement still raises a one-round block to two rounds.
+- **One-tap library add.** A block editor lists `ADD FROM LIBRARY` under its movements: every library movement not already in the block, one 44 pt row each with a `MANUAL` label and a `+`. A tap appends that movement with `MANUAL` and no target in one draft edit and flushes once; no sheet opens and the row appears in the same frame. The same list appears for a staged block, so `ADD BLOCK` → tap a movement → `DONE` creates a one-movement block and nothing reaches `session.blocks` before DONE. The list is hidden while editing is locked and absent when every library movement is already in the block. The add-movement sheet remains for several movements, custom ends or targets, and typed names, and a second movement still raises a one-round block to two rounds.
 - **A staged block is not a session block.** A new block's name, rounds, sets, rests, movements, and order edits live in the draft store outside `session.blocks`. They do not mark the draft dirty or schedule a save; only DONE commits the block, and back or cancel drops it. The block editor hides DELETE BLOCK for a staged block because leaving is the delete action.
 - **Flush on exit.** Dismissal, `Done`, and `scenePhase != .active` commit a pending edit. A synchronous SwiftData save or `engine.use` inside the tap handler is the bug this exists to prevent.
-- **A page tap dismisses the keyboard.** On the session, block, movement, recording, and add-movement pages, a tap outside the focused text field ends editing and hides the keyboard; a tap inside the field keeps it, and the typed text stays. One shared modifier owns the field-frame guard.
-- Discrete actions (activate, create, delete, move, record, re-record) apply immediately; they are one intentional action, not a burst.
+- **A page tap dismisses the keyboard.** On the session, block, movement, and add-movement pages, a tap outside the focused text field ends editing and hides the keyboard; a tap inside the field keeps it, and the typed text stays. One shared modifier owns the field-frame guard.
+- Discrete actions (activate, create, delete, move) apply immediately; they are one intentional action, not a burst.
 - Counts have no upper bound: ROUNDS and SETS PER ROUND step by 1 and a tapped value becomes a number field. The rounds stepper stops at 2 while the block has two or more movements. Rests are stepper-only in 15 s steps; a round rest stops at 15 and 600, and a set rest may be 0 and stops at 600 (never wrapping).
 - **A stepper's whole chip is the target.** The visible 48 × 44 body is the control, not only its symbol or leading edge. A tap steps once; holding for 500 ms repeats every 100 ms until release, disable, lock, or the range bound. Every repeat updates the draft in memory, and the same 350 ms debounce collapses the whole hold into one save and one refresh. DONE is the commit for a draft.
 - **The drag grip owns only its own row.** The grip's drag surface is 44 × 44 and hit-tests only that height; it must never claim a vertical strip above or below its row, or it steals taps from steppers and header actions in the same trailing x range.
 - **Draggable plan rows.** The session editor's block list and a block editor's movement list use one row: number, name and meta, a trailing grip, and a trailing trash. The grip is the drag source and every row in the same list is a drop target, so the list reorders as the row is moved. The card still opens its editor. The last block and the last movement keep no trash. Drag and delete disappear while editing is locked.
 - **Red delete.** DELETE SESSION, DELETE BLOCK, REMOVE FROM BLOCK and the row trash use one destructive red: the red at reduced opacity at rest, the full red with a red-tinted capsule when armed, and the row's secondary line changes to `TAP AGAIN TO DELETE`. Arm one row at a time; any other delete tap moves the arm.
 - A session never has zero blocks, a block never has zero movements, and the app never has zero sessions; the last delete action is not offered. Deletes are two-step: `DELETE` → `TAP AGAIN TO DELETE`.
-- A block movement carries its own end condition and target; the library has no default to copy. A reps set also ends when the watch reaches its target; SET DONE remains available for every set. REPS and TIME label the target.
+- A block movement carries its own end condition and target; the library has no default to copy. SET DONE ends every set. TIME labels its target.
 - The library lives **inside SESSIONS** as a `MOVEMENTS` entry, not as a third tab. The two-tab shell and its "switching tabs never changes the rest" contract stay intact.
 - Library edits (name) do not reset the running session; they are not a plan change.
 - Names trim and cap at 40 characters, and a pasted newline, carriage return, or tab becomes a space before the trim: empty session → `Untitled`, empty block → `Untitled block`, empty movement → `Untitled movement`. Names are single-line data.
 - Long names: a SESSIONS card and a movement or pending row wrap to two lines; the timer header, block strip, position strip, expanded island, and Lock Screen rows stay on one line by scaling or truncating. A 40-character name must not move the ring or grow the 160-point panel.
-
-## Watch counting
-
-`RestlessWatch/` counts a reps set for the timer. The phone arms the current ready reps set with a token, the recorded profile, and the target; the watch counts the watch arm, reports progress, and sends a completion at the target. The phone applies the same `setDone` transition as SET DONE and the island link, so a duplicate completion cannot consume two sets. SET DONE always remains available.
-
-Counting runs in an `HKWorkoutSession`, so the watch keeps sampling with the wrist down and the screen off. If workout authorization is denied, the watch falls back to foreground counting and the timer still shows the manual path. The watch app's **LAB** button still opens the curl-measuring lab; that lab is not the timer and needs the screen on. Only the watch arm is counted.
 
 ## Navigation
 
 Two persistent bottom tabs, `TIMER` and `SESSIONS`; TIMER is the default.
 
 - `TIMER` shows the live session. `EDIT` opens the active session in SESSIONS and is hidden during a set or rest. A `↺` restart pill sits beside EDIT once at least one set is done, stays available while EDIT is hidden, and is absent in `done`, where START AGAIN is the primary action. Tapping it opens one confirmation dialog: `Restart this session?`, `This clears all completed sets, cancels the current rest, and returns to block 1, set 1.`, a destructive `Restart Session`, and `Cancel`. Cancelling changes nothing. Confirming applies the restart transition — the start gate at block 1, round 1, set 1, zero completed sets and no Live Activity. The dialog closes when the phase it was opened in changes, on leaving the timer, and when the restart control disappears. The session editor's `RESTART SESSION` opens the same dialog and keeps its flush and return-to-timer path.
-- `SESSIONS` lists every session card (`name`, `n BLOCKS · n SETS · rest REST`, `ACTIVE` badge), then a `MOVEMENTS` card with the library. The order is manual and persisted: each card has the same 44 × 44 grip as a plan row, drag and drop reorders the list, a new session appends at the end, and the order survives relaunch. The `ACTIVE` badge stays on its own card and is never pinned to the top. Reordering writes the order only: it never activates, edits, or resets a session, and the grip is disabled while editing is locked. VoiceOver offers `Move up` and `Move down` on the card. The add control opens the new-session editor on an unsaved draft; the card appears only after DONE or USE THIS SESSION. A session opens its ordered blocks; a block edits its rounds, sets per round, rests, and movements; a movement opens its end condition and target. Blocks and movements reorder by their grip and delete from their row. The library opens the flat movement list and a movement detail; both return to SESSIONS.
+- `SESSIONS` lists every session card (`name`, `n BLOCKS · n SETS · rest REST`, `ACTIVE` badge), then a `MOVEMENTS` card with the name-only library. The order is manual and persisted: each card has the same 44 × 44 grip as a plan row, drag and drop reorders the list, a new session appends at the end, and the order survives relaunch. The `ACTIVE` badge stays on its own card and is never pinned to the top. Reordering writes the order only: it never activates, edits, or resets a session, and the grip is disabled while editing is locked. VoiceOver offers `Move up` and `Move down` on the card. The add control opens the new-session editor on an unsaved draft; the card appears only after DONE or USE THIS SESSION. A session opens its ordered blocks; a block edits its rounds, sets per round, rests, and movements; a block movement opens its end condition and target. Blocks and movements reorder by their grip and delete from their row. The library opens the flat movement list and a movement detail for rename, usage, and delete; both return to SESSIONS.
 - An island link opens the app on the TIMER tab and then applies its action. Launch and `onOpenURL` handling live at the root so they work from either tab.
 
 ## Chrome
@@ -224,12 +217,12 @@ On iOS 26 the timer's `EDIT` and restart pills and the SESSIONS add control rend
 
 ## Timer presentation
 
-- **The ring does not move.** The countdown ring's centre is pinned to the timer viewport's vertical middle on every block, round, and phase. The block strip and position strip sit above it; the set map and watch strip sit below it at a fixed gap. A wrapping position strip, a taller map, or a watch strip appearing never moves the ring. The actions sit at the bottom when they fit and below the map when they do not. Content that does not fit makes the timer page scroll. If the top chrome and the ring cannot both fit, the ring is clamped below the chrome and the page scrolls.
+- **The ring does not move.** The countdown ring's centre is pinned to the timer viewport's vertical middle on every block, round, and phase. The block strip and position strip sit above it; the set map and actions sit below it at a fixed gap. A wrapping position strip or a taller map never moves the ring. The actions follow the set map directly. Content that does not fit makes the timer page scroll. If the top chrome and the ring cannot both fit, the ring is clamped below the chrome and the page scrolls.
 - Multi-block sessions show a horizontally scrolling **block strip** under the header, auto-scrolled to the active block: completed blocks dim with a check, the active block is filled, future blocks are outlined. Hidden for one block.
-- Not started: kicker `READY`, hero `START`, subtitle `n BLOCKS · n SETS · total rest TOTAL REST`, primary action `START SESSION` with `BLOCK 1 · first block name`. The block strip, position strip and block map preview block 1 set 1 with nothing completed. The watch strip and `SKIP REST` are hidden, and no Live Activity exists. `EDIT` stays available; the gate is not locked.
+- Not started: kicker `READY`, hero `START`, subtitle `n BLOCKS · n SETS · total rest TOTAL REST`, primary action `START SESSION` with `BLOCK 1 · first block name`. The block strip, position strip and block map preview block 1 set 1 with nothing completed. `SKIP REST` is hidden, and no Live Activity exists. `EDIT` stays available; the gate is not locked.
 - The position strip reads `UP NEXT · movement · ROUND r OF R · SET s OF S` during a rest, and `block name · movement · ROUND r OF R · SET s OF S` when the plan has one block whose name adds something the movement name does not. With several blocks the block strip already names the active block, so the position strip carries only the movement and the round/set segments; the block name is never repeated in both. The block name is dropped when it equals the movement name, ignoring case and surrounding spaces. There is no `BLOCK n OF m` segment and no arrangement word. Hide the round segment when rounds is 1 and the set segment when sets per round is 1; a 1 × 1 block shows only the movement. The strip stays on one line at default sizes; at accessibility sizes it may wrap above the ring.
 - The **block map** draws the active block only: one row per round, and one dot per set in the round grouped by movement with a small gap between movements. It uses dots when rounds ≤ 12, `movements × setsPerRound` ≤ 12, and total dots ≤ 72; anything larger becomes a progress bar with `n OF m SETS IN THIS BLOCK`. Row labels are `R1`, `R2`, …; the position line names the active movement. The caption above it stays `n OF m SETS` for the whole session.
-- Ready: kicker is the upcoming rest kind, hero time is its duration, subtitle `AFTER THIS SET`; on the final set `LAST SET` / `FINISH` / `NO REST AFTER`; on a zero set rest `NO REST` / `NEXT` / `AFTER THIS SET`. For a reps set, a watch strip under the map shows `WATCH ARMED · n OF m REPS` or `WATCH UNAVAILABLE` and SET DONE still works. The action is `START` with the hold for a timed set, otherwise `SET DONE` with the watch count or the rest length.
+- Ready: kicker is the upcoming rest kind, hero time is its duration, subtitle `AFTER THIS SET`; on the final set `LAST SET` / `FINISH` / `NO REST AFTER`; on a zero set rest `NO REST` / `NEXT` / `AFTER THIS SET`. The action is `START` with the hold for a timed set, otherwise `SET DONE` with the rest length.
 - Performing: kicker `WORK`, the work countdown, and the rest that follows (`REST 1:00 AFTER`, or `NEXT SET IMMEDIATELY` for a zero set rest). The action is `SET DONE`; ending early starts the rest.
 - Resting: kicker `SET REST` or `ROUND REST`, the countdown, and the context subtitle from the transition table; the action is `PAUSE` plus `SKIP REST`.
 - Paused: kicker `PAUSED`, frozen countdown, action `RESUME` plus `SKIP REST`.
@@ -259,7 +252,6 @@ Island content by state:
 - Expanded: session name small, active block, active movement prominent, `ROUND r OF R` and `SET s OF S` (each hidden at a count of 1), timer trailing, controls at the bottom. The compact leading region gets a 3-character movement label (`BEN`), or `DONE`; compact trailing is the countdown, `READY`, or `DONE`. The full block and movement names live in the expanded and Lock Screen views.
 - Controls are `Link`s to `restless://set-done`, `restless://start-set`, `restless://pause`, `restless://resume`, `restless://skip`, and `restless://restart`. The app applies the matching action in `onOpenURL` through `SessionTransitions.apply`. Set done during a rest is ignored; start set applies only to a ready timed set.
 - Accent follows the rest or work kind, not the screen: set rest `#C8FF4D`, round rest and movement or block transition `#FFB84D`, work countdown `#C8FF4D` (it is not a rest), done `#C8FF4D`.
-- At most one activity exists. The island never shows rep progress or the watch-armed state; the timer does.
 
 ### Lock Screen panel
 
@@ -302,7 +294,6 @@ app, so every change to it needs the screen locked with a rest or set running.
 - A personal (free) Apple ID gets 7-day profiles. **App Groups are not configured**: `SessionStore` falls back to `.standard`, so the widget extension cannot read the app's session and an App Intent button in the island would only repaint the island while the app kept the old state. Apple lists App Groups as available to free accounts, but this project has not tested provisioning one; do not repeat the old "free team cannot use App Groups" claim without a clean build.
 - Tapping the compact island opens the app. It cannot run an action, and compact/minimal regions cannot hold buttons.
 - Current approach: island controls are `Link`s. If an App Group is provisioned for both targets, switch the links to `LiveActivityIntent` buttons so the action no longer opens the app.
-- Counting runs in an `HKWorkoutSession` and keeps sampling with the wrist down. If workout authorization is denied, the watch falls back to the foreground. The phone stays the source of truth and the manual fallback must always work.
 - Completion alerts use one local notification with the system sound when the app is in the background. In-app completion is haptic only; Restless adds no custom audio asset and schedules no system alarm.
 - The local notification is the one background alert. The app does not depend on background execution: the system delivers the notification whether the app is still executing or suspended, and mirrors it to the paired watch.
 
@@ -312,16 +303,13 @@ A rest or timed work countdown that reaches zero raises exactly one alert. It
 never completes a set, skips a rest, or creates a second transition; the
 deadline reconciliation is the only state change.
 
-- **Foreground:** one phone haptic (`UINotificationFeedbackGenerator` success)
-  and, when the watch app is reachable, one `WatchMessage.alert` haptic. No
-  banner, no sound, no island expansion. The watch haptic must not change reps,
-  target, or phase.
+- **Foreground:** one phone haptic (`UINotificationFeedbackGenerator` success). No banner, no sound, no island expansion, and no app-level watch message. The haptic must not change the phase or the completed sets.
 - **Background:** one local notification scheduled when the app moves to the
   background. It is left pending at the deadline, even if the app is still
   executing, so the system delivers exactly one notification. iOS mirrors it to
-  the paired watch, which plays the notification haptic. The app does not
-  depend on background execution and sends no alerting Live Activity update.
-  No system alarm is scheduled.
+  a paired watch, which plays the notification haptic; the app sends no second
+  alert. The app does not depend on background execution and sends no alerting
+  Live Activity update. No system alarm is scheduled.
 - **Island:** the Live Activity stays a state display. The app updates it on
   transitions while it is executing, but it never carries an alert
   configuration and does not expand as part of the alert.
@@ -351,25 +339,25 @@ deadline reconciliation is the only state change.
 
 Sessions persist locally in SwiftData. The record keeps the legacy single-part columns and stores the ordered blocks as JSON in an optional `blocksData`; a nil `blocksData` reads `partsData` as one block per part (`rounds`, `setsPerRound`, one manual movement), or the legacy columns as one block. Writing encodes `rounds` and `setsPerRound` and mirrors the first block as `(rounds, movements × setsPerRound)` into the legacy columns so an older build still sees the same total sets in its single part. `partsData` stays nil after a write. No explicit migration plan and no entity rename.
 
-Movements persist as their own `MovementRecord` rows: id, name, and the recorded profile (axis, rise, fall, minimum period). The legacy muscle-group and default columns remain for store compatibility but are unused. A block movement stores only the library id, end condition, and target. A used movement cannot be deleted.
+Movements persist as their own `MovementRecord` rows: an id and a name. The legacy muscle-group, default-condition, and profile columns remain for store compatibility but are never read or written. A block movement stores only the library id, end condition, and target. A used movement cannot be deleted.
 
 Migration rule: each stored part `R rounds × S sets`, set rest `a`, round rest `b` becomes **one block with rounds R, sets per round S, one manual movement**, name preserved, set rest `a`, round rest `b`. This preserves the old part's total sets and round-rest rhythm. A legacy straight block with count `C` becomes rounds 1, sets per round `C`; if it has several movements it splits into one block per movement, in order, each keeping the old name and rests. A legacy circuit with count `C` becomes rounds `C`, sets per round 1. Adjacent duplicate circuit movements with the same library movement, end condition, and target collapse into one movement with sets per round equal to the duplicate count when every run is the same length; otherwise the duplicates stay separate. New `rounds`/`setsPerRound` keys win on read; `kind`/`count` are read only for migration. The prototype demonstrates the block model with richer demo data; the app fallback above is the seed.
+
+A stored end condition of `reps`, or any other value the app no longer offers, decodes as `manual` with no target. Decoding never throws on an unknown condition: a throw would drop a saved block and could return the whole plan to the seed. The bridge covers `PresetRecord.blocksData`, the legacy part columns, and a saved `SessionSnapshot`.
 
 A missing or unreadable stored plan falls back to the seeded `Chest` block. A block movement whose library entry is missing is dropped on read; a block left with no movements is dropped; a session left with no blocks falls back to the seed.
 
 ## Copy
 
-Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `AFTER BENCH PRESS · NEXT INCLINE PRESS`, `AFTER CHEST · NEXT ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `Restart this session?`, `Restart Session`, `Cancel`, `SET REST OVER`, `ROUND REST OVER`, `WORK SET OVER`, `SESSION COMPLETE`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `REPS`, `HOLD`.
+Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `AFTER BENCH PRESS · NEXT INCLINE PRESS`, `AFTER CHEST · NEXT ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `Restart this session?`, `Restart Session`, `Cancel`, `SET REST OVER`, `ROUND REST OVER`, `WORK SET OVER`, `SESSION COMPLETE`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `HOLD`.
 
-The `CONNECT`, `DISCONNECT`, and `+ REP` controls in the prototype are stand-ins for a real watch and are not production copy.
-
-Blocks and movements: `BLOCKS`, `ROUNDS`, `SETS PER ROUND`, `SETS EACH`, `MOVEMENTS`, `END CONDITION`, `TARGET`, `REPS`, `TIME`, `MANUAL`, `DELETE MOVEMENT`, `USED BY CHEST · REMOVE IT FROM THE PLAN FIRST`. Block rows and summaries are numeric: `2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS`, `1 MOVEMENT · 4 ROUNDS · 4 SETS EACH · 16 SETS`. The app never assigns a straight, superset, or circuit label; a user may still type one as a block name.
+Blocks and movements: `BLOCKS`, `ROUNDS`, `SETS PER ROUND`, `SETS EACH`, `MOVEMENTS`, `END CONDITION`, `TARGET`, `TIME`, `MANUAL`, `DELETE MOVEMENT`, `USED BY CHEST · REMOVE IT FROM THE PLAN FIRST`. Block rows and summaries are numeric: `2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS`, `1 MOVEMENT · 4 ROUNDS · 4 SETS EACH · 16 SETS`. The app never assigns a straight, superset, or circuit label; a user may still type one as a block name.
 
 Navigation and editing: `TIMER`, `SESSIONS`, `WORKOUTS`, `ACTIVE`, `ACTIVE SESSION`, `USE THIS SESSION`, `RESTART SESSION`, `EDITING THIS SESSION RESTARTS IT.`, `EDIT`, `ADD BLOCK`, `ADD FROM LIBRARY`, `DELETE BLOCK`, `ADD MOVEMENT`, `TO ADD`, `REMOVE FROM BLOCK`, `TAP AGAIN TO DELETE`, `DELETE SESSION`, `EDITING LOCKED DURING A SET OR REST · SWITCH TO TIMER TO SET DONE OR PAUSE`, `Untitled`, `Untitled block`, `Untitled movement`, `New session`.
 
 The grip is an icon, not copy. VoiceOver reads the row actions as `Move up`, `Move down`, and `Delete`; those labels never appear on screen. The row delete, DELETE SESSION, DELETE BLOCK, and REMOVE FROM BLOCK use the destructive red; `TAP AGAIN TO DELETE` is the armed state.
 
-Retired words: `PART`, `PARTS`, `PART n OF m`, `SETS PER MOVEMENT`, `SETS IN THIS PART`, `ADD PART`, `DELETE PART`, `Untitled part`, `New part`, `NEW BLOCK`, `EDITING LOCKED DURING REST · SWITCH TO TIMER TO PAUSE OR SKIP`, and the old arrangement labels.
+Retired words: `PART`, `PARTS`, `PART n OF m`, `SETS PER MOVEMENT`, `SETS IN THIS PART`, `ADD PART`, `DELETE PART`, `Untitled part`, `New part`, `NEW BLOCK`, `EDITING LOCKED DURING REST · SWITCH TO TIMER TO PAUSE OR SKIP`, the old arrangement labels, and the recording vocabulary: `REPS`, `WATCH ARMED`, `WATCH UNAVAILABLE`, `PROFILE`, `NO PROFILE`, `RECORD MOVEMENT`, `RE-RECORD ON WATCH`, `START RECORDING`, `TRACE RECEIVED`.
 
 The timer's last-set primary action is `SET DONE`, not `FINISH SESSION`; the island uses `Finish session` only as its action label.
 
@@ -392,7 +380,7 @@ The timer's last-set primary action is `SET DONE`, not `FINISH SESSION`; the isl
 - Set done twice in a row consumes one set, not two — including across a movement or block boundary; set done during a rest is ignored; start set twice does not restart the countdown.
 - Pause for longer than the remaining time, then resume: remaining is unchanged and the deadline moves. A rest that expires while the app is inactive reconciles to ready; a timed set that expires while inactive reconciles to its rest.
 - Editing locks during performing, resting, and paused; SESSIONS is read-only with the banner; switching tabs does not change the set or rest; editing the active plan resets, editing another session does not.
-- Watch counting: arming sends the profile and target; stale progress and duplicate completion are ignored; the watch counts the watch arm; the lab still builds and its CSV transfer is unchanged.
+- End conditions: only MANUAL and TIME are offered; a stored `reps` row decodes as MANUAL with no target; any unknown condition decodes as MANUAL; a saved plan and a saved snapshot keep every block, movement, round, set, rest, and order.
 - Restart: `canRestart` is true in ready, performing, resting and paused once a set is done, and false in notStarted and done; tapping opens the dialog without changing the snapshot; cancelling leaves the phase and completed sets untouched; confirming lands in the start gate at block 1 set 1 with zero sets and no activity; a phase change and leaving the timer close the dialog; restart during a rest clears the rest. The editor's RESTART SESSION shows the same dialog and returns to the gate.
 - Position strip: multi-block ready and resting carry no block name; a single block names itself only when its name differs from the movement; a block and movement with the same name produce one segment; resting prefixes `UP NEXT`; rounds > 1 gives the round segment, sets per round > 1 the set segment, and 1 × 1 gives neither. No `BLOCK n OF m` anywhere.
 - Library add: one tap appends a MANUAL movement with no target to a saved block and to a staged block, flushes once, and raises a one-round block to two rounds on the second movement; the rows exclude used movements, disappear while locked, and a staged append leaves `session.blocks` unchanged until DONE.

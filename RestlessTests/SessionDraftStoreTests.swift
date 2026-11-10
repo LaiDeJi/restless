@@ -178,7 +178,7 @@ func appendMovementMissingBlock() {
     let block = draftBlock("Chest", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
-    #expect(!store.appendMovement(movement, toBlock: UUID(), condition: .reps, target: 10))
+    #expect(!store.appendMovement(movement, toBlock: UUID(), condition: .time, target: 45))
     #expect(!store.isDirty)
     #expect(store.session.blocks[0].movements.count == 1)
 }
@@ -206,11 +206,11 @@ func appendMovementsBatchOrder() {
 
     #expect(store.appendMovements([
         MovementAddition(movement: first, condition: .manual, target: nil),
-        MovementAddition(movement: second, condition: .reps, target: 10)
+        MovementAddition(movement: second, condition: .time, target: 45)
     ], toBlock: block.id))
     #expect(store.session.blocks[0].movements.map(\.movementId) == [first.id, second.id])
-    #expect(store.session.blocks[0].movements.map(\.endCondition) == [.manual, .reps])
-    #expect(store.session.blocks[0].movements[1].target == 10)
+    #expect(store.session.blocks[0].movements.map(\.endCondition) == [.manual, .time])
+    #expect(store.session.blocks[0].movements[1].target == 45)
     #expect(commits == 0)
 
     store.flush()
@@ -396,14 +396,14 @@ func stagedEditsStayOutOfTheSession() async throws {
     let second = Movement(name: "Pushdown")
     #expect(store.appendMovements([
         MovementAddition(movement: first, condition: .manual, target: nil),
-        MovementAddition(movement: second, condition: .reps, target: 12)
+        MovementAddition(movement: second, condition: .time, target: 45)
     ], to: .staged))
 
     let staged = try #require(store.stagedBlock)
     #expect(staged.name == "Arms")
     #expect(staged.setRest == 30)
     #expect(staged.movements.map(\.movementId) == [first.id, second.id])
-    #expect(staged.movements[1].target == 12)
+    #expect(staged.movements[1].target == 45)
     #expect(store.session.blocks == [previous])
     #expect(!store.isDirty)
 
@@ -493,11 +493,11 @@ func stagedMovementEditsStayOutOfTheSession() throws {
     let secondID = try #require(store.stagedBlock?.movements.last?.id)
 
     store.editBlock(.staged) { block in
-        block.movements[0].endCondition = .reps
-        block.movements[0].target = 12
+        block.movements[0].endCondition = .time
+        block.movements[0].target = 45
     }
-    #expect(store.stagedBlock?.movements[0].endCondition == .reps)
-    #expect(store.stagedBlock?.movements[0].target == 12)
+    #expect(store.stagedBlock?.movements[0].endCondition == .time)
+    #expect(store.stagedBlock?.movements[0].target == 45)
     #expect(store.moveMovement(firstID, in: .staged, onto: secondID))
     #expect(store.stagedBlock?.movements.last?.id == firstID)
     #expect(store.stagedBlock?.movements.count == 2)

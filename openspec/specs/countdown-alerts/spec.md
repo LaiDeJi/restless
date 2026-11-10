@@ -58,7 +58,7 @@ A countdown that is paused, skipped, restarted, replaced by a plan change, or en
 
 ### Requirement: Foreground completion is a haptic
 
-While Restless is the active app, a countdown that reaches zero SHALL produce one phone haptic and SHALL NOT show a notification banner, play the completion sound, or expand the Dynamic Island. The foreground alert plays no sound and follows the system haptics setting.
+While Restless is the active app, a countdown that reaches zero SHALL produce one phone haptic and SHALL NOT show a notification banner, play the completion sound, expand the Dynamic Island, or send an app-level watch haptic. The foreground alert plays no sound and follows the system haptics setting.
 
 #### Scenario: A rest ends while the timer is open
 
@@ -71,6 +71,12 @@ While Restless is the active app, a countdown that reaches zero SHALL produce on
 - **GIVEN** Restless in the foreground with a timed work set running
 - **WHEN** the work countdown reaches zero
 - **THEN** the phone plays one haptic and the rest begins
+
+#### Scenario: No watch app receives a foreground alert
+
+- **GIVEN** a paired watch and Restless in the foreground
+- **WHEN** a countdown reaches zero
+- **THEN** the phone plays one haptic and the app sends no watch message or watch-specific haptic
 
 ### Requirement: Background completion is one local notification
 
@@ -121,28 +127,6 @@ A completion alert SHALL state what finished and what comes next: the rest kind 
 - **GIVEN** the last set of the last block
 - **WHEN** the completion alert is raised
 - **THEN** it names the session as complete and does not promise a next set
-
-### Requirement: A paired watch alerts with the phone
-
-When the phone raises a foreground completion and the watch app is reachable, the watch SHALL also play one notification haptic. For a background completion, the local notification is the watch notice through the system's mirroring, and the app SHALL NOT add a second watch notification. The watch alert SHALL NOT count reps, complete a set, or change the armed set.
-
-#### Scenario: The watch is on the wrist for a foreground rest end
-
-- **GIVEN** a paired watch, a reachable watch app, and Restless in the foreground
-- **WHEN** the rest reaches zero
-- **THEN** the watch plays one alert haptic and the armed set state is unchanged
-
-#### Scenario: A background rest end does not double-buzz
-
-- **GIVEN** a paired watch and a rest that ends while Restless is in another app
-- **WHEN** the system mirrors the local notification to the watch
-- **THEN** the app sends no second watch notification or haptic
-
-#### Scenario: The watch app is not running
-
-- **GIVEN** a paired watch whose watch app is not running
-- **WHEN** the rest reaches zero while Restless is suspended
-- **THEN** the system notification still reaches the watch
 
 ### Requirement: Alert permission is requested once and denial is survivable
 

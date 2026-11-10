@@ -10,7 +10,7 @@ private func block(name: String, movementIDs: [UUID], rounds: Int = 1) -> Workou
         setRest: 60,
         roundRest: 120,
         movements: movementIDs.map {
-            BlockMovement(movementId: $0, endCondition: .reps, target: 10)
+            BlockMovement(movementId: $0, endCondition: .manual)
         }
     )
 }
@@ -87,21 +87,21 @@ func secondLibraryAddRaisesRounds() {
 }
 
 @MainActor
-@Test("The single append clamps a manual target away and a reps target up")
+@Test("The single append clamps a manual target away and a time target up")
 func libraryAddClampsTargets() {
     let existing = Movement(name: "Chest")
     let manual = Movement(name: "Bench press")
-    let reps = Movement(name: "Curl")
+    let timed = Movement(name: "Curl")
     let saved = block(name: "Chest", movementIDs: [existing.id])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [saved]))
 
     #expect(store.appendMovements([
         addition(manual, condition: .manual, target: 10),
-        addition(reps, condition: .reps, target: 0)
+        addition(timed, condition: .time, target: 0)
     ], toBlock: saved.id))
 
     #expect(store.session.blocks[0].movements[1].target == nil)
-    #expect(store.session.blocks[0].movements[2].target == 1)
+    #expect(store.session.blocks[0].movements[2].target == 15)
 }
 
 @MainActor

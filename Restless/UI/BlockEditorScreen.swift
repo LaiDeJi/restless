@@ -316,7 +316,6 @@ struct BlockEditorScreen: View {
     private func conditionLabel(_ movement: BlockMovement) -> String {
         switch movement.endCondition {
         case .manual: "MANUAL"
-        case .reps: "\(movement.target ?? 1) REPS"
         case .time: "TIME \(clockString(movement.target ?? 60))"
         }
     }

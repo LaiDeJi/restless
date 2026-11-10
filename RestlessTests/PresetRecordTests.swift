@@ -90,7 +90,7 @@ func blocksRoundTrip() throws {
                 setRest: 60,
                 roundRest: 120,
                 movements: [
-                    BlockMovement(movementId: bench, endCondition: .reps, target: 10),
+                    BlockMovement(movementId: bench, endCondition: .manual),
                     BlockMovement(movementId: incline, endCondition: .time, target: 45)
                 ]
             ),
@@ -274,4 +274,68 @@ func newSessionAppends() throws {
     #expect(ordered.map(\.name) == ["Chest", "Arms", "Core"])
     #expect(ordered.last?.id == saved.id)
     #expect(saved.sortIndex == 2)
+}
+
+@MainActor
+@Test("A stored blocksData plan with a REPS row keeps every block and order")
+func storedBlocksWithRepsKeepPlan() throws {
+    let container = try memoryContainer()
+    let context = ModelContext(container)
+    let json = #"""
+    [
+      {
+        "id": "00000000-0000-0000-0000-00000000B10C",
+        "name": "Chest",
+        "rounds": 3,
+        "setsPerRound": 4,
+        "setRest": 60,
+        "roundRest": 120,
+        "movements": [
+          {
+            "id": "00000000-0000-0000-0000-00000000B3C1",
+            "movementId": "00000000-0000-0000-0000-00000000B3A1",
+            "endCondition": "manual"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-00000000B20C",
+        "name": "Arms",
+        "rounds": 2,
+        "setsPerRound": 1,
+        "setRest": 30,
+        "roundRest": 90,
+        "movements": [
+          {
+            "id": "00000000-0000-0000-0000-00000000B3C2",
+            "movementId": "00000000-0000-0000-0000-00000000B3A2",
+            "endCondition": "reps",
+            "target": 10
+          },
+          {
+            "id": "00000000-0000-0000-0000-00000000B3C3",
+            "movementId": "00000000-0000-0000-0000-00000000B3A3",
+            "endCondition": "manual"
+          }
+        ]
+      }
+    ]
+    """#
+    let record = PresetRecord(.chest)
+    record.name = "Full"
+    record.blocksData = Data(json.utf8)
+    context.insert(record)
+    try context.save()
+
+    let preset = record.preset
+    #expect(preset.blocks.count == 2)
+    #expect(preset.blocks.map(\.name) == ["Chest", "Arms"])
+    #expect(preset.blocks.map(\.rounds) == [3, 2])
+    #expect(preset.blocks.map(\.setsPerRound) == [4, 1])
+    #expect(preset.blocks.map(\.setRest) == [60, 30])
+    #expect(preset.blocks.map(\.roundRest) == [120, 90])
+    #expect(preset.blocks[1].movements.count == 2)
+    #expect(preset.blocks[1].movements[0].endCondition == .manual)
+    #expect(preset.blocks[1].movements[0].target == nil)
+    #expect(preset.totalSets == 16)
 }

@@ -14,9 +14,9 @@ enum Theme {
     static let ink = Color(red: 0.027, green: 0.027, blue: 0.031)
 
     /// Named roles over SwiftUI's semantic text styles. Text scales with the
-    /// system text size, and the same role means the same style on every screen,
-    /// in the widget and in the watch lab. Tracking and weight live with the
-    /// call site; only `Font` here, so the watch target can compile this file.
+    /// system text size, and the same role means the same style on every screen
+    /// and in the widget. Tracking and weight live with the call site; only
+    /// `Font` here, so the widget target can compile this file.
     enum TypeScale {
         /// SESSIONS page title. Default 34.
         static let screenTitle = Font.largeTitle.weight(.semibold)

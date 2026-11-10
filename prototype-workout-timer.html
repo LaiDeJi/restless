@@ -10,8 +10,8 @@
   Model:
     A session is an ordered list of blocks. A block holds movements from the
     reusable library, a number of rounds, a number of sets per round, a set
-    rest, and a round rest. Every set ends on one of three conditions: a rep
-    target counted on the watch, a timed hold on the phone, or a manual tap.
+    rest, and a round rest. Every set ends on one of two conditions: a timed
+    hold on the phone or a manual tap.
 
     Each round runs every movement in order for its sets-per-round sets. A set
     rest follows every set except the last of its round; a round rest follows
@@ -32,14 +32,10 @@
   15–600 seconds in 15s steps, except a block's set rest may be 0.
 
   The add-movement picker can also create a library movement from a typed name: it
-  is appended with the selected set end and target, carries no watch profile, and is
-  reused when a matching name already exists. Dragging a block or movement by its
-  grip floats an opaque card under the pointer while the source slot dims and the row
-  under the pointer is outlined.
-
-  The watch buttons in the timer and recording screens are a prototype stand-in for a
-  real watch. They let you walk the armed, unavailable, counting, received, and failed
-  states without a device.
+  is appended with the selected set end and target, and is reused when a matching
+  name already exists. Dragging a block or movement by its grip floats an opaque card
+  under the pointer while the source slot dims and the row under the pointer is
+  outlined.
 
   The timer's ↺ restart opens a confirmation dialog that names the lost sets, the
   cancelled rest, and the return to block 1; it appears once a set is done and stays
@@ -1505,67 +1501,6 @@
   .map-dots { display: flex; align-items: center; gap: 5px; }
   .map-gap { width: 5px; flex: 0 0 auto; }
 
-  .watch-strip {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    padding: 9px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(200,255,77,.24);
-    background: rgba(200,255,77,.055);
-    font-size: 11px;
-    letter-spacing: .07em;
-    line-height: 1.2;
-  }
-  .watch-strip.off {
-    border-color: rgba(255,255,255,.1);
-    background: rgba(255,255,255,.035);
-  }
-  .watch-dot {
-    width: 7px;
-    height: 7px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: #C8FF4D;
-    box-shadow: 0 0 7px rgba(200,255,77,.55);
-  }
-  .watch-strip.off .watch-dot {
-    background: rgba(255,255,255,.22);
-    box-shadow: none;
-  }
-  .watch-label {
-    font-weight: 700;
-    color: #C8FF4D;
-    letter-spacing: .1em;
-  }
-  .watch-strip.off .watch-label { color: rgba(255,255,255,.5); }
-  .watch-count {
-    color: #fff;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: .03em;
-  }
-  .watch-sim {
-    display: flex;
-    gap: 6px;
-    margin-left: auto;
-  }
-  .watch-sim button {
-    height: 29px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(255,255,255,.06);
-    color: rgba(255,255,255,.72);
-    font-family: inherit;
-    font-size: 10px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .watch-sim button:active { background: rgba(255,255,255,.14); }
-
   /* ---------------------------------------------------------------- segmented controls and chips */
   .seg {
     display: flex;
@@ -1687,22 +1622,6 @@
   .lib-row.on .chev { color: #C8FF4D; }
   .lib-row .sc-name { font-size: 16px; }
   .lib-row .sc-meta { margin-top: 4px; }
-  .record-row {
-    width: 100%;
-    min-height: 50px;
-    margin-top: 9px;
-    border-radius: 14px;
-    border: 1px dashed rgba(255,255,255,.14);
-    background: transparent;
-    color: rgba(255,255,255,.48);
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .09em;
-    cursor: pointer;
-  }
-  .record-row:active { background: rgba(255,255,255,.04); }
-  .record-row:disabled { opacity: .28; }
   .new-movement-name {
     margin-top: 8px;
     font-size: 22px;
@@ -1715,103 +1634,6 @@
     font-size: 15px;
   }
 
-  /* ---------------------------------------------------------------- watch recording */
-  .record-box {
-    margin-top: 14px;
-    padding: 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,.08);
-    background: rgba(255,255,255,.035);
-  }
-  .record-state {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .1em;
-    color: #C8FF4D;
-  }
-  .record-state.bad { color: #FFB84D; }
-  .record-dots {
-    display: flex;
-    gap: 8px;
-    margin-top: 14px;
-  }
-  .record-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,.18);
-  }
-  .record-dot.on {
-    background: #C8FF4D;
-    border-color: #C8FF4D;
-  }
-  .trace-svg {
-    display: block;
-    width: 100%;
-    height: 86px;
-    margin-top: 12px;
-  }
-  .trace-grid { stroke: rgba(255,255,255,.08); }
-  .trace-line {
-    fill: none;
-    stroke: #C8FF4D;
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
-  .profile-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 10px;
-    margin-top: 12px;
-  }
-  .profile-cell {
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: rgba(255,255,255,.04);
-  }
-  .profile-k {
-    font-size: 9px;
-    font-weight: 650;
-    letter-spacing: .1em;
-    color: rgba(255,255,255,.34);
-  }
-  .profile-v {
-    margin-top: 3px;
-    font-size: 16px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -.01em;
-  }
-  .sim-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 14px;
-  }
-  .mini-btn {
-    min-height: 38px;
-    padding: 0 12px;
-    border-radius: 11px;
-    border: 1px solid rgba(255,255,255,.1);
-    background: rgba(255,255,255,.055);
-    color: rgba(255,255,255,.7);
-    font-family: inherit;
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: .06em;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .mini-btn.primary {
-    background: #C8FF4D;
-    border-color: #C8FF4D;
-    color: #070708;
-  }
-  .mini-btn:disabled { opacity: .3; }
-  .mini-btn:active:not(:disabled) { transform: scale(.99); }
   .link-btn {
     border: none;
     background: none;
@@ -1855,10 +1677,6 @@
     letter-spacing: -.02em;
     line-height: 1.15;
     color: #fff;
-  }
-  .record-state.bad .watch-dot {
-    background: #FFB84D;
-    box-shadow: none;
   }
   .lib-row:disabled { opacity: .35; cursor: default; }
 
@@ -1914,7 +1732,7 @@
   <div class="page">
     <header class="page-head">
       <div class="ph-left"><span class="ph-mark"></span>Restless <em>session rest timer</em></div>
-      <div class="ph-right">TIMER / SESSIONS · blocks, movements, and a watch that counts · watch buttons are a prototype stand-in</div>
+      <div class="ph-right">TIMER / SESSIONS · blocks, movements, and rests</div>
     </header>
 
     <div class="stage" id="stage">
@@ -1991,7 +1809,7 @@
   var V2_KEY = "restless.sessions.v2";
   var LEGACY_KEY = "rounds.presets.v1";
   var GROUPS = ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Legs", "Glutes"];
-  var CONDITIONS = ["reps", "time", "manual"];
+  var CONDITIONS = ["time", "manual"];
   var DEFAULT_ROUNDS = 1;
   var DEFAULT_SETS_PER_ROUND = 3;
   var DEFAULT_SET_REST = 60;
@@ -2020,13 +1838,13 @@
 
   /* ------------------------------------------------------------------ demo data */
   var DEMO_LIBRARY = [
-    { id: "m-bench", name: "Bench press", group: "Chest", defaultCondition: "reps", defaultTarget: 10, profile: { axis: "FOREARM", rise: 42, fall: 46, minPeriod: 0.92 } },
-    { id: "m-incline", name: "Incline press", group: "Chest", defaultCondition: "reps", defaultTarget: 10, profile: { axis: "FOREARM", rise: 39, fall: 44, minPeriod: 0.98 } },
-    { id: "m-curl", name: "Curl", group: "Biceps", defaultCondition: "reps", defaultTarget: 12, profile: { axis: "FOREARM", rise: 38, fall: 41, minPeriod: 0.86 } },
-    { id: "m-pushdown", name: "Pushdown", group: "Triceps", defaultCondition: "reps", defaultTarget: 12, profile: { axis: "FOREARM", rise: 36, fall: 43, minPeriod: 0.88 } },
-    { id: "m-plank", name: "Plank", group: "Core", defaultCondition: "time", defaultTarget: 60, profile: { axis: "FOREARM", rise: 21, fall: 24, minPeriod: 1.4 } },
-    { id: "m-deadhang", name: "Dead hang", group: "Back", defaultCondition: "manual", defaultTarget: null, profile: null },
-    { id: "m-lateral", name: "Lateral raise", group: "Shoulders", defaultCondition: "reps", defaultTarget: 15, profile: { axis: "FOREARM", rise: 33, fall: 37, minPeriod: 0.94 } }
+    { id: "m-bench", name: "Bench press", group: "Chest", defaultCondition: "manual", defaultTarget: null },
+    { id: "m-incline", name: "Incline press", group: "Chest", defaultCondition: "manual", defaultTarget: null },
+    { id: "m-curl", name: "Curl", group: "Biceps", defaultCondition: "manual", defaultTarget: null },
+    { id: "m-pushdown", name: "Pushdown", group: "Triceps", defaultCondition: "manual", defaultTarget: null },
+    { id: "m-plank", name: "Plank", group: "Core", defaultCondition: "time", defaultTarget: 60 },
+    { id: "m-deadhang", name: "Dead hang", group: "Back", defaultCondition: "manual", defaultTarget: null },
+    { id: "m-lateral", name: "Lateral raise", group: "Shoulders", defaultCondition: "manual", defaultTarget: null }
   ];
   var DEMO_SESSIONS = [
     {
@@ -2040,7 +1858,7 @@
         setRest: 60,
         roundRest: 120,
         movements: [
-          { id: "bm-bench", movementId: "m-bench", endCondition: "reps", target: 10 }
+          { id: "bm-bench", movementId: "m-bench", endCondition: "manual", target: null }
         ]
       }]
     },
@@ -2055,8 +1873,8 @@
         setRest: 30,
         roundRest: 120,
         movements: [
-          { id: "bm-curl", movementId: "m-curl", endCondition: "reps", target: 12 },
-          { id: "bm-pushdown", movementId: "m-pushdown", endCondition: "reps", target: 12 }
+          { id: "bm-curl", movementId: "m-curl", endCondition: "manual", target: null },
+          { id: "bm-pushdown", movementId: "m-pushdown", endCondition: "manual", target: null }
         ]
       }]
     },
@@ -2087,8 +1905,6 @@
     deadline: 0,
     setDuration: 0,
     setDeadline: 0,
-    reps: 0,
-    watchReachable: true,
     rest: null
   };
   var ui = {
@@ -2106,7 +1922,6 @@
     mapSig: "",
     islandSig: "",
     debugSig: "",
-    record: null,
     draft: null,
     stagedBlock: null,
     restartConfirm: null,
@@ -2171,8 +1986,7 @@
   }
   function safeTarget(condition, value, fallback) {
     if (condition === "manual") return null;
-    if (condition === "time") return safeTime(value, fallback == null ? 60 : fallback);
-    return Math.max(1, safeCount(value, fallback == null ? 10 : fallback));
+    return safeTime(value, fallback == null ? 60 : fallback);
   }
   function trimName(value, fallback) {
     var name = String(value == null ? "" : value).trim().slice(0, 40);
@@ -2227,17 +2041,11 @@
     var m = bm ? findMovement(bm.movementId) : null;
     return m ? m.group : "Untitled group";
   }
-  function movementProfile(bm) {
-    var m = bm ? findMovement(bm.movementId) : null;
-    return m ? m.profile : null;
-  }
   function activeSession() {
     return findSession(activeSessionId) || sessions[0] || null;
   }
   function conditionLabel(condition) {
-    if (condition === "reps") return "REPS";
-    if (condition === "time") return "TIME";
-    return "MANUAL";
+    return condition === "time" ? "TIME" : "MANUAL";
   }
   function conditionTargetLabel(condition, target) {
     if (condition === "manual" || target == null) return "MANUAL";
@@ -2245,11 +2053,6 @@
   }
   function movementConditionLabel(bm) {
     return conditionTargetLabel(bm.endCondition, bm.target);
-  }
-  function profileText(profile) {
-    if (!profile) return "NO PROFILE · MANUAL ONLY";
-    return "FOREARM ANGLE · RISE " + Math.round(profile.rise) + "° · FALL " + Math.round(profile.fall) +
-      "° · MIN PERIOD " + profile.minPeriod.toFixed(2) + " s";
   }
 
   /* ------------------------------------------------------------------ totals and position */
@@ -2464,16 +2267,6 @@
       return null;
     }
   }
-  function sanitizeProfile(raw) {
-    if (!raw || typeof raw !== "object") return null;
-    var axis = String(raw.axis || "").toUpperCase();
-    if (axis !== "X" && axis !== "Y" && axis !== "Z") return null;
-    var rise = Number(raw.rise);
-    var fall = Number(raw.fall);
-    var minPeriod = Number(raw.minPeriod);
-    if (!isFinite(rise) || !isFinite(fall) || !isFinite(minPeriod) || minPeriod <= 0) return null;
-    return { axis: axis, rise: Math.max(0, rise), fall: Math.max(0, fall), minPeriod: minPeriod };
-  }
   function sanitizeMovement(raw, fallback, usedIds) {
     var m = raw || {};
     var f = fallback || {};
@@ -2485,8 +2278,7 @@
       name: trimName(typeof m.name === "string" ? m.name : f.name, "Untitled movement"),
       group: trimName(typeof m.group === "string" ? m.group : f.group, "Untitled group"),
       defaultCondition: condition,
-      defaultTarget: safeTarget(condition, m.defaultTarget != null ? m.defaultTarget : f.defaultTarget, null),
-      profile: sanitizeProfile(m.profile)
+      defaultTarget: safeTarget(condition, m.defaultTarget != null ? m.defaultTarget : f.defaultTarget, null)
     };
   }
   function sanitizeBlockMovement(raw, usedIds, libraryById) {
@@ -2578,8 +2370,7 @@
           name: clean,
           group: clean,
           defaultCondition: "manual",
-          defaultTarget: null,
-          profile: null
+          defaultTarget: null
         });
       }
       return byName[key];
@@ -2643,8 +2434,7 @@
           name: clean,
           group: clean,
           defaultCondition: "manual",
-          defaultTarget: null,
-          profile: null
+          defaultTarget: null
         });
       }
       return byName[key];
@@ -2774,8 +2564,6 @@
     if (blockInput && ui.route.kind === "block") commitBlockName(blockInput);
     var movementInput = $('[data-el="movementName"]', appEl);
     if (movementInput && ui.route.kind === "movement") commitMovementName(movementInput);
-    var recordInput = $('[data-el="recordName"]', appEl);
-    if (recordInput && ui.route.kind === "record") commitRecordName(recordInput);
   }
   function commitSessionName(input) {
     if (ui.route.kind !== "session") return;
@@ -2810,12 +2598,6 @@
       movement.name = name;
       markEdited(null);
     }
-  }
-  function commitRecordName(input) {
-    if (!ui.record || !ui.record.draft) return;
-    var name = trimName(input.value, "Untitled movement");
-    if (input.value !== name) input.value = name;
-    ui.record.draft.name = name;
   }
 
   /* ------------------------------------------------------------------ navigation */
@@ -2890,36 +2672,6 @@
     ui.route = { kind: "movement", id: id };
     ui.deleteArmed = null;
     ui.editingNumber = null;
-    render(false);
-  }
-  function startRecord(movementId) {
-    flushEdit();
-    if (isLocked()) return;
-    var m = movementId ? findMovement(movementId) : null;
-    ui.tab = "sessions";
-    ui.record = {
-      step: "idle",
-      movementId: m ? m.id : null,
-      draft: {
-        name: m ? m.name : "Untitled movement"
-      },
-      profile: null,
-      reason: ""
-    };
-    ui.route = { kind: "record", movementId: m ? m.id : null };
-    ui.deleteArmed = null;
-    ui.editingNumber = null;
-    render(false);
-  }
-  function recordBack() {
-    var movementId = ui.record ? ui.record.movementId : null;
-    ui.record = null;
-    ui.deleteArmed = null;
-    if (movementId && findMovement(movementId)) {
-      ui.route = { kind: "movement", id: movementId };
-    } else {
-      ui.route = { kind: "library" };
-    }
     render(false);
   }
   function backToList() {
@@ -3286,8 +3038,7 @@
             name: entry.name,
             group: "New",
             defaultCondition: entry.condition,
-            defaultTarget: entry.condition === "manual" ? null : entry.target,
-            profile: null
+            defaultTarget: entry.condition === "manual" ? null : entry.target
           };
           movements.push(movement);
           markEdited(null);
@@ -3422,13 +3173,7 @@
     var bm = findBlockMovement(block, movementId);
     if (!bm || bm.endCondition === condition) return;
     bm.endCondition = condition;
-    if (condition === "manual") {
-      bm.target = null;
-    } else if (condition === "time") {
-      bm.target = safeTime(bm.target, 60);
-    } else {
-      bm.target = Math.max(1, safeCount(bm.target, 10));
-    }
+    bm.target = safeTarget(condition, bm.target, null);
     if (!ui.route.staged) markEdited(session);
     render(false);
   }
@@ -3438,10 +3183,8 @@
     var block = routeBlock(ui.route);
     var bm = findBlockMovement(block, movementId);
     if (!bm) return;
-    var next = bm.target;
-    if (bm.endCondition === "reps") next = Math.max(1, (bm.target || 1) + Number(dir));
-    else if (bm.endCondition === "time") next = clamp((bm.target || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
-    else return;
+    if (bm.endCondition !== "time") return;
+    var next = clamp((bm.target || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
     if (next === bm.target) return;
     bm.target = next;
     if (!ui.route.staged) markEdited(session);
@@ -3476,13 +3219,7 @@
     var movement = findMovement(movementId);
     if (!movement || movement.defaultCondition === condition) return;
     movement.defaultCondition = condition;
-    if (condition === "manual") {
-      movement.defaultTarget = null;
-    } else if (condition === "time") {
-      movement.defaultTarget = safeTime(movement.defaultTarget, 60);
-    } else {
-      movement.defaultTarget = Math.max(1, safeCount(movement.defaultTarget, 10));
-    }
+    movement.defaultTarget = safeTarget(condition, movement.defaultTarget, null);
     markEdited(null);
     render(false);
   }
@@ -3490,10 +3227,8 @@
     if (isLocked()) return;
     var movement = findMovement(movementId);
     if (!movement) return;
-    var next = movement.defaultTarget;
-    if (movement.defaultCondition === "reps") next = Math.max(1, (movement.defaultTarget || 1) + Number(dir));
-    else if (movement.defaultCondition === "time") next = clamp((movement.defaultTarget || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
-    else return;
+    if (movement.defaultCondition !== "time") return;
+    var next = clamp((movement.defaultTarget || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
     if (next === movement.defaultTarget) return;
     movement.defaultTarget = next;
     markEdited(null);
@@ -3541,89 +3276,6 @@
     return order.map(function (g) { return { group: g, movements: groups[g] }; });
   }
 
-  /* ------------------------------------------------------------------ watch recording */
-  function startRecordingNow() {
-    if (isLocked() || !ui.record || ui.record.step !== "idle") return;
-    if (!state.watchReachable) return;
-    ui.record.step = "waiting";
-    render(false);
-  }
-  function simulateTrace(cycles) {
-    if (!ui.record || ui.record.step !== "waiting") return;
-    if (cycles < 3) {
-      failRecording("ONLY TWO CYCLES · NEED AT LEAST THREE");
-      return;
-    }
-    ui.record.profile = { axis: "FOREARM", rise: 42, fall: 46, minPeriod: 0.92 };
-    ui.record.step = "received";
-    render(false);
-  }
-  function failRecording(reason) {
-    if (!ui.record) return;
-    ui.record.step = "failed";
-    ui.record.reason = reason;
-    ui.record.profile = null;
-    render(false);
-  }
-  function retryRecording() {
-    if (!ui.record) return;
-    ui.record.step = "idle";
-    ui.record.reason = "";
-    ui.record.profile = null;
-    render(false);
-  }
-  function saveRecordedMovement() {
-    if (isLocked() || !ui.record || ui.record.step !== "received") return;
-    var draft = ui.record.draft;
-    var name = trimName(draft.name, "Untitled movement");
-    var profile = ui.record.profile;
-    var movementId = ui.record.movementId;
-    if (movementId && findMovement(movementId)) {
-      var existing = findMovement(movementId);
-      existing.name = name;
-      existing.profile = profile;
-    } else {
-      movementId = uid("m");
-      movements.push({
-        id: movementId,
-        name: name,
-        profile: profile
-      });
-    }
-    saveData();
-    ui.record = null;
-    ui.tab = "sessions";
-    ui.route = { kind: "movement", id: movementId };
-    render(true);
-  }
-  function discardRecording() {
-    recordBack();
-  }
-  function setRecordGroup(group) {
-    if (!ui.record || isLocked()) return;
-    ui.record.draft.group = trimName(group, "Untitled group");
-    render(false);
-  }
-  function setRecordCondition(condition) {
-    if (!ui.record || isLocked() || !isCondition(condition)) return;
-    ui.record.draft.condition = condition;
-    if (condition === "manual") ui.record.draft.target = null;
-    else if (condition === "time") ui.record.draft.target = safeTime(ui.record.draft.target, 60);
-    else ui.record.draft.target = Math.max(1, safeCount(ui.record.draft.target, 10));
-    render(false);
-  }
-  function bumpRecordTarget(dir) {
-    if (!ui.record || isLocked()) return;
-    var draft = ui.record.draft;
-    var next = draft.target;
-    if (draft.condition === "reps") next = Math.max(1, (draft.target || 1) + Number(dir));
-    else if (draft.condition === "time") next = clamp((draft.target || 15) + Number(dir) * 15, LIMITS.time[0], LIMITS.time[1]);
-    else return;
-    if (next === draft.target) return;
-    draft.target = next;
-    render(false);
-  }
-
   /* ------------------------------------------------------------------ state changes */
   function resetSession() {
     state.doneSets = 0;
@@ -3634,7 +3286,6 @@
     state.deadline = 0;
     state.setDuration = 0;
     state.setDeadline = 0;
-    state.reps = 0;
     state.rest = null;
     ui.restartConfirm = null;
     ui.alert = null;
@@ -3651,7 +3302,6 @@
     state.deadline = 0;
     state.setDuration = 0;
     state.setDeadline = 0;
-    state.reps = 0;
     state.rest = null;
     render(true);
   }
@@ -3666,7 +3316,6 @@
     ui.editingNumber = null;
     state.setDuration = 0;
     state.setDeadline = 0;
-    state.reps = 0;
 
     if (!rest) {
       state.doneSets = total;
@@ -3711,7 +3360,6 @@
     state.status = "performing";
     state.setDuration = p.movement.target;
     state.setDeadline = performance.now() + p.movement.target * 1000;
-    state.reps = 0;
     render(true);
   }
   function finishRest(pulse) {
@@ -3725,7 +3373,6 @@
     state.restKind = null;
     state.deadline = 0;
     state.rest = null;
-    state.reps = 0;
     if (pulse) {
       islandEl.classList.remove("pulse");
       void islandEl.offsetWidth;
@@ -3764,33 +3411,6 @@
     ui.expanded = false;
     render(true);
   }
-  function watchReady(p) {
-    if (!state.watchReachable) return false;
-    var movement = p && p.movement ? findMovement(p.movement.endCondition === "reps" ? p.movement.movementId : null) : null;
-    return !!(movement && movement.profile);
-  }
-  function watchRep() {
-    if (state.status !== "ready") return;
-    var p = currentPos();
-    if (!p || !p.movement || p.movement.endCondition !== "reps" || !watchReady(p)) return;
-    var target = p.movement.target || 1;
-    state.reps = Math.min(target, state.reps + 1);
-    if (state.reps >= target) {
-      setDone();
-    } else {
-      render(false);
-    }
-  }
-  function watchDrop() {
-    state.watchReachable = false;
-    render(false);
-  }
-  function watchConnect() {
-    state.watchReachable = true;
-    state.reps = 0;
-    render(false);
-  }
-
   /* ------------------------------------------------------------------ numeric editing */
   function startEditNumber(key) {
     if (isLocked()) return;
@@ -3991,7 +3611,6 @@
         '</div>' +
         '<div class="timer-lower">' +
           mapMarkup(session, block, doneInBlock) +
-          watchMarkup(p, group) +
           '<div class="actions">' +
             '<button class="primary" data-act="primary">' +
               '<span class="btn-main" data-el="btnMain"></span>' +
@@ -4059,34 +3678,6 @@
     return '<div class="map-wrap">' + inner + '<div class="map-caption" data-el="mapCap"></div></div>';
   }
 
-  function watchMarkup(p, group) {
-    if (group !== "ready" || !p.movement || p.movement.endCondition !== "reps") return "";
-    var lib = findMovement(p.movement.movementId);
-    var target = p.movement.target || 1;
-    if (!state.watchReachable) {
-      return '<div class="watch-strip off">' +
-        '<span class="watch-dot"></span>' +
-        '<span class="watch-label">WATCH UNAVAILABLE</span>' +
-        '<span class="watch-count">SET DONE STILL WORKS</span>' +
-        '<span class="watch-sim"><button data-act="watch-connect">CONNECT</button></span>' +
-      '</div>';
-    }
-    if (!lib || !lib.profile) {
-      return '<div class="watch-strip off">' +
-        '<span class="watch-dot"></span>' +
-        '<span class="watch-label">WATCH UNAVAILABLE</span>' +
-        '<span class="watch-count">NO PROFILE · SET DONE STILL WORKS</span>' +
-        '<span class="watch-sim"><button data-act="watch-drop">DISCONNECT</button></span>' +
-      '</div>';
-    }
-    return '<div class="watch-strip">' +
-      '<span class="watch-dot"></span>' +
-      '<span class="watch-label">WATCH ARMED</span>' +
-      '<span class="watch-count" data-el="watchCount">' + state.reps + ' OF ' + target + ' REPS</span>' +
-      '<span class="watch-sim"><button data-act="watch-rep">+ REP</button><button data-act="watch-drop">DISCONNECT</button></span>' +
-    '</div>';
-  }
-
   function tabbarMarkup() {
     return '<nav class="tabbar" aria-label="Main tabs">' +
       '<button class="' + (ui.tab === "timer" ? "on" : "") + '" data-act="tab-timer" aria-label="Timer">' +
@@ -4103,7 +3694,6 @@
     if (ui.route.kind === "picker") return pickerMarkup(ui.route.sessionId, ui.route.blockId);
     if (ui.route.kind === "library") return libraryMarkup();
     if (ui.route.kind === "movement") return movementDetailMarkup(ui.route.id);
-    if (ui.route.kind === "record") return recordMarkup();
     return sessionsListMarkup();
   }
 
@@ -4136,7 +3726,7 @@
       '<div class="lib-count">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + '</div></div>';
     html += '<button class="session-card" data-act="open-library">' +
       '<div class="sc-main"><div class="sc-name">MOVEMENTS</div>' +
-        '<div class="sc-meta">Recorded on the watch · reusable in any block</div></div>' +
+        '<div class="sc-meta">Reusable in any block</div></div>' +
       '<div class="sc-right"><span class="chev">›</span></div>' +
     '</button>';
     html += '<div class="sessions-foot">Each round runs every movement in order for its sets-per-round sets. A set rest follows each set; a round rest follows each round.</div>';
@@ -4277,7 +3867,7 @@
       unusedMovements.forEach(function (m) {
         html += '<button class="lib-row" data-act="add-from-library" data-id="' + esc(m.id) + '">' +
           '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
-            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + ' · MANUAL</div></div>' +
+            '<div class="sc-meta">MANUAL</div></div>' +
           '<span class="chev">+</span></button>';
       });
     }
@@ -4331,7 +3921,6 @@
       return sessionsListMarkup();
     }
     var locked = isLocked();
-    var lib = findMovement(bm.movementId);
     var html = '<div class="sessions-scroll">';
     html += '<div class="editor-head">' +
       '<button class="back-pill" data-act="back-block">‹ BLOCK</button>' +
@@ -4345,16 +3934,12 @@
     html += '<div class="section-head"><div class="section-k">END CONDITION</div></div>';
     html += segMarkup([
       { value: "manual", label: "MANUAL" },
-      { value: "time", label: "TIME" },
-      { value: "reps", label: "REPS" }
+      { value: "time", label: "TIME" }
     ], bm.endCondition, "bm-condition", locked);
     if (bm.endCondition === "manual") {
       html += '<div class="sheet-note">NO TARGET · TAP SET DONE WHEN THE SET ENDS.</div>';
     } else {
       html += '<div class="rows">' + targetRow("blockMovement", bm.target, bm.endCondition, "TARGET", locked) + '</div>';
-    }
-    if (lib && bm.endCondition === "reps" && !lib.profile) {
-      html += '<div class="danger-note">NO PROFILE · RE-RECORD THIS MOVEMENT BEFORE THE WATCH CAN COUNT.</div>';
     }
     html += '<div class="editor-foot">';
     if (block.movements.length > 1) {
@@ -4412,12 +3997,11 @@
     '</div>';
     html += '<div class="editor-kicker">ADD MOVEMENT</div>';
     html += '<div class="sessions-title">SET END</div>';
-    html += '<div class="sheet-note">Choose how the set ends, then queue a recorded movement or name a new one.</div>';
+    html += '<div class="sheet-note">Choose how the set ends, then queue a library movement or name a new one.</div>';
     html += lockBannerMarkup(locked);
     html += segMarkup([
       { value: "manual", label: "MANUAL" },
-      { value: "time", label: "TIME" },
-      { value: "reps", label: "REPS" }
+      { value: "time", label: "TIME" }
     ], pick.condition, "picker-condition", locked);
     if (pick.condition === "manual") {
       html += '<div class="sheet-note">NO TARGET · TAP SET DONE WHEN THE SET ENDS.</div>';
@@ -4429,9 +4013,6 @@
     html += '<input class="preset-name new-movement-name" data-el="pickerName" value="' + esc(newName) +
       '" maxlength="40" spellcheck="false" autocomplete="off" aria-label="New movement name"' +
       (locked ? " disabled" : "") + '>';
-    if (pick.condition === "reps") {
-      html += '<div class="sheet-note">NO PROFILE · THE WATCH CANNOT COUNT IT UNTIL IT IS RECORDED.</div>';
-    }
     html += '<button class="use-btn new-movement-add" data-act="add-new-movement"' +
       (locked || !newName.trim() ? " disabled" : "") + '>ADD MOVEMENT</button>';
     html += '<div class="section-head"><div class="section-k">TO ADD</div><div class="section-count">' +
@@ -4454,14 +4035,14 @@
     html += '<div class="sheet-note">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") +
       ' in the library · tap one to queue or unqueue it.</div>';
     if (!movements.length) {
-      html += '<div class="empty-note">No movements yet. Record one first.</div>';
+      html += '<div class="empty-note">No movements yet. Type a name above to create one.</div>';
     } else {
       movements.forEach(function (m) {
         var queued = pending.some(function (entry) { return entry.movementId === m.id; });
         html += '<button class="lib-row' + (queued ? " on" : "") + '" data-act="toggle-block-movement" data-id="' + esc(m.id) + '"' +
           (locked ? " disabled" : "") + '>' +
           '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
-            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + '</div></div>' +
+            '<div class="sc-meta">MANUAL</div></div>' +
           '<span class="chev">' + (queued ? "✓" : "+") + '</span></button>';
       });
     }
@@ -4489,23 +4070,21 @@
     var html = '<div class="sessions-scroll">';
     html += '<div class="editor-head">' +
       '<button class="back-pill" data-act="back-list">‹ SESSIONS</button>' +
-      '<button class="sheet-done" data-act="record-new"' + (locked ? " disabled" : "") + '>+</button>' +
     '</div>';
     html += '<div class="editor-kicker">LIBRARY</div>';
     html += '<div class="sessions-title">MOVEMENTS</div>';
-    html += '<div class="sheet-note">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + ' · recorded on the watch</div>';
+    html += '<div class="sheet-note">' + plural(movements.length, "MOVEMENT", "MOVEMENTS") + ' · added from a block</div>';
     html += lockBannerMarkup(locked);
     if (!movements.length) {
-      html += '<div class="empty-note">No movements yet. Record a movement on the watch to create one.</div>';
+      html += '<div class="empty-note">No movements yet. Add one by typing a name in a block\'s add-movement picker.</div>';
     } else {
       movements.forEach(function (m) {
         html += '<button class="lib-row" data-act="open-movement" data-id="' + esc(m.id) + '">' +
           '<div class="sc-main"><div class="sc-name">' + esc(m.name) + '</div>' +
-            '<div class="sc-meta">' + (m.profile ? "PROFILE" : "NO PROFILE") + '</div></div>' +
+            '<div class="sc-meta">' + esc(m.group).toUpperCase() + '</div></div>' +
           '<span class="chev">›</span></button>';
       });
     }
-    html += '<button class="record-row" data-act="record-new"' + (locked ? " disabled" : "") + '>+ RECORD MOVEMENT</button>';
     html += '</div>';
     return html;
   }
@@ -4528,13 +4107,7 @@
       '" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Movement name"' + (locked ? " disabled" : "") + '>';
     html += '<div class="sheet-note">' + (used.length ? "USED IN " + esc(used.join(" · ")) : "NOT IN A SESSION") + '</div>';
     html += lockBannerMarkup(locked);
-    html += '<div class="section-k">PROFILE</div>';
-    html += '<div class="sheet-note">' + profileText(m.profile) + '</div>';
-    if (!m.profile) {
-      html += '<div class="danger-note">NO PROFILE · RE-RECORD THIS MOVEMENT BEFORE THE WATCH CAN COUNT.</div>';
-    }
     html += '<div class="editor-foot">';
-    html += '<button class="use-btn" data-act="re-record"' + (locked ? " disabled" : "") + '>RE-RECORD ON WATCH</button>';
     if (used.length) {
       html += '<button class="danger-link" disabled>DELETE MOVEMENT</button>' +
         '<div class="danger-note">USED BY ' + esc(used.join(" · ").toUpperCase()) + ' · REMOVE IT FROM THE PLAN FIRST.</div>';
@@ -4545,117 +4118,6 @@
     }
     html += '</div></div>';
     return html;
-  }
-
-  function recordMarkup() {
-    if (!ui.record) {
-      ui.route = { kind: "library" };
-      return libraryMarkup();
-    }
-    var locked = isLocked();
-    var record = ui.record;
-    var editing = !!record.movementId;
-    var html = '<div class="sessions-scroll">';
-    html += '<div class="editor-head">' +
-      '<button class="back-pill" data-act="record-back">‹ ' + (editing ? "MOVEMENT" : "LIBRARY") + '</button>' +
-      '<button class="sheet-done" data-act="record-back">DONE</button>' +
-    '</div>';
-    html += '<div class="editor-kicker">RECORD</div>';
-    html += '<div class="sessions-title">' + (editing ? "RE-RECORD" : "NEW MOVEMENT") + '</div>';
-    html += lockBannerMarkup(locked);
-
-    if (record.step === "idle") {
-      html += '<div class="sheet-note">The watch records 15 seconds of your movement in the background. You can put your wrist down.</div>';
-      html += watchRecordStrip();
-      html += '<div class="editor-foot">' +
-        '<button class="use-btn" data-act="start-recording"' + (locked || !state.watchReachable ? " disabled" : "") + '>START RECORDING</button>' +
-      '</div>';
-    } else if (record.step === "waiting") {
-      html += '<div class="record-box">' +
-        '<div class="record-state"><span class="watch-dot"></span>WAITING FOR THE TRACE</div>' +
-        '<div class="sheet-note">Keep the watch on your wrist. It records 15 seconds in the background and sends the trace automatically.</div>' +
-        '<div class="sheet-note">After the window, the watch fetches the motion; this can take a few seconds.</div>' +
-        '<div class="sim-row">' +
-          '<button class="mini-btn primary" data-act="simulate-trace">GOOD TRACE</button>' +
-          '<button class="mini-btn" data-act="simulate-short">2 REPS</button>' +
-          '<button class="mini-btn" data-act="simulate-timeout">TIMEOUT</button>' +
-          '<button class="mini-btn" data-act="simulate-nomotion">NO MOTION</button>' +
-        '</div>' +
-      '</div>';
-      html += '<div class="editor-foot"><button class="danger-link" data-act="record-back">CANCEL</button></div>';
-    } else if (record.step === "received") {
-      html += '<div class="record-box">' +
-        '<div class="record-state"><span class="watch-dot"></span>TRACE RECEIVED</div>' +
-        traceSVG(5) +
-        '<div class="profile-grid">' +
-          '<div class="profile-cell"><div class="profile-k">SIGNAL</div><div class="profile-v">FOREARM</div></div>' +
-          '<div class="profile-cell"><div class="profile-k">MIN PERIOD</div><div class="profile-v">' + record.profile.minPeriod.toFixed(2) + ' s</div></div>' +
-          '<div class="profile-cell"><div class="profile-k">RISE</div><div class="profile-v">' + Math.round(record.profile.rise) + '°</div></div>' +
-          '<div class="profile-cell"><div class="profile-k">FALL</div><div class="profile-v">' + Math.round(record.profile.fall) + '°</div></div>' +
-        '</div>' +
-        '<div class="sheet-note">PROFILE OK · THREE OR MORE STEADY CYCLES.</div>' +
-      '</div>';
-      html += '<div class="section-k">NAME</div>';
-      html += '<input class="preset-name" data-el="recordName" value="' + esc(record.draft.name) +
-        '" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Movement name"' + (locked ? " disabled" : "") + '>';
-      html += '<div class="editor-foot">' +
-        '<button class="use-btn" data-act="save-record"' + (locked ? " disabled" : "") + '>SAVE MOVEMENT</button>' +
-        '<button class="danger-link" data-act="discard-record">DISCARD</button>' +
-      '</div>';
-    } else {
-      html += '<div class="record-box">' +
-        '<div class="record-state bad"><span class="watch-dot"></span>RECORDING FAILED</div>' +
-        '<div class="sheet-note">' + esc(record.reason || "NO TRACE ARRIVED") + '</div>' +
-      '</div>';
-      html += '<div class="editor-foot">' +
-        '<button class="use-btn" data-act="retry-record">TRY AGAIN</button>' +
-        '<button class="danger-link" data-act="record-back">CANCEL</button>' +
-      '</div>';
-    }
-
-    html += '</div>';
-    return html;
-  }
-
-  function watchRecordStrip() {
-    if (state.watchReachable) {
-      return '<div class="watch-strip"><span class="watch-dot"></span>' +
-        '<span class="watch-label">WATCH READY</span>' +
-        '<span class="watch-count">OPEN THE WATCH APP</span>' +
-        '<span class="watch-sim"><button data-act="watch-drop">DISCONNECT</button></span></div>';
-    }
-    return '<div class="watch-strip off"><span class="watch-dot"></span>' +
-      '<span class="watch-label">WATCH UNAVAILABLE</span>' +
-      '<span class="watch-count">OPEN RESTLESS ON THE WATCH</span>' +
-      '<span class="watch-sim"><button data-act="watch-connect">CONNECT</button></span></div>';
-  }
-  function traceSVG(cycles) {
-    var points = [];
-    for (var i = 0; i <= 120; i++) {
-      var x = (i / 120) * 300;
-      var y = 40 - Math.sin((i / 120) * Math.PI * 2 * cycles) * 26;
-      points.push(x.toFixed(1) + "," + y.toFixed(1));
-    }
-    return '<svg class="trace-svg" viewBox="0 0 300 80" aria-hidden="true">' +
-      '<line class="trace-grid" x1="0" y1="40" x2="300" y2="40"></line>' +
-      '<polyline class="trace-line" points="' + points.join(" ") + '"></polyline>' +
-    '</svg>';
-  }
-  function recordTargetRow(draft, locked) {
-    var text = draft.condition === "time" ? fmt(draft.target) : String(draft.target == null ? "—" : draft.target);
-    var step = draft.condition === "time" ? 15 : 1;
-    var min = draft.condition === "time" ? LIMITS.time[0] : 1;
-    var max = draft.condition === "time" ? LIMITS.time[1] : Number.MAX_SAFE_INTEGER;
-    return '<div class="srow">' +
-      '<span class="sk">TARGET</span>' +
-      '<span class="sv">' + text + '</span>' +
-      '<div class="sstep">' +
-        '<button data-act="record-target" data-dir="-1" aria-label="Decrease target"' +
-          (locked || draft.target <= min ? " disabled" : "") + '>−</button>' +
-        '<button data-act="record-target" data-dir="1" aria-label="Increase target"' +
-          (locked || draft.target >= max ? " disabled" : "") + '>+</button>' +
-      '</div>' +
-    '</div>';
   }
 
   function groupChips(selected, action, locked) {
@@ -4695,7 +4157,7 @@
   }
 
   function focusNameInput() {
-    var input = $('[data-el="sessionName"], [data-el="blockName"], [data-el="movementName"], [data-el="recordName"]', appEl);
+    var input = $('[data-el="sessionName"], [data-el="blockName"], [data-el="movementName"]', appEl);
     if (input) { input.focus(); input.select(); }
   }
   function focusNumberInput() {
@@ -4800,12 +4262,6 @@
         setText($(".map-bar-label", appEl), doneInBlock + " OF " + blockTotal + " SETS IN THIS BLOCK");
       }
 
-      var watchCount = $("[data-el='watchCount']", appEl);
-      if (watchCount) {
-        var target = p.movement.endCondition === "reps" ? (p.movement.target || 1) : 0;
-        setText(watchCount, state.reps + " OF " + target + " REPS");
-      }
-
       var main, btnSub;
       if (group === "gate") {
         main = "START SESSION";
@@ -4814,9 +4270,6 @@
         if (p.movement.endCondition === "time") {
           main = "START";
           btnSub = fmt(p.movement.target) + " HOLD";
-        } else if (p.movement.endCondition === "reps") {
-          main = "SET DONE";
-          btnSub = watchReady(p) ? state.reps + " OF " + (p.movement.target || 1) + " REPS · WATCH ARMED" : "WATCH UNAVAILABLE · TAP WHEN DONE";
         } else {
           var readyRest = upcomingRest();
           main = "SET DONE";
@@ -4845,7 +4298,7 @@
     syncIsland(false);
 
     var debugSig = group + "|" + state.status + "|" + state.doneSets + "|" + (state.restKind || "") + "|" +
-      Math.floor(remainingNow()) + "|" + Math.floor(remainingSetNow()) + "|" + state.reps + "|" + state.watchReachable;
+      Math.floor(remainingNow()) + "|" + Math.floor(remainingSetNow());
     if (debugSig !== ui.debugSig) {
       ui.debugSig = debugSig;
       var txt;
@@ -4857,7 +4310,7 @@
       } else if (group === "ready") {
         txt = "READY · BLOCK " + (p.blockIndex + 1) + "/" + session.blocks.length + " · " + p.block.name + " · " +
           movementName(p.movement) + " · " + positionLabel(p.block, p) +
-          " · " + (p.movement.endCondition === "reps" ? (watchReady(p) ? "WATCH ARMED " + state.reps + "/" + (p.movement.target || 1) : "WATCH UNAVAILABLE") : movementConditionLabel(p.movement));
+          " · " + movementConditionLabel(p.movement);
       } else if (group === "work") {
         txt = "PERFORMING · WORK " + fmt(remainingSetNow()) + " · " + movementName(p.movement) + " · " +
           positionLabel(p.block, p);
@@ -5055,15 +4508,6 @@
       case "skip":
         skipRest();
         break;
-      case "watch-rep":
-        watchRep();
-        break;
-      case "watch-drop":
-        watchDrop();
-        break;
-      case "watch-connect":
-        watchConnect();
-        break;
       case "tab-timer":
         flushEdit();
         ui.draft = null;
@@ -5165,9 +4609,6 @@
       case "done-movement":
         backToLibrary();
         break;
-      case "record-back":
-        recordBack();
-        break;
       case "use-session":
         if (ui.draft) {
           var committed = commitDraft();
@@ -5221,18 +4662,12 @@
         break;
       case "picker-condition":
         ui.picker.condition = el.getAttribute("data-value");
-        if (ui.picker.condition === "manual") ui.picker.target = null;
-        else if (ui.picker.condition === "time") ui.picker.target = safeTime(ui.picker.target, 60);
-        else ui.picker.target = Math.max(1, safeCount(ui.picker.target, 10));
+        ui.picker.target = safeTarget(ui.picker.condition, ui.picker.target, null);
         render(false);
         break;
       case "picker-target":
         var pickDir = Number(el.getAttribute("data-dir"));
-        if (ui.picker.condition === "time") {
-          ui.picker.target = clamp((ui.picker.target || 15) + pickDir * 15, LIMITS.time[0], LIMITS.time[1]);
-        } else {
-          ui.picker.target = Math.max(1, (ui.picker.target || 1) + pickDir);
-        }
+        ui.picker.target = clamp((ui.picker.target || 15) + pickDir * 15, LIMITS.time[0], LIMITS.time[1]);
         render(false);
         break;
       case "bm-condition":
@@ -5264,45 +4699,6 @@
         break;
       case "open-movement":
         openMovement(el.getAttribute("data-id"));
-        break;
-      case "record-new":
-        startRecord(null);
-        break;
-      case "re-record":
-        startRecord(ui.route.id);
-        break;
-      case "start-recording":
-        startRecordingNow();
-        break;
-      case "simulate-trace":
-        simulateTrace(5);
-        break;
-      case "simulate-short":
-        simulateTrace(2);
-        break;
-      case "simulate-timeout":
-        failRecording("NO TRACE ARRIVED");
-        break;
-      case "simulate-nomotion":
-        failRecording("NO MOTION DETECTED");
-        break;
-      case "retry-record":
-        retryRecording();
-        break;
-      case "save-record":
-        saveRecordedMovement();
-        break;
-      case "discard-record":
-        discardRecording();
-        break;
-      case "record-group":
-        setRecordGroup(el.getAttribute("data-group"));
-        break;
-      case "record-condition":
-        setRecordCondition(el.getAttribute("data-value"));
-        break;
-      case "record-target":
-        bumpRecordTarget(el.getAttribute("data-dir"));
         break;
       case "movement-group":
         setMovementGroup(ui.route.id, el.getAttribute("data-group"));
@@ -5530,8 +4926,6 @@
         movement.name = liveName(t.value);
         markEdited(null);
       }
-    } else if (t.matches('[data-el="recordName"]') && ui.record) {
-      ui.record.draft.name = liveName(t.value);
     } else if (t.matches('[data-el="pickerName"]') && ui.route.kind === "picker") {
       if (!ui.picker) ui.picker = pickerDefault();
       ui.picker.name = liveName(t.value);
@@ -5551,8 +4945,6 @@
       commitBlockName(t);
     } else if (t.matches('[data-el="movementName"]')) {
       commitMovementName(t);
-    } else if (t.matches('[data-el="recordName"]')) {
-      commitRecordName(t);
     } else if (t.matches('[data-el="pickerName"]') && ui.picker) {
       ui.picker.name = trimName(t.value, "");
       if (t.value !== ui.picker.name) t.value = ui.picker.name;
@@ -5572,7 +4964,7 @@
       return;
     }
     if ((t.matches('[data-el="sessionName"]') || t.matches('[data-el="blockName"]') ||
-         t.matches('[data-el="movementName"]') || t.matches('[data-el="recordName"]')) && e.key === "Enter") {
+         t.matches('[data-el="movementName"]')) && e.key === "Enter") {
       e.preventDefault();
       t.blur();
       return;
@@ -5601,8 +4993,7 @@
         return;
       }
       if (ui.tab === "sessions") {
-        if (ui.route.kind === "record") recordBack();
-        else if (ui.route.kind === "movement") backToLibrary();
+        if (ui.route.kind === "movement") backToLibrary();
         else if (ui.route.kind === "library") backToList();
         else if (ui.route.kind === "picker") cancelPicker();
         else if (ui.route.kind === "blockMovement") backToBlock(ui.route.sessionId, ui.route.blockId);

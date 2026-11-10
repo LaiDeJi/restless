@@ -195,7 +195,7 @@ struct SessionsScreen: View {
                             .font(Theme.TypeScale.rowTitle)
                             .tracking(0.2)
                             .foregroundStyle(.white)
-                        Text("Recorded on the watch · reusable in any block")
+                        Text("Reusable in any block")
                             .font(Theme.TypeScale.meta.weight(.medium))
                             .tracking(0.2)
                             .foregroundStyle(Theme.secondaryText)

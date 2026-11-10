@@ -112,7 +112,7 @@ Session total rest SHALL include every set rest, every round rest after a non-fi
 
 ### Requirement: Session start gate
 
-A session selected for the first time, and the app with no saved run, SHALL open in a not-started state. The timer's primary action in that state SHALL be START SESSION, and the session MUST NOT count sets, arm the watch, or start a Live Activity before it is started.
+A session selected for the first time, and the app with no saved run, SHALL open in a not-started state. The timer's primary action in that state SHALL be START SESSION, and the session MUST NOT count sets or start a Live Activity before it is started.
 
 #### Scenario: Launching a fresh session
 
@@ -130,7 +130,7 @@ A session selected for the first time, and the app with no saved run, SHALL open
 
 - **GIVEN** a not-started session
 - **WHEN** the timer is shown
-- **THEN** no set is counted, the watch is not armed, and no Live Activity exists
+- **THEN** no set is counted and no Live Activity exists
 
 ### Requirement: Start session transition
 
@@ -441,7 +441,7 @@ The done state SHALL summarize the completed session by blocks, total sets, and 
 
 ### Requirement: Stable timer hero
 
-The timer's countdown ring SHALL keep one fixed vertical centre in the timer viewport on every block and phase. The block strip, position strip, set map, and watch strip SHALL NOT move that centre as their copy wraps or their row count changes. When the top chrome and the ring cannot both fit, the ring SHALL sit below the chrome and the page SHALL scroll.
+The timer's countdown ring SHALL keep one fixed vertical centre in the timer viewport on every block and phase. The block strip, position strip, and set map SHALL NOT move that centre as their copy wraps or their row count changes. When the top chrome and the ring cannot both fit, the ring SHALL sit below the chrome and the page SHALL scroll.
 
 #### Scenario: Moving from a short block to a tall block
 
@@ -469,7 +469,7 @@ The timer's countdown ring SHALL keep one fixed vertical centre in the timer vie
 
 ### Requirement: Timer content sits below the ring
 
-The set map and watch strip SHALL render below the countdown ring. When the content below the ring cannot fit, the timer page SHALL scroll rather than move the ring.
+The set map SHALL render below the countdown ring. When the content below the ring cannot fit, the timer page SHALL scroll rather than move the ring.
 
 #### Scenario: A map too tall for one screen
 

@@ -3,14 +3,14 @@
 Rest timer for iPhone: untimed sets, a set rest, a longer round rest, and the
 same state mirrored on the Dynamic Island. A session is an ordered list of
 blocks of movements; after a block's last set its round rest leads into the next
-block. Two bottom tabs — TIMER and SESSIONS — replace the old setup sheet. The
-watch app in `RestlessWatch/` counts recorded movements for an armed set, records
-new movement profiles, and keeps the curl lab behind its LAB button.
+block. Two bottom tabs — TIMER and SESSIONS — replace the old setup sheet. A set
+ends on MANUAL (SET DONE) or TIME (a phone countdown); the movement library is a
+name-only list shared by every block.
 
 ## Source of truth
 
 - `prototype-workout-timer.html` is the behaviour and visual reference. It is
-  about 5,500 lines, so `grep -n '/\* -' prototype-workout-timer.html` prints its
+  about 5,000 lines, so `grep -n '/\* -' prototype-workout-timer.html` prints its
   40 section headings (CSS and JS); read the matched range with `offset`/`limit`
   instead of paging the whole file.
 - Change timing, copy, layout or colour in `prototype-workout-timer.html`
@@ -20,8 +20,6 @@ new movement profiles, and keeps the curl lab behind its LAB button.
   machine, the island contract, the platform limits and how to verify a Lock
   Screen or Dynamic Island change. Read it before changing anything that decides
   which rest comes next.
-- `RestlessWatch/README.md` owns the watch app: movement recording, set counting,
-  the curl lab, install steps and its limits.
 - `project.yml` generates the Xcode project. Never edit `Restless.xcodeproj` by hand.
 - `openspec/` is the planning home: one directory per change under
   `openspec/changes/`, plus the specs they derive from. Plan a change there
@@ -55,15 +53,6 @@ repository; the other targets keep the sandbox on.
 
 The repository is under git. `git config core.hooksPath .githooks` installs the
 pre-commit gate: SwiftLint plus `openspec validate --all --strict`.
-
-Watch app (`RestlessWatch` is embedded in the iPhone app; no watch simulator is
-installed on this Mac):
-
-```bash
-xcodebuild -project Restless.xcodeproj -scheme RestlessWatch \
-  -destination 'generic/platform=watchOS' \
-  -derivedDataPath "$TMPDIR/restless-watch-dd" build
-```
 
 Device build (iPhone 15 Pro Max, team `VMZG879ZU8`):
 
@@ -106,26 +95,19 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
 ## Rules
 
 1. `Shared/` is pure model plus ActivityKit; no SwiftUI except `Shared/Theme.swift`.
-   The watch target compiles `WorkoutPreset.swift`, `WorkoutBlock.swift`,
-   `MovementProfileDerivation.swift`, `ProfileRepCounter.swift`,
-   `WatchMessage.swift`, `SessionSnapshot.swift` and `Theme.swift` from it, so
-   keep those free of iOS-only frameworks.
+   Keep it free of iOS-only frameworks.
 2. Time is a deadline, never a decrementing counter. A ticker only triggers
    redraws and deadline reconciliation.
 3. Every mutation goes through `SessionTransitions.apply` — the app button, the
    island link and the URL handler must not have separate logic.
 4. `setDone` is valid only in `ready`; a double tap must not consume two sets,
    including at a block boundary.
-5. The team is a free Apple Developer account. **HealthKit is available**: a
-   clean build with `com.apple.developer.healthkit` in
-   `RestlessWatch.entitlements` produced a profile and a signed app carrying the
-   entitlement, so an `HKWorkoutSession` is possible and counting keeps running
-   with the wrist down. App Groups are not configured; `SessionStore` falls back
-   to `.standard`, so the widget extension cannot read the session. Apple lists
-   App Groups as available to free accounts, but this project has not tested
-   provisioning one; do not repeat the old "free team cannot use App Groups"
-   claim without a clean build. Island controls are `Link`s to
-   `restless://<action>` and the app applies them in `onOpenURL`.
+5. The team is a free Apple Developer account. **App Groups are not configured**;
+   `SessionStore` falls back to `.standard`, so the widget extension cannot read
+   the session. Apple lists App Groups as available to free accounts, but this
+   project has not tested provisioning one; do not repeat the old "free team
+   cannot use App Groups" claim without a clean build. Island controls are
+   `Link`s to `restless://<action>` and the app applies them in `onOpenURL`.
 6. A session is an ordered list of blocks and always keeps at least one block.
    The last saved session cannot be deleted, and a session's last block has no
    delete action. Blocks persist as JSON on the SwiftData record, with the
@@ -140,32 +122,24 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
    timer hides EDIT and SESSIONS is read-only with its lock banner. Switching
    tabs must not change or pause the set or rest.
 10. The prototype is silent. Completion alerts are decided: Restless in the
-    foreground plays one phone haptic (and a reachable watch gets one haptic);
-    in the background one local notification is scheduled when the app
-    backgrounds and left for the system to deliver at the deadline, including
-    while the app is still executing. iOS mirrors it to the paired watch, so
-    the app sends no second watch alert. No alerting Live Activity update and
-    no system alarm is scheduled. The prototype simulates the notification card
-    visually and adds no audio. The watch plays one haptic when a set target is
-    reached and when a recording stops, plus one notification haptic for a
-    reachable foreground completion.
-11. The watch counts the watch arm only. Counting runs in an `HKWorkoutSession`,
-    so motion continues with the wrist down and the screen off; if workout
-    authorization is denied it falls back to the foreground. Recording a
-    movement uses `CMSensorRecorder` for the same reason. The curl lab is still a
-    measuring tool, not the timer: it needs the screen on and its CSV/logs travel
-    one way over WatchConnectivity. Do not add a second counting path.
+    foreground plays one phone haptic; in the background one local notification
+    is scheduled when the app backgrounds and left for the system to deliver at
+    the deadline, including while the app is still executing. iOS mirrors it to
+    a paired watch, so the app sends no watch alert of its own. No alerting Live
+    Activity update and no system alarm is scheduled. The prototype simulates
+    the notification card visually and adds no audio.
+11. The movement library is a name list. A movement is created by typing its name
+    in a block's add-movement picker and managed from MOVEMENTS by rename and
+    delete; it has no profile, recording action, or watch count. A used movement
+    cannot be deleted. Do not add a second set-ending path.
 
 ## Layout
 
 - `Shared/` — session and block maths, rest plan, session snapshot and
   transitions, store, activity attributes, coordinator, palette.
 - `Restless/` — app entry, router and root tab shell, engine, draft store,
-  SwiftData session record, timer and sessions screens, watch link, recording and
-  trace receiver.
+  SwiftData session record, timer and sessions screens.
 - `RestlessWidget/` — Live Activity and Dynamic Island, built from the shared
   session snapshot.
-- `RestlessWatch/` — watch app: set counting, movement recording, curl lab,
-  WatchConnectivity.
 - `RestlessTests/` — rest plan across blocks, session transitions, draft
-  debouncing, and record migration.
+  debouncing, record migration, and end-condition decoding.

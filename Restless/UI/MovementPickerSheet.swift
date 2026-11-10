@@ -35,7 +35,7 @@ struct MovementPickerSheet: View {
                     Text("SET END")
                         .font(Theme.TypeScale.screenTitle)
                         .foregroundStyle(.white)
-                    Text("Choose how the set ends, then queue a recorded movement or name a new one.")
+                    Text("Choose how the set ends, then queue a library movement or name a new one.")
                         .font(Theme.TypeScale.body)
                         .foregroundStyle(Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -65,9 +65,9 @@ struct MovementPickerSheet: View {
                         PlanStepperRow(
                             label: "TARGET",
                             value: $targetValue,
-                            range: condition == .time ? 15...600 : 1...Int.max,
-                            step: condition == .time ? 15 : 1,
-                            format: { condition == .time ? clockString($0) : "\($0)" },
+                            range: 15...600,
+                            step: 15,
+                            format: { clockString($0) },
                             locked: isLocked
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -101,14 +101,6 @@ struct MovementPickerSheet: View {
                                 .fill(.white.opacity(0.045))
                         )
 
-                    if condition.requiresWatchProfile {
-                        Text("NO PROFILE · THE WATCH CANNOT COUNT IT UNTIL IT IS RECORDED.")
-                            .font(Theme.TypeScale.meta.weight(.semibold))
-                            .tracking(0.4)
-                            .foregroundStyle(Theme.roundAccent)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
                     Button(action: queueNewName) {
                         Text("ADD MOVEMENT")
                             .font(Theme.TypeScale.compactAction.weight(.bold))
@@ -141,7 +133,7 @@ struct MovementPickerSheet: View {
                     }
 
                     if records.isEmpty {
-                        Text("No movements yet. Record one first.")
+                        Text("No movements yet. Type a name above to create one.")
                             .font(Theme.TypeScale.body)
                             .foregroundStyle(Theme.tertiaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -271,18 +263,12 @@ struct MovementPickerSheet: View {
     private func row(_ record: MovementRecord) -> some View {
         let queued = pending.contains(movementID: record.id)
         return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(record.name)
-                    .font(Theme.TypeScale.rowTitle)
-                    .tracking(0.2)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(record.movement.profile?.usesForearmSignal == true ? "PROFILE" : "NO PROFILE")
-                    .font(Theme.TypeScale.meta)
-                    .tracking(0.2)
-                    .foregroundStyle(Theme.secondaryText)
-            }
+            Text(record.name)
+                .font(Theme.TypeScale.rowTitle)
+                .tracking(0.2)
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 8)
 
@@ -306,7 +292,6 @@ struct MovementPickerSheet: View {
     private func conditionText(_ condition: EndCondition, _ target: Int?) -> String {
         switch condition {
         case .manual: "MANUAL"
-        case .reps: "\(target ?? 1) REPS"
         case .time: "TIME \(clockString(target ?? 60))"
         }
     }

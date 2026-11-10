@@ -12,9 +12,6 @@ final class SessionEngine {
     /// session, not the library, so the app supplies the lookup.
     var movementNamesProvider: (() -> [UUID: String])?
 
-    /// Set by RootView: a best-effort watch haptic for a foreground completion.
-    var foregroundWatchAlert: (() -> Void)?
-
     @ObservationIgnored private var alertCenter: CompletionAlertCenter!
 
     init(preset: WorkoutPreset, scheduler: any CountdownAlertScheduler = NoopCountdownAlertScheduler()) {
@@ -27,8 +24,7 @@ final class SessionEngine {
         }
         alertCenter = CompletionAlertCenter(
             scheduler: scheduler,
-            movementNames: { [weak self] in self?.movementNames ?? [:] },
-            watchAlert: { [weak self] in self?.foregroundWatchAlert?() }
+            movementNames: { [weak self] in self?.movementNames ?? [:] }
         )
         SessionStore.save(snapshot)
         // No alert may survive a relaunch of a countdown that already ended.

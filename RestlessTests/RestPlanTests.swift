@@ -280,19 +280,13 @@ func emptyBlockFallsBack() {
     #expect(preset.blocks[0].movements.count == 1)
 }
 
-@Test("Movements clamp their name and profile")
+@Test("Movements clamp their name")
 func movementClamping() {
-    let movement = Movement(
-        name: "   ",
-        profile: MovementProfile(axis: .x, rise: -2, fall: 400, minPeriod: 0)
-    ).clamped()
+    let movement = Movement(name: "   ").clamped()
     #expect(movement.name == "Untitled movement")
-    #expect(movement.profile?.rise == 0)
-    #expect(movement.profile?.fall == 180)
-    #expect(movement.profile?.minPeriod == 0.01)
 
-    let counted = BlockMovement(movementId: benchID, endCondition: .reps, target: 0)
-    #expect(counted.clamped().target == 1)
+    let timed = BlockMovement(movementId: benchID, endCondition: .time, target: 0)
+    #expect(timed.clamped().target == 15)
 
     let manual = BlockMovement(movementId: benchID, endCondition: .manual, target: 10)
     #expect(manual.clamped().target == nil)

@@ -78,22 +78,13 @@ struct BlockMovementEditorScreen: View {
                                 get: { movement.target ?? defaultTarget },
                                 set: { newValue in edit { $0.target = newValue } }
                             ),
-                            range: movement.endCondition == .time ? 15...600 : 1...Int.max,
-                            step: movement.endCondition == .time ? 15 : 1,
-                            format: { movement.endCondition == .time ? clockString($0) : "\($0)" },
+                            range: 15...600,
+                            step: 15,
+                            format: { clockString($0) },
                             locked: isLocked
                         )
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-
-                if movement.endCondition.requiresWatchProfile,
-                   libraryMovement?.profile?.usesForearmSignal != true {
-                    Text("NO PROFILE · RE-RECORD THIS MOVEMENT BEFORE THE WATCH CAN COUNT.")
-                        .font(Theme.TypeScale.meta.weight(.semibold))
-                        .tracking(0.4)
-                        .foregroundStyle(Theme.roundAccent)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 removeButton(block: block, movement: movement)

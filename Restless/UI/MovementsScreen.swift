@@ -6,9 +6,6 @@ struct MovementsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \MovementRecord.createdAt) private var records: [MovementRecord]
 
-    @State private var showRecording = false
-    @State private var recordingMovementID: UUID?
-
     private var isLocked: Bool { engine.snapshot.isLocked }
 
     var body: some View {
@@ -22,16 +19,18 @@ struct MovementsScreen: View {
                     Text("MOVEMENTS")
                         .font(Theme.TypeScale.screenTitle)
                         .foregroundStyle(.white)
-                    Text(plural(records.count, "MOVEMENT", "MOVEMENTS"))
-                        .font(Theme.TypeScale.body)
-                        .foregroundStyle(Theme.secondaryText)
+                    Text(
+                        "\(plural(records.count, "MOVEMENT", "MOVEMENTS")) · ADDED FROM A BLOCK"
+                    )
+                    .font(Theme.TypeScale.body)
+                    .foregroundStyle(Theme.secondaryText)
 
                     if isLocked {
                         EditingLockBanner()
                     }
 
                     if records.isEmpty {
-                        Text("No movements yet. Record one on the watch to create it.")
+                        Text("No movements yet. Add one by typing a name in a block's add-movement picker.")
                             .font(Theme.TypeScale.body)
                             .foregroundStyle(Theme.tertiaryText)
                             .padding(.vertical, 12)
@@ -47,8 +46,6 @@ struct MovementsScreen: View {
                             }
                         }
                     }
-
-                    recordButton
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 6)
@@ -58,9 +55,6 @@ struct MovementsScreen: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showRecording) {
-            RecordingSheet(movementID: recordingMovementID)
-        }
     }
 
     private var header: some View {
@@ -68,22 +62,6 @@ struct MovementsScreen: View {
             PlanPillButton(title: "‹ SESSIONS") {
                 dismiss()
             }
-
-            Spacer()
-
-            Button {
-                startRecording(nil)
-            } label: {
-                Image(systemName: "plus")
-                    .font(Theme.TypeScale.value)
-                    .foregroundStyle(isLocked ? .white.opacity(0.18) : .white.opacity(0.75))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(.white.opacity(isLocked ? 0.03 : 0.07)))
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(isLocked)
-            .accessibilityLabel("Record movement")
         }
         .frame(minHeight: 44)
     }
@@ -97,18 +75,12 @@ struct MovementsScreen: View {
 
     private func movementRow(_ movement: MovementRecord) -> some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(movement.name)
-                    .font(Theme.TypeScale.rowTitle)
-                    .tracking(0.2)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(movement.movement.profile?.usesForearmSignal == true ? "PROFILE" : "NO PROFILE")
-                    .font(Theme.TypeScale.meta)
-                    .tracking(0.2)
-                    .foregroundStyle(Theme.secondaryText)
-            }
+            Text(movement.name)
+                .font(Theme.TypeScale.rowTitle)
+                .tracking(0.2)
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 8)
 
@@ -123,32 +95,5 @@ struct MovementsScreen: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(.white.opacity(0.045))
         )
-    }
-
-    private var recordButton: some View {
-        Button {
-            startRecording(nil)
-        } label: {
-            Text("+ RECORD MOVEMENT")
-                .font(Theme.TypeScale.compactAction.weight(.bold))
-                .tracking(1.0)
-                .foregroundStyle(isLocked ? .white.opacity(0.2) : .white.opacity(0.7))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 48)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(.white.opacity(isLocked ? 0.04 : 0.09), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isLocked)
-        .padding(.top, 8)
-    }
-
-    private func startRecording(_ id: UUID?) {
-        guard !isLocked else { return }
-        recordingMovementID = id
-        showRecording = true
     }
 }

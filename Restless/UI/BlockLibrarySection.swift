@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The block editor's one-tap library path: every recorded movement not already
+/// The block editor's one-tap library path: every library movement not already
 /// in the block, appended with MANUAL and no target. Hidden while editing is
 /// locked and absent when the block already uses the whole library.
 struct BlockLibrarySection: View {
@@ -55,9 +55,7 @@ struct BlockLibrarySection: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(record.movement.profile?.usesForearmSignal == true
-                     ? "PROFILE · MANUAL"
-                     : "NO PROFILE · MANUAL")
+                Text("MANUAL")
                     .font(Theme.TypeScale.meta)
                     .tracking(0.2)
                     .foregroundStyle(Theme.secondaryText)
