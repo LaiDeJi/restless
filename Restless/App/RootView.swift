@@ -28,6 +28,18 @@ struct RootView: View {
             }
             .tabItem { Label("SESSIONS", systemImage: "list.bullet.rectangle") }
             .tag(AppTab.sessions)
+
+            NavigationStack(path: $router.calendarPath) {
+                CalendarScreen()
+                    .navigationDestination(for: CalendarRoute.self) { route in
+                        switch route {
+                        case .exceptions:
+                            ExceptionsScreen()
+                        }
+                    }
+            }
+            .tabItem { Label("CALENDAR", systemImage: "calendar") }
+            .tag(AppTab.calendar)
         }
         .tint(Theme.setAccent)
         .toolbarBackground(Theme.background, for: .tabBar)

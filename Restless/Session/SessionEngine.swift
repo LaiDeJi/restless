@@ -12,6 +12,13 @@ final class SessionEngine {
     /// session, not the library, so the app supplies the lookup.
     var movementNamesProvider: (() -> [UUID: String])?
 
+    /// The history hook. Installing it records the snapshot the engine restored
+    /// (a timed set or rest that expired before launch would otherwise be
+    /// missed until the next action) and every later state change.
+    @ObservationIgnored var historyRecorder: (any WorkoutHistoryRecording)? {
+        didSet { recordHistory() }
+    }
+
     @ObservationIgnored private var alertCenter: CompletionAlertCenter!
 
     init(preset: WorkoutPreset, scheduler: any CountdownAlertScheduler = NoopCountdownAlertScheduler()) {
@@ -40,9 +47,11 @@ final class SessionEngine {
     }
 
     func perform(_ action: SessionAction) {
-        SessionTransitions.apply(action, to: &snapshot)
+        let now = Date.now
+        SessionTransitions.apply(action, to: &snapshot, now: now)
         alertCenter.sessionChanged(snapshot, isActive: isActive)
         persist()
+        recordHistory(now: now)
         restartTicker()
     }
 
@@ -50,8 +59,10 @@ final class SessionEngine {
     /// due now to the system, so this path must not report a session change
     /// that would cancel it.
     private func performDeadline(_ action: SessionAction) {
-        SessionTransitions.apply(action, to: &snapshot)
+        let now = Date.now
+        SessionTransitions.apply(action, to: &snapshot, now: now)
         persist()
+        recordHistory(now: now)
         restartTicker()
     }
 
@@ -80,12 +91,14 @@ final class SessionEngine {
     func refreshFromStore() {
         guard let saved = SessionStore.load() else { return }
         var restored = saved
-        _ = restored.reconcile(now: .now)
+        let now = Date.now
+        _ = restored.reconcile(now: now)
         guard restored != snapshot else { return }
         alertCenter.cancelAll()
         snapshot = restored
         alertCenter.sessionChanged(snapshot, isActive: isActive)
         SessionStore.save(snapshot)
+        recordHistory(now: now)
         restartTicker()
         let names = movementNames
         Task { await LiveActivityCoordinator.start(snapshot, movementNames: names) }
@@ -111,6 +124,10 @@ final class SessionEngine {
         let current = snapshot
         let names = movementNames
         Task { await LiveActivityCoordinator.start(current, movementNames: names) }
+    }
+
+    private func recordHistory(now: Date = .now) {
+        historyRecorder?.record(snapshot, now: now)
     }
 
     private var movementNames: [UUID: String] {

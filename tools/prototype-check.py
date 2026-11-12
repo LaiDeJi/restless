@@ -60,7 +60,7 @@ def instrumented_page(driver: Path | None) -> bytes:
         code = driver.read_text().replace("</script>", "<\\/script>")
         html = re.sub(
             r"</body>",
-            f"<script>\n{code}\n</script>\n</body>",
+            lambda _match: f"<script>\n{code}\n</script>\n</body>",
             html,
             count=1,
         )

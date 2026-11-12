@@ -26,11 +26,24 @@
   The key interaction: tap the Dynamic Island → Set done. That starts the right rest
   without reopening the app. The phone screen is the detailed view of the same state.
 
-  Navigation: TIMER and SESSIONS bottom tabs. SESSIONS lists saved sessions and the
+  Navigation: TIMER, SESSIONS and CALENDAR bottom tabs. SESSIONS lists saved sessions and the
   MOVEMENTS library. A session opens its ordered blocks; a block edits its rounds,
   sets per round, rests, and movements. A movement opens its end condition and target.
-  Values persist in localStorage. Rounds and sets per round are unbounded; rests stay
-  15–600 seconds in 15s steps, except a block's set rest may be 0.
+  CALENDAR projects the SESSIONS order onto a fixed cadence: one session every rest
+  gap plus one days from the anchor, taking the next session in order at each slot.
+  A dated range or a repeating weekday closes a date: it keeps its slot but plans no
+  session, so that session is skipped for the lap. A skipped date hides its plan and
+  offers no START; a date can use another session for that date only. A reorder and a
+  new round both move the anchor; a past day, a record and a run in progress keep
+  their record. A month cell shows a recorded session with a filled set bar, a planned
+  one with a hollow bar, REST, CLOSED or SKIP, and a ring for today. A day opens a
+  sheet: a planned day offers START, CHANGE, SKIP and NEW ROUND, a recorded day is
+  read-only with a two-tap delete and NEW ROUND, a skipped day offers UNSKIP, a rest
+  day offers NEW ROUND, and a closed day offers no action. REST DAYS carries an inline
+  0–6 stepper and EXCEPTIONS opens its editor; the demo grid keeps a fixed Monday
+  start. Values persist in localStorage. Rounds and sets
+  per round are unbounded; rests stay 15–600 seconds in 15s steps, except a block's set
+  rest may be 0.
 
   The add-movement picker can also create a library movement from a typed name: it
   is appended with the selected set end and target, and is reused when a matching
@@ -993,6 +1006,450 @@
     color: rgba(255,255,255,.28);
   }
 
+  /* ---------------------------------------------------------------- calendar */
+  .calendar-screen { padding-bottom: 92px; }
+  .calendar-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .calendar-scroll::-webkit-scrollbar { display: none; }
+  .cal-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 3px;
+  }
+  .cal-filters {
+    display: flex;
+    gap: 7px;
+    margin-top: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cal-filters::-webkit-scrollbar { display: none; }
+  .cal-chip {
+    flex: 0 0 auto;
+    height: 30px;
+    max-width: 132px;
+    padding: 0 12px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 999px;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.42);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .cal-chip.on { color: #0b0b0e; background: #C8FF4D; border-color: transparent; }
+  .cal-month {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .cal-month-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: rgba(255,255,255,.52);
+  }
+  .cal-nav {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 50%;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.62);
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .cal-nav:active { background: rgba(255,255,255,.09); }
+  .cal-weekdays,
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .cal-weekdays { margin-top: 12px; }
+  .cal-weekday {
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.28);
+  }
+  .cal-grid { margin-top: 6px; }
+  .cal-cell {
+    position: relative;
+    min-height: 54px;
+    padding: 5px 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .cal-cell.adjacent { background: transparent; color: rgba(255,255,255,.16); cursor: default; }
+  .cal-cell.today { box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
+  .cal-cell.dim { opacity: .26; }
+  .cal-day {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: .01em;
+  }
+  .cal-mark {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    line-height: 1.3;
+  }
+  .cal-mark.record { color: #C8FF4D; }
+  .cal-mark.plan { color: #FFB84D; }
+  .cal-mark.word { color: rgba(255,255,255,.34); font-size: 8px; letter-spacing: .07em; }
+  .cal-sub { font-size: 7px; font-weight: 700; letter-spacing: .07em; color: rgba(255,255,255,.3); }
+  .cal-bar {
+    width: 22px;
+    height: 3px;
+    margin-top: auto;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    overflow: hidden;
+  }
+  .cal-bar i { display: block; height: 100%; background: #C8FF4D; }
+  .cal-bar.hollow { background: transparent; border: 1px solid rgba(255,184,77,.55); }
+  .cal-count {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    font-size: 8px;
+    font-weight: 700;
+    color: #C8FF4D;
+  }
+  .cal-upnext {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid rgba(255,255,255,.055);
+  }
+  .cal-upnext-k { font-size: 10px; font-weight: 700; letter-spacing: .11em; color: rgba(255,255,255,.3); }
+  .cal-upnext-v { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgba(255,255,255,.78); }
+  .cal-section { margin-top: 22px; }
+  .cal-setting-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 16px;
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .cal-setting-row:active { background: rgba(255,255,255,.07); }
+  .cal-setting-main { flex: 1 1 auto; min-width: 0; }
+  .cal-setting-label { font-size: 11px; font-weight: 700; letter-spacing: .11em; color: rgba(255,255,255,.36); }
+  .cal-setting-value {
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .015em;
+    color: rgba(255,255,255,.86);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0,0,0,.58);
+  }
+  .cal-sheet {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 21;
+    max-height: 74%;
+    overflow-y: auto;
+    padding: 12px 18px 22px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 26px;
+    background: #141417;
+    box-shadow: 0 -30px 70px -30px rgba(0,0,0,.9);
+  }
+  .cal-sheet-grip {
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.16);
+  }
+  .cal-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .cal-sheet-kicker { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: rgba(255,255,255,.32); }
+  .cal-sheet-title { margin-top: 5px; font-size: 26px; font-weight: 600; line-height: 1.15; }
+  .cal-sheet-meta { margin-top: 6px; font-size: 13px; line-height: 1.4; color: rgba(255,255,255,.42); }
+  .cal-sheet-note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,184,77,.2);
+    border-radius: 12px;
+    background: rgba(255,184,77,.07);
+    font-size: 12px;
+    line-height: 1.45;
+    color: #FFB84D;
+  }
+  .cal-primary {
+    width: 100%;
+    min-height: 52px;
+    margin-top: 16px;
+    border: none;
+    border-radius: 999px;
+    background: #C8FF4D;
+    color: #0b0b0e;
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .cal-primary:active { opacity: .85; }
+  .cal-record {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 16px;
+    background: rgba(255,255,255,.035);
+  }
+  .cal-record-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .cal-record-name { font-size: 17px; font-weight: 600; }
+  .cal-record-sets { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #C8FF4D; white-space: nowrap; }
+  .cal-record-block { margin-top: 8px; font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.36); }
+  .cal-delete {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 14px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(255,92,77,.62);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    cursor: pointer;
+  }
+  .cal-delete.armed { color: #FF5C4D; background: rgba(255,92,77,.12); border-color: rgba(255,92,77,.34); }
+  .cal-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .cal-option {
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 999px;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.52);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cal-option.on { background: rgba(200,255,77,.12); border-color: rgba(200,255,77,.34); color: #C8FF4D; }
+  .cal-option:disabled { opacity: .34; cursor: default; }
+  .cal-range { display: flex; gap: 8px; margin-top: 14px; }
+  .cal-field { flex: 1 1 0; min-width: 0; }
+  .cal-field span {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: rgba(255,255,255,.32);
+  }
+  .cal-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .cal-input::placeholder { color: rgba(255,255,255,.26); }
+  .cal-exception {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+  }
+  .cal-exception-main { flex: 1 1 auto; min-width: 0; }
+  .cal-exception-label { font-size: 13px; font-weight: 600; }
+  .cal-exception-days { margin-top: 3px; font-size: 11px; color: rgba(255,255,255,.34); }
+  .cal-exception-delete {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,92,77,.1);
+    color: #FF5C4D;
+    font-family: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .cal-empty { margin-top: 16px; font-size: 13px; color: rgba(255,255,255,.3); }
+  .cal-setting-row.static { cursor: default; }
+  .cal-setting-row.static:active { background: rgba(255,255,255,.04); }
+  .cal-gap { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+  .cal-step {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 50%;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.72);
+    font-family: inherit;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .cal-step:active { background: rgba(255,255,255,.09); }
+  .cal-step-value {
+    min-width: 20px;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: .01em;
+  }
+  .cal-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 7px;
+    border: 1px solid rgba(255,184,77,.35);
+    border-radius: 999px;
+    background: rgba(255,184,77,.12);
+    color: #FFB84D;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    vertical-align: middle;
+  }
+  .cal-blocks { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .cal-block {
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.055);
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+  }
+  .cal-block-name { font-size: 13px; font-weight: 600; }
+  .cal-block-meta { margin-top: 4px; font-size: 11px; line-height: 1.4; color: rgba(255,255,255,.34); }
+  .cal-next {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+  .cal-next-k { font-size: 10px; font-weight: 700; letter-spacing: .11em; color: rgba(255,255,255,.3); }
+  .cal-next-v { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgba(255,255,255,.72); }
+  .cal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  .cal-outline {
+    flex: 1 1 0;
+    min-width: 96px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(255,255,255,.72);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    cursor: pointer;
+  }
+  .cal-outline:active { background: rgba(255,255,255,.07); }
+  .cal-outline.danger { color: rgba(255,92,77,.72); border-color: rgba(255,92,77,.24); }
+  .cal-outline.danger.armed { color: #FF5C4D; background: rgba(255,92,77,.12); border-color: rgba(255,92,77,.34); }
+  .cal-modes { display: flex; gap: 6px; margin-top: 14px; }
+  .cal-mode {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 999px;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.42);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    cursor: pointer;
+  }
+  .cal-mode.on { background: rgba(200,255,77,.12); border-color: rgba(200,255,77,.34); color: #C8FF4D; }
+  .cal-picker { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .cal-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .cal-picker-name { flex: 1 1 auto; font-size: 15px; font-weight: 600; }
+  .cal-picker-check { color: #C8FF4D; font-size: 14px; font-weight: 700; }
+
   /* ---------------------------------------------------------------- session editor */
   .editor-head {
     display: flex;
@@ -1735,7 +2192,7 @@
   <div class="page">
     <header class="page-head">
       <div class="ph-left"><span class="ph-mark"></span>Restless <em>session rest timer</em></div>
-      <div class="ph-right">TIMER / SESSIONS · blocks, movements, and rests</div>
+      <div class="ph-right">TIMER / SESSIONS / CALENDAR · plans, history, and rests</div>
     </header>
 
     <div class="stage" id="stage">
@@ -1811,6 +2268,15 @@
   var STORAGE_KEY = "restless.sessions.v4";
   var V2_KEY = "restless.sessions.v2";
   var LEGACY_KEY = "rounds.presets.v1";
+  var CAL_KEY = "restless.calendar.v2";
+  var CAL_GAP_MAX = 6;
+  var MONTH_NAMES = [
+    "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+    "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+  ];
+  var MONTH_SHORT = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  var WEEKDAY_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  var WEEKDAY_FULL = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
   var GROUPS = ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Legs", "Glutes"];
   var CONDITIONS = ["time", "manual"];
   var DEFAULT_ROUNDS = 1;
@@ -1836,7 +2302,8 @@
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6.5 7l.8 12.2a1.6 1.6 0 0 0 1.6 1.5h6.2a1.6 1.6 0 0 0 1.6-1.5L17.5 7"/><path d="M10 11v6M14 11v6"/></svg>',
     restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 9.6a7.6 7.6 0 1 1 1.1 7.2"/><path d="M4.3 4.7v5.2h5.2"/></svg>',
     timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.6 1.6M9 2.5h6"/></svg>',
-    sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4.5"/></svg>'
+    sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4.5"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="3.5"/><path d="M3.5 10h17M8 3.5v4M16 3.5v4"/></svg>'
   };
 
   /* ------------------------------------------------------------------ demo data */
@@ -1928,7 +2395,15 @@
     draft: null,
     stagedBlock: null,
     restartConfirm: null,
-    alert: null
+    alert: null,
+    calMonth: null,
+    calFilter: "all",
+    calSheet: null,
+    calDeleteArmed: null,
+    calExceptionDraft: null,
+    calExceptionError: "",
+    calExceptionMode: "dates",
+    calExceptionWeekday: 1
   };
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -1944,6 +2419,7 @@
   var textCache = new WeakMap();
 
   initData();
+  initCalendar();
 
   /* ------------------------------------------------------------------ tiny helpers */
   function uid(prefix) {
@@ -2543,6 +3019,782 @@
     if (loaded.migrated) saveData();
   }
 
+  /* ------------------------------------------------------------------ calendar */
+  var calendar;
+  var calRenderBoundary = null;
+
+  // The demo grid keeps a fixed Monday start; the app follows the device.
+  function weekStartIndex() { return 1; }
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+  function addDays(date, count) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + count);
+  }
+  function dayKey(date) {
+    var copy = startOfDay(date);
+    return copy.getFullYear() + "-" + pad2(copy.getMonth() + 1) + "-" + pad2(copy.getDate());
+  }
+  function keyToDate(key) {
+    var parts = String(key).split("-");
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+  function keyOk(key) { return /^\d{4}-\d{2}-\d{2}$/.test(String(key)); }
+  function todayKey() { return dayKey(new Date()); }
+  function weekdayNumber(key) { return keyToDate(key).getDay() + 1; }
+
+  function defaultCalendar() {
+    return {
+      restDaysBetween: 0,
+      exceptions: [],
+      skippedDays: [],
+      dayChanges: [],
+      anchor: null,
+      records: []
+    };
+  }
+  function makeCalendarRecord(session, date, doneSets, startTime, durationMin) {
+    var total = sessionTotals(session).sets;
+    var done = clamp(Number(doneSets) || 0, 0, total);
+    return {
+      id: uid("r"),
+      sessionId: session.id,
+      sessionName: session.name,
+      startDay: dayKey(date),
+      startTime: startTime || "",
+      durationMin: Math.max(0, Number(durationMin) || 0),
+      doneSets: done,
+      totalSets: total,
+      finished: done >= total,
+      blocks: clone(session.blocks)
+    };
+  }
+  function demoCalendarRecords() {
+    if (!sessions.length) return [];
+    var today = startOfDay(new Date());
+    var chest = sessions[0];
+    var arms = sessions[1] || sessions[0];
+    return [
+      makeCalendarRecord(chest, addDays(today, -4), sessionTotals(chest).sets, "18:30", 42),
+      makeCalendarRecord(arms, addDays(today, -2), Math.max(1, sessionTotals(arms).sets - 1), "07:15", 0)
+    ];
+  }
+  function sanitizeException(raw) {
+    if (!raw) return null;
+    var label = trimName(typeof raw.label === "string" ? raw.label : "", "");
+    var id = idOk(raw.id, {}) ? raw.id : uid("x");
+    if (raw.kind === "weekday") {
+      var weekday = Number(raw.weekday);
+      if (!isFinite(weekday) || weekday < 1 || weekday > 7) return null;
+      return { id: id, kind: "weekday", weekday: Math.round(weekday), label: label };
+    }
+    if (!keyOk(raw.start) || !keyOk(raw.end) || raw.end < raw.start) return null;
+    return { id: id, kind: "dates", start: raw.start, end: raw.end, label: label };
+  }
+  function sanitizeRecord(raw) {
+    if (!raw || !keyOk(raw.startDay)) return null;
+    var total = Number(raw.totalSets);
+    if (!isFinite(total) || total < 1) total = 1;
+    var done = Number(raw.doneSets);
+    if (!isFinite(done)) done = 0;
+    var blocks = Array.isArray(raw.blocks) ? raw.blocks : [];
+    return {
+      id: idOk(raw.id, {}) ? raw.id : uid("r"),
+      sessionId: typeof raw.sessionId === "string" ? raw.sessionId : "",
+      sessionName: trimName(typeof raw.sessionName === "string" ? raw.sessionName : "", "Untitled"),
+      startDay: raw.startDay,
+      startTime: typeof raw.startTime === "string" ? raw.startTime : "",
+      durationMin: Math.max(0, Number(raw.durationMin) || 0),
+      doneSets: clamp(done, 0, total),
+      totalSets: total,
+      finished: raw.finished === true,
+      blocks: blocks
+    };
+  }
+  function initCalendar() {
+    var stored = readJSON(CAL_KEY);
+    calendar = defaultCalendar();
+    if (stored && stored.v === 2) {
+      var gap = Number(stored.restDaysBetween);
+      calendar.restDaysBetween = isFinite(gap) ? clamp(Math.round(gap), 0, CAL_GAP_MAX) : 0;
+      if (Array.isArray(stored.exceptions)) {
+        stored.exceptions.forEach(function (raw) {
+          var clean = sanitizeException(raw);
+          if (clean) calendar.exceptions.push(clean);
+        });
+      }
+      if (Array.isArray(stored.skippedDays)) {
+        stored.skippedDays.forEach(function (raw) {
+          if (keyOk(raw) && calendar.skippedDays.indexOf(raw) < 0) calendar.skippedDays.push(raw);
+        });
+      }
+      if (Array.isArray(stored.dayChanges)) {
+        stored.dayChanges.forEach(function (raw) {
+          if (!raw || !keyOk(raw.day) || typeof raw.sessionId !== "string") return;
+          calendar.dayChanges = calendar.dayChanges.filter(function (change) {
+            return change.day !== raw.day;
+          });
+          calendar.dayChanges.push({ day: raw.day, sessionId: raw.sessionId });
+        });
+      }
+      if (Array.isArray(stored.records)) {
+        stored.records.forEach(function (raw) {
+          var clean = sanitizeRecord(raw);
+          if (clean) calendar.records.push(clean);
+        });
+      }
+      if (keyOk(stored.anchor)) calendar.anchor = stored.anchor;
+    } else {
+      calendar.records = demoCalendarRecords();
+    }
+    if (!calendar.anchor) {
+      var start = todayKey();
+      calendar.anchor = exceptionFor(start) ? nextOpenKeyAfter(start) : start;
+    }
+    saveCalendar();
+  }
+  function saveCalendar() {
+    try {
+      localStorage.setItem(CAL_KEY, JSON.stringify({
+        v: 2,
+        restDaysBetween: calendar.restDaysBetween,
+        exceptions: calendar.exceptions,
+        skippedDays: calendar.skippedDays,
+        dayChanges: calendar.dayChanges,
+        anchor: calendar.anchor,
+        records: calendar.records
+      }));
+    } catch (e) { /* private mode / file:// */ }
+  }
+  function resetRotationAfterReorder() {
+    var boundary = nextUnstartedKey();
+    if (boundary) calendar.anchor = boundary;
+    saveCalendar();
+  }
+
+  function dayOffset(fromKey, toKey) {
+    var from = startOfDay(keyToDate(fromKey));
+    var to = startOfDay(keyToDate(toKey));
+    return Math.round((to - from) / 86400000);
+  }
+  function cadenceStep() { return calendar.restDaysBetween + 1; }
+  function isSessionSlot(key) {
+    if (!calendar.anchor || key < calendar.anchor) return false;
+    return dayOffset(calendar.anchor, key) % cadenceStep() === 0;
+  }
+  function slotNumber(key) {
+    if (!isSessionSlot(key)) return -1;
+    return dayOffset(calendar.anchor, key) / cadenceStep();
+  }
+  function scheduledPlanForKey(key) {
+    var slot = slotNumber(key);
+    if (slot < 0 || !sessions.length) return null;
+    return sessions[slot % sessions.length];
+  }
+  function exceptionFor(key) {
+    var i;
+    var exception;
+    for (i = 0; i < calendar.exceptions.length; i++) {
+      exception = calendar.exceptions[i];
+      if (exception.kind === "dates" && key >= exception.start && key <= exception.end) {
+        return exception;
+      }
+    }
+    for (i = 0; i < calendar.exceptions.length; i++) {
+      exception = calendar.exceptions[i];
+      if (exception.kind === "weekday" && exception.weekday === weekdayNumber(key)) {
+        return exception;
+      }
+    }
+    return null;
+  }
+  function weekdayException(number) {
+    for (var i = 0; i < calendar.exceptions.length; i++) {
+      if (calendar.exceptions[i].kind === "weekday" && calendar.exceptions[i].weekday === number) {
+        return calendar.exceptions[i];
+      }
+    }
+    return null;
+  }
+  function nextOpenKeyAfter(key) {
+    var date = addDays(keyToDate(key), 1);
+    for (var i = 0; i < 3660; i++) {
+      var next = dayKey(date);
+      if (!exceptionFor(next)) return next;
+      date = addDays(date, 1);
+    }
+    return null;
+  }
+  function isSkipped(key) { return calendar.skippedDays.indexOf(key) >= 0; }
+  function skipKey(key) {
+    if (isSkipped(key) || !planForKey(key)) return;
+    calendar.skippedDays.push(key);
+    saveCalendar();
+  }
+  function unskipKey(key) {
+    calendar.skippedDays = calendar.skippedDays.filter(function (day) { return day !== key; });
+    saveCalendar();
+  }
+  function dayChangeFor(key) {
+    for (var i = 0; i < calendar.dayChanges.length; i++) {
+      if (calendar.dayChanges[i].day === key) return calendar.dayChanges[i];
+    }
+    return null;
+  }
+  function changeSessionFor(key) {
+    var change = dayChangeFor(key);
+    return change ? findSession(change.sessionId) : null;
+  }
+  function planForKey(key) {
+    var scheduled = scheduledPlanForKey(key);
+    if (!scheduled) return null;
+    return changeSessionFor(key) || scheduled;
+  }
+  function setDayChange(key, sessionId) {
+    var scheduled = scheduledPlanForKey(key);
+    calendar.dayChanges = calendar.dayChanges.filter(function (change) {
+      return change.day !== key;
+    });
+    if (!scheduled || scheduled.id !== sessionId) {
+      calendar.dayChanges.push({ day: key, sessionId: sessionId });
+    }
+    saveCalendar();
+  }
+  function startNewRound(key) {
+    if (!keyOk(key) || key < todayKey() || exceptionFor(key)) return false;
+    calendar.anchor = key;
+    calendar.skippedDays = [];
+    calendar.dayChanges = [];
+    saveCalendar();
+    return true;
+  }
+  function recordsOn(key) {
+    return calendar.records.filter(function (record) { return record.startDay === key; });
+  }
+  function nextUnstartedKey() {
+    if (!calendar.anchor) return null;
+    var date = keyToDate(todayKey());
+    for (var i = 0; i < 3660; i++) {
+      var key = dayKey(date);
+      if (!exceptionFor(key) && !isSkipped(key) && !recordsOn(key).length && isSessionSlot(key)) {
+        return key;
+      }
+      date = addDays(date, 1);
+    }
+    return null;
+  }
+  function nextPlanAfter(key) {
+    var date = addDays(keyToDate(key), 1);
+    for (var i = 0; i < 3660; i++) {
+      var next = dayKey(date);
+      if (!exceptionFor(next) && !isSkipped(next) && isSessionSlot(next)) {
+        return { key: next, plan: planForKey(next) };
+      }
+      date = addDays(date, 1);
+    }
+    return null;
+  }
+  function setRestGap(value) {
+    var gap = Number(value);
+    if (!isFinite(gap)) return;
+    calendar.restDaysBetween = clamp(Math.round(gap), 0, CAL_GAP_MAX);
+    saveCalendar();
+    render(false);
+  }
+  function addDatedException(start, end, label) {
+    if (!keyOk(start) || !keyOk(end) || end < start) return false;
+    calendar.exceptions.push({
+      id: uid("x"),
+      kind: "dates",
+      start: start,
+      end: end,
+      label: trimName(label, "")
+    });
+    saveCalendar();
+    return true;
+  }
+  function addWeekdayException(number, label) {
+    if (weekdayException(number)) return false;
+    calendar.exceptions.push({
+      id: uid("x"),
+      kind: "weekday",
+      weekday: clamp(Math.round(number), 1, 7),
+      label: trimName(label, "")
+    });
+    saveCalendar();
+    return true;
+  }
+  function removeException(id) {
+    calendar.exceptions = calendar.exceptions.filter(function (range) { return range.id !== id; });
+    saveCalendar();
+    render(false);
+  }
+  function deleteCalendarRecord(id) {
+    if (ui.calDeleteArmed !== id) {
+      ui.calDeleteArmed = id;
+      render(false);
+      return;
+    }
+    calendar.records = calendar.records.filter(function (record) { return record.id !== id; });
+    ui.calDeleteArmed = null;
+    ui.calSheet = null;
+    saveCalendar();
+    render(false);
+  }
+  function calAddExceptionFromSheet() {
+    var labelEl = $('[data-el="calLabel"]', appEl);
+    var label = labelEl ? labelEl.value : "";
+    if (ui.calExceptionMode === "weekday") {
+      var number = ui.calExceptionWeekday;
+      if (!addWeekdayException(number, label)) {
+        ui.calExceptionError = WEEKDAY_FULL[number - 1] + " IS ALREADY CLOSED.";
+        render(false);
+        return;
+      }
+    } else {
+      var startEl = $('[data-el="calStart"]', appEl);
+      var endEl = $('[data-el="calEnd"]', appEl);
+      var start = startEl && startEl.value ? startEl.value : dayKey(new Date());
+      var end = endEl && endEl.value ? endEl.value : start;
+      ui.calExceptionDraft = { start: start, end: end, label: label };
+      if (!addDatedException(start, end, label)) {
+        ui.calExceptionError = "THE END DATE IS BEFORE THE START DATE.";
+        render(false);
+        return;
+      }
+    }
+    ui.calExceptionDraft = null;
+    ui.calExceptionError = "";
+    render(false);
+  }
+  function calStartSession(sessionId) {
+    if (!findSession(sessionId)) return;
+    if (state.doneSets > 0 || isLocked()) {
+      ui.calSheet = { kind: "startConfirm", sessionId: sessionId };
+      render(false);
+      return;
+    }
+    useSession(sessionId, true);
+  }
+  function calStartConfirmed(sessionId) {
+    ui.calSheet = null;
+    useSession(sessionId, true);
+  }
+
+  function sessionCode(name) {
+    return String(name).toUpperCase();
+  }
+  function calMonthDate() {
+    var now = new Date();
+    if (!ui.calMonth) return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date(ui.calMonth.y, ui.calMonth.m, 1);
+  }
+  function calDayMatches(key) {
+    var plan = planForKey(key);
+    if (plan && plan.id === ui.calFilter) return true;
+    return recordsOn(key).some(function (record) { return record.sessionId === ui.calFilter; });
+  }
+  /* ------------------------------------------------------------------ calendar markup */
+  function calendarMarkup() {
+    calRenderBoundary = nextUnstartedKey();
+    var html = '<div class="calendar-scroll">';
+    html += '<div class="cal-head"><div><div class="sessions-kicker">TRAINING</div>' +
+      '<div class="sessions-title">CALENDAR</div></div></div>';
+    html += calFiltersMarkup();
+    html += calMonthMarkup();
+    html += calUpNextMarkup();
+    html += calSettingsMarkup();
+    html += '<div class="sessions-foot">One session falls every rest gap plus one days, ' +
+      'taking the SESSIONS order in turn. A closed or skipped date keeps its slot and takes no session.</div>';
+    html += '</div>';
+    return html + calSheetMarkup();
+  }
+
+  function calFiltersMarkup() {
+    var html = '<div class="cal-filters" aria-label="Session filter">';
+    html += calChipMarkup("all", "ALL");
+    sessions.forEach(function (session) {
+      html += calChipMarkup(session.id, sessionCode(session.name));
+    });
+    return html + '</div>';
+  }
+  function calChipMarkup(id, label) {
+    var on = ui.calFilter === id;
+    return '<button class="cal-chip' + (on ? " on" : "") + '" data-act="cal-filter" data-id="' +
+      esc(id) + '" aria-pressed="' + (on ? "true" : "false") + '">' + esc(label) + '</button>';
+  }
+
+  function calMonthMarkup() {
+    var month = calMonthDate();
+    var html = '<div class="cal-month">' +
+      '<button class="cal-nav" data-act="cal-prev" aria-label="Previous month">‹</button>' +
+      '<div class="cal-month-label" data-el="calMonthLabel">' + MONTH_NAMES[month.getMonth()] +
+        " " + month.getFullYear() + '</div>' +
+      '<button class="cal-nav" data-act="cal-next" aria-label="Next month">›</button>' +
+    '</div>';
+    html += '<div class="cal-weekdays" data-el="calWeekdays">';
+    for (var i = 0; i < 7; i++) {
+      html += '<div class="cal-weekday">' + WEEKDAY_SHORT[(weekStartIndex() + i) % 7] + '</div>';
+    }
+    html += '</div><div class="cal-grid">';
+    var lead = (month.getDay() - weekStartIndex() + 7) % 7;
+    var start = addDays(month, -lead);
+    for (var day = 0; day < 42; day++) {
+      html += calCellMarkup(addDays(start, day), month);
+    }
+    return html + '</div>';
+  }
+
+  function calDayMark(key) {
+    var exception = exceptionFor(key);
+    if (exception) return { kind: "closed", exception: exception };
+    if (isSkipped(key)) return { kind: "skipped" };
+    if (!calRenderBoundary || key < calRenderBoundary) return { kind: "none" };
+    if (!isSessionSlot(key)) return { kind: "rest" };
+    var plan = planForKey(key);
+    return plan ? { kind: "planned", plan: plan } : { kind: "none" };
+  }
+
+  function calCellMarkup(date, month) {
+    var key = dayKey(date);
+    var adjacent = date.getMonth() !== month.getMonth();
+    var classes = "cal-cell";
+    if (adjacent) classes += " adjacent";
+    if (key === todayKey()) classes += " today";
+    if (!adjacent && ui.calFilter !== "all" && !calDayMatches(key)) classes += " dim";
+
+    var inner = '<span class="cal-day">' + date.getDate() + '</span>';
+    if (!adjacent) {
+      var records = recordsOn(key);
+      var mark = calDayMark(key);
+      var body = "";
+      var bar = "";
+      var sub = "";
+      if (records.length) {
+        var latest = records[records.length - 1];
+        var pct = latest.totalSets > 0 ? Math.round((latest.doneSets / latest.totalSets) * 100) : 0;
+        body = '<span class="cal-mark record">' + esc(sessionCode(latest.sessionName)) + '</span>';
+        bar = '<span class="cal-bar"><i style="width:' + pct + '%"></i></span>';
+        if (records.length > 1) {
+          inner += '<span class="cal-count">' + records.length + '</span>';
+        }
+        if (mark.kind === "closed") sub = "CLOSED";
+        else if (mark.kind === "skipped") sub = "SKIP";
+        else if (mark.kind === "rest") sub = "REST";
+      } else if (mark.kind === "closed") {
+        body = '<span class="cal-mark word">CLOSED</span>';
+      } else if (mark.kind === "skipped") {
+        body = '<span class="cal-mark word">SKIP</span>';
+      } else if (mark.kind === "rest") {
+        body = '<span class="cal-mark word">REST</span>';
+      } else if (mark.kind === "planned") {
+        body = '<span class="cal-mark plan">' + esc(sessionCode(mark.plan.name)) + '</span>';
+        bar = '<span class="cal-bar hollow"></span>';
+      }
+      inner += body + bar;
+      if (sub) inner += '<span class="cal-sub">' + sub + '</span>';
+    }
+    if (adjacent) return '<div class="' + classes + '">' + inner + '</div>';
+    return '<button class="' + classes + '" data-act="open-cal-day" data-key="' + key + '">' + inner + '</button>';
+  }
+
+  function calUpNextMarkup() {
+    var key = calRenderBoundary;
+    var plan = key ? planForKey(key) : null;
+    if (!plan) return "";
+    var label = key === todayKey()
+      ? "TODAY"
+      : WEEKDAY_SHORT[keyToDate(key).getDay()] + " " + keyToDate(key).getDate() + " " +
+        MONTH_SHORT[keyToDate(key).getMonth()];
+    return '<div class="cal-upnext"><span class="cal-upnext-k">UP NEXT</span> ' +
+      '<span class="cal-upnext-v">' + esc(sessionCode(plan.name)) + " · " + label + '</span></div>';
+  }
+
+  function calSettingsMarkup() {
+    var html = '<div class="cal-section"><div class="section-head"><div class="section-k">SETTINGS</div></div>';
+    html += calRestGapRow();
+    html += calSettingRow("exceptions", "EXCEPTIONS", calExceptionsValue());
+    return html + '</div>';
+  }
+  function calRestGapRow() {
+    return '<div class="cal-setting-row static" data-kind="restDays">' +
+      '<span class="cal-setting-main"><span class="cal-setting-label">REST DAYS</span>' +
+        '<span class="cal-setting-value">BETWEEN SESSIONS</span></span>' +
+      '<span class="cal-gap">' +
+        '<button class="cal-step" data-act="cal-gap-step" data-value="-1" aria-label="One rest day fewer">−</button>' +
+        '<span class="cal-step-value" data-el="calGapValue">' + calendar.restDaysBetween + '</span>' +
+        '<button class="cal-step" data-act="cal-gap-step" data-value="1" aria-label="One rest day more">+</button>' +
+      '</span></div>';
+  }
+  function calSettingRow(kind, label, value) {
+    return '<button class="cal-setting-row" data-act="open-cal-setting" data-kind="' + kind + '">' +
+      '<span class="cal-setting-main"><span class="cal-setting-label">' + label + '</span>' +
+        '<span class="cal-setting-value">' + esc(value) + '</span></span>' +
+      '<span class="chev">›</span></button>';
+  }
+  function calExceptionsValue() {
+    if (!calendar.exceptions.length) return "NONE";
+    var text = exceptionText(calendar.exceptions[0]);
+    if (calendar.exceptions.length > 1) text += " +" + (calendar.exceptions.length - 1);
+    return text;
+  }
+  function exceptionWhenText(exception) {
+    if (exception.kind === "weekday") return "EVERY " + WEEKDAY_FULL[exception.weekday - 1];
+    var start = keyToDate(exception.start);
+    var end = keyToDate(exception.end);
+    var startText = start.getDate() + " " + MONTH_SHORT[start.getMonth()];
+    if (exception.start === exception.end) return startText;
+    return startText + "–" + end.getDate() + " " + MONTH_SHORT[end.getMonth()];
+  }
+  function exceptionText(exception) {
+    var prefix = exception.label ? exception.label.toUpperCase() + " · " : "";
+    return prefix + exceptionWhenText(exception);
+  }
+
+  /* ------------------------------------------------------------------ calendar sheets */
+  function calSheetMarkup() {
+    if (!ui.calSheet) return "";
+    var body;
+    switch (ui.calSheet.kind) {
+      case "day": body = calDaySheetMarkup(ui.calSheet.key); break;
+      case "exceptions": body = calExceptionsSheetMarkup(); break;
+      case "changePicker": body = calChangePickerMarkup(ui.calSheet.key); break;
+      case "startConfirm": body = calStartConfirmMarkup(); break;
+      default: return "";
+    }
+    if (!body) return "";
+    return '<div class="cal-sheet-backdrop" data-act="close-cal-sheet"></div>' +
+      '<div class="cal-sheet" role="dialog" aria-modal="true">' +
+        '<div class="cal-sheet-grip"></div>' + body +
+      '</div>';
+  }
+  function calSheetHead(kicker) {
+    return '<div class="cal-sheet-head"><span class="cal-sheet-kicker">' + kicker + '</span>' +
+      '<button class="sheet-done" data-act="close-cal-sheet">DONE</button></div>';
+  }
+  function dayLongText(key) {
+    var date = keyToDate(key);
+    return WEEKDAY_SHORT[date.getDay()] + " " + date.getDate() + " " +
+      MONTH_NAMES[date.getMonth()] + " " + date.getFullYear();
+  }
+
+  function calSheetTag(label) {
+    return ' <span class="cal-tag">' + label + '</span>';
+  }
+  function calSheetTitle(name, tag) {
+    return '<div class="cal-sheet-title">' + esc(name) + (tag ? calSheetTag(tag) : "") + '</div>';
+  }
+  function calSessionSummary(session) {
+    var totals = sessionTotals(session);
+    return plural(session.blocks.length, "BLOCK", "BLOCKS") + ' · ' +
+      plural(totals.sets, "SET", "SETS") + ' · ' + fmtLong(totals.rest) + ' TOTAL REST';
+  }
+  function calBlocksMarkup(session) {
+    var html = '<div class="cal-blocks">';
+    session.blocks.forEach(function (block) {
+      html += '<div class="cal-block"><div class="cal-block-name">' + esc(block.name) + '</div>' +
+        '<div class="cal-block-meta">' + esc(blockNumbers(block)) + '</div>' +
+        '<div class="cal-block-meta">' + fmtLong(block.setRest) + ' SET REST · ' +
+          fmtLong(block.roundRest) + ' ROUND REST</div></div>';
+    });
+    return html + '</div>';
+  }
+  function calNextMarkup(key) {
+    var next = nextPlanAfter(key);
+    if (!next) {
+      return '<div class="cal-next"><span class="cal-next-k">NEXT</span>' +
+        '<span class="cal-next-v">NO SESSION PLANNED</span></div>';
+    }
+    var date = keyToDate(next.key);
+    return '<div class="cal-next"><span class="cal-next-k">NEXT</span><span class="cal-next-v">' +
+      esc(sessionCode(next.plan.name)) + ' · ' + WEEKDAY_SHORT[date.getDay()] + ' ' + date.getDate() +
+      ' ' + MONTH_SHORT[date.getMonth()] + '</span></div>';
+  }
+  function calFooterMarkup(buttons) {
+    var shown = buttons.filter(function (button) { return !!button; });
+    if (!shown.length) return "";
+    return '<div class="cal-footer">' + shown.join("") + '</div>';
+  }
+  function calActionButton(act, label) {
+    return '<button class="cal-outline" data-act="' + act + '" data-key="' + esc(ui.calSheet.key) + '">' +
+      label + '</button>';
+  }
+  function calRecordDeleteButton(record) {
+    var armed = ui.calDeleteArmed === record.id;
+    return '<button class="cal-outline danger' + (armed ? " armed" : "") + '" data-act="cal-delete-record" data-id="' +
+      esc(record.id) + '">' + (armed ? "TAP AGAIN TO DELETE" : "DELETE RECORD") + '</button>';
+  }
+
+  function calDaySheetMarkup(key) {
+    var records = recordsOn(key);
+    var exception = exceptionFor(key);
+    var skipped = isSkipped(key);
+    var plan = planForKey(key);
+    var future = key >= todayKey();
+    var round = future ? calActionButton("cal-new-round", "NEW ROUND") : "";
+    var html = calSheetHead(dayLongText(key));
+
+    if (records.length) {
+      html += calSheetTitle(
+        records.length === 1 ? records[0].sessionName : plural(records.length, "RECORD", "RECORDS"),
+        "RECORDED"
+      );
+      records.forEach(function (record) { html += calRecordMarkup(record); });
+      if (exception) {
+        html += '<div class="cal-sheet-note">CLOSED · ' + esc(exceptionText(exception)) +
+          '. The record still shows on this date.</div>';
+      }
+      if (skipped) {
+        html += '<div class="cal-sheet-note">SKIPPED · The record still shows on this date.</div>';
+      }
+      html += calNextMarkup(key);
+      html += calFooterMarkup([calRecordDeleteButton(records[records.length - 1]), round]);
+      return html;
+    }
+    if (exception) {
+      html += '<div class="cal-sheet-title">' + esc(exception.label ? exception.label.toUpperCase() : "CLOSED") + '</div>' +
+        '<div class="cal-sheet-meta">' + esc(exceptionWhenText(exception)) + ' · NO SESSION IS PLANNED</div>' +
+        '<div class="cal-sheet-note">This date is closed. It skips the session on its slot and does not move the schedule.</div>' +
+        calNextMarkup(key);
+      return html;
+    }
+    if (skipped) {
+      var skippedPlan = plan || scheduledPlanForKey(key);
+      html += calSheetTitle(skippedPlan ? skippedPlan.name : "SKIPPED", "SKIPPED");
+      if (skippedPlan) html += '<div class="cal-sheet-meta">' + esc(calSessionSummary(skippedPlan)) + '</div>';
+      html += '<div class="cal-sheet-note">This session is skipped. The gap, the anchor and every other day stay where they are.</div>' +
+        calNextMarkup(key) +
+        calFooterMarkup([calActionButton("cal-unskip", "UNSKIP"), round]);
+      return html;
+    }
+    if (calRenderBoundary && key >= calRenderBoundary && !isSessionSlot(key)) {
+      html += '<div class="cal-sheet-title">REST DAY</div>' +
+        '<div class="cal-sheet-meta">' + plural(calendar.restDaysBetween, "DAY", "DAYS") + ' BETWEEN SESSIONS</div>' +
+        '<div class="cal-sheet-note">No session is planned on a rest day.</div>' +
+        calNextMarkup(key) +
+        calFooterMarkup([round]);
+      return html;
+    }
+    if (plan) {
+      var changed = !!changeSessionFor(key);
+      html += calSheetTitle(plan.name, changed ? "CHANGED" : "") +
+        '<div class="cal-sheet-meta">' + esc(calSessionSummary(plan)) + '</div>' +
+        '<button class="cal-primary" data-act="cal-start" data-id="' + esc(plan.id) + '">START</button>' +
+        calBlocksMarkup(plan) +
+        calFooterMarkup([
+          calActionButton("cal-open-change", "CHANGE"),
+          calActionButton("cal-skip", "SKIP"),
+          round
+        ]);
+      return html;
+    }
+    html += '<div class="cal-sheet-title">NO RECORD</div>' +
+      '<div class="cal-sheet-meta">This date is before the next planned session.</div>' +
+      calNextMarkup(key) +
+      calFooterMarkup([round]);
+    return html;
+  }
+
+  function calRecordMarkup(record) {
+    var html = '<div class="cal-record"><div class="cal-record-head">' +
+      '<span class="cal-record-name">' + esc(record.sessionName) + '</span>' +
+      '<span class="cal-record-sets">' + record.doneSets + ' OF ' + record.totalSets + ' SETS</span></div>';
+    var time = record.startTime ? "STARTED " + esc(record.startTime) : "START TIME NOT SAVED";
+    var duration = record.finished
+      ? (record.durationMin ? record.durationMin + " MIN" : "FINISHED")
+      : "STOPPED BEFORE THE LAST SET";
+    html += '<div class="cal-record-block">' + time + ' · ' + duration + '</div>';
+    record.blocks.forEach(function (block) {
+      html += '<div class="cal-record-block">' + esc(block.name) + ' · ' + esc(blockMeta(block)) + '</div>';
+    });
+    return html + '</div>';
+  }
+
+  function calExceptionsSheetMarkup() {
+    var mode = ui.calExceptionMode === "weekday" ? "weekday" : "dates";
+    var html = calSheetHead("EXCEPTIONS") +
+      '<div class="cal-sheet-meta">A closed date plans no session and keeps its slot.</div>' +
+      '<div class="cal-modes">' +
+        calModeMarkup("dates", "DATES", mode) +
+        calModeMarkup("weekday", "WEEKDAY", mode) +
+      '</div>';
+    calendar.exceptions.forEach(function (exception) {
+      html += '<div class="cal-exception"><div class="cal-exception-main">' +
+        '<div class="cal-exception-label">' + esc(exception.label || "CLOSED") + '</div>' +
+        '<div class="cal-exception-days">' + esc(exceptionWhenText(exception)) + '</div></div>' +
+        '<button class="cal-exception-delete" data-act="cal-remove-exception" data-id="' +
+          esc(exception.id) + '" aria-label="Remove exception">×</button></div>';
+    });
+    if (!calendar.exceptions.length) {
+      html += '<div class="cal-empty">NO EXCEPTIONS</div>';
+    }
+    if (mode === "weekday") {
+      html += '<div class="cal-options">';
+      for (var number = 1; number <= 7; number++) {
+        var on = ui.calExceptionWeekday === number;
+        html += '<button class="cal-option' + (on ? " on" : "") + '" data-act="cal-exception-weekday" data-value="' +
+          number + '" aria-pressed="' + on + '">' + WEEKDAY_SHORT[number - 1] + '</button>';
+      }
+      html += '</div>';
+    } else {
+      var draft = ui.calExceptionDraft || { start: todayKey(), end: todayKey(), label: "" };
+      html += '<div class="cal-range">' +
+        '<label class="cal-field"><span>START</span><input class="cal-input" type="date" data-el="calStart" value="' +
+          draft.start + '"></label>' +
+        '<label class="cal-field"><span>END</span><input class="cal-input" type="date" data-el="calEnd" value="' +
+          draft.end + '"></label>' +
+      '</div>';
+    }
+    html += '<label class="cal-field" style="display:block;margin-top:10px"><span>LABEL</span>' +
+      '<input class="cal-input" data-el="calLabel" maxlength="40" placeholder="Gym closed" value="' +
+        esc((ui.calExceptionDraft && ui.calExceptionDraft.label) || "") + '"></label>';
+    if (ui.calExceptionError) {
+      html += '<div class="cal-sheet-note">' + esc(ui.calExceptionError) + '</div>';
+    }
+    html += '<button class="cal-primary" data-act="cal-add-exception">ADD CLOSURE</button>';
+    return html;
+  }
+
+  function calModeMarkup(value, label, current) {
+    var on = value === current;
+    return '<button class="cal-mode' + (on ? " on" : "") + '" data-act="cal-exception-mode" data-value="' +
+      value + '" aria-pressed="' + on + '">' + label + '</button>';
+  }
+
+  function calChangePickerMarkup(key) {
+    var scheduled = scheduledPlanForKey(key);
+    var chosen = changeSessionFor(key);
+    var current = chosen || scheduled;
+    var html = calSheetHead("CHANGE EXERCISE") +
+      '<div class="cal-sheet-meta">' + esc(dayLongText(key)) + '</div>' +
+      '<div class="cal-picker">';
+    sessions.forEach(function (session) {
+      var isScheduled = !!scheduled && session.id === scheduled.id;
+      var isChosen = !!current && session.id === current.id;
+      html += '<button class="cal-picker-row" data-act="cal-pick-session" data-id="' + esc(session.id) + '">' +
+        '<span class="cal-picker-name">' + esc(session.name) + '</span>' +
+        (isScheduled ? '<span class="cal-tag">SCHEDULED</span>' : "") +
+        (isChosen ? '<span class="cal-picker-check">✓</span>' : "") +
+      '</button>';
+    });
+    return html + '</div>';
+  }
+
+  function calStartConfirmMarkup() {
+    var target = findSession(ui.calSheet.sessionId);
+    if (!target) return "";
+    var active = activeSession();
+    var sets = state.doneSets;
+    return calSheetHead("START " + esc(sessionCode(target.name))) +
+      '<div class="cal-sheet-title">Discard ' + plural(sets, "set", "sets") + '?</div>' +
+      '<div class="cal-sheet-meta">' + esc(active ? active.name : "The session") + ' has ' + sets +
+        ' completed ' + (sets === 1 ? "set" : "sets") + '. Starting ' + esc(target.name) +
+        ' clears them and opens the start gate.</div>' +
+      '<button class="cal-primary" data-act="cal-start-confirm" data-id="' + esc(target.id) +
+        '">DISCARD AND START</button>';
+  }
+
   /* ------------------------------------------------------------------ edits */
   function markEdited(session) {
     ui.deleteArmed = null;
@@ -2857,6 +4109,9 @@
       var moved = sessions.splice(from, 1)[0];
       sessions.splice(to, 0, moved);
       saveData();
+      // The manual order is the program: a reorder restarts the upcoming
+      // sequence at the first session from the next unstarted day.
+      resetRotationAfterReorder();
       ui.deleteArmed = null;
       render(false);
       return;
@@ -2927,10 +4182,11 @@
     ui.route = { kind: "list" };
     render(false);
   }
-  function useSession(sessionId) {
-    if (isLocked()) return;
+  function useSession(sessionId, force) {
+    if (isLocked() && force !== true) return;
     flushEdit();
     ui.stagedBlock = null;
+    ui.calSheet = null;
     var session = findSession(sessionId);
     if (!session) return;
     activeSessionId = session.id;
@@ -3513,9 +4769,11 @@
 
   function appMarkup() {
     var sessionsView = ui.tab === "sessions";
-    var body = sessionsView ? sessionsMarkup() : timerMarkup();
-    var phase = sessionsView ? "set" : accentKind();
-    return '<div class="app-screen' + (sessionsView ? " sessions-screen" : " timer-screen") + '" data-phase="' + phase + '">' +
+    var calendarView = ui.tab === "calendar";
+    var body = sessionsView ? sessionsMarkup() : (calendarView ? calendarMarkup() : timerMarkup());
+    var phase = sessionsView || calendarView ? "set" : accentKind();
+    var screenClass = sessionsView ? " sessions-screen" : (calendarView ? " calendar-screen" : " timer-screen");
+    return '<div class="app-screen' + screenClass + '" data-phase="' + phase + '">' +
       body +
       completionAlertMarkup() +
       restartDialogMarkup() +
@@ -3693,6 +4951,8 @@
         ICON.timer + '<span>TIMER</span></button>' +
       '<button class="' + (ui.tab === "sessions" ? "on" : "") + '" data-act="tab-sessions" aria-label="Sessions">' +
         ICON.sessions + '<span>SESSIONS</span></button>' +
+      '<button class="' + (ui.tab === "calendar" ? "on" : "") + '" data-act="tab-calendar" aria-label="Calendar">' +
+        ICON.calendar + '<span>CALENDAR</span></button>' +
     '</nav>';
   }
 
@@ -4539,6 +5799,104 @@
         ui.editingNumber = null;
         render(false);
         break;
+      case "tab-calendar":
+        flushEdit();
+        ui.draft = null;
+        ui.stagedBlock = null;
+        ui.tab = "calendar";
+        ui.route = { kind: "list" };
+        ui.deleteArmed = null;
+        ui.editingNumber = null;
+        ui.calSheet = null;
+        render(false);
+        break;
+      case "cal-filter":
+        ui.calFilter = el.getAttribute("data-id") || "all";
+        render(false);
+        break;
+      case "cal-prev":
+      case "cal-next": {
+        var month = calMonthDate();
+        var movedMonth = new Date(
+          month.getFullYear(),
+          month.getMonth() + (act === "cal-prev" ? -1 : 1),
+          1
+        );
+        ui.calMonth = { y: movedMonth.getFullYear(), m: movedMonth.getMonth() };
+        render(false);
+        break;
+      }
+      case "open-cal-day":
+        ui.calSheet = { kind: "day", key: el.getAttribute("data-key") };
+        ui.calDeleteArmed = null;
+        render(false);
+        break;
+      case "open-cal-setting":
+        ui.calSheet = { kind: el.getAttribute("data-kind") };
+        ui.calDeleteArmed = null;
+        ui.calExceptionDraft = null;
+        ui.calExceptionError = "";
+        ui.calExceptionMode = "dates";
+        ui.calExceptionWeekday = new Date().getDay() + 1;
+        render(false);
+        break;
+      case "close-cal-sheet":
+        ui.calSheet = null;
+        ui.calDeleteArmed = null;
+        ui.calExceptionDraft = null;
+        ui.calExceptionError = "";
+        ui.calExceptionMode = "dates";
+        render(false);
+        break;
+      case "cal-gap-step":
+        setRestGap(calendar.restDaysBetween + Number(el.getAttribute("data-value")));
+        break;
+      case "cal-exception-mode":
+        ui.calExceptionMode = el.getAttribute("data-value") === "weekday" ? "weekday" : "dates";
+        ui.calExceptionError = "";
+        render(false);
+        break;
+      case "cal-exception-weekday":
+        ui.calExceptionWeekday = Number(el.getAttribute("data-value"));
+        ui.calExceptionError = "";
+        render(false);
+        break;
+      case "cal-remove-exception":
+        removeException(el.getAttribute("data-id"));
+        break;
+      case "cal-add-exception":
+        calAddExceptionFromSheet();
+        break;
+      case "cal-skip":
+        skipKey(ui.calSheet.key);
+        render(false);
+        break;
+      case "cal-unskip":
+        unskipKey(ui.calSheet.key);
+        render(false);
+        break;
+      case "cal-new-round":
+        startNewRound(ui.calSheet.key);
+        render(false);
+        break;
+      case "cal-open-change":
+        ui.calSheet = { kind: "changePicker", key: ui.calSheet.key };
+        render(false);
+        break;
+      case "cal-pick-session":
+        setDayChange(ui.calSheet.key, el.getAttribute("data-id"));
+        ui.calSheet = { kind: "day", key: ui.calSheet.key };
+        render(false);
+        break;
+      case "cal-delete-record":
+        deleteCalendarRecord(el.getAttribute("data-id"));
+        break;
+      case "cal-start":
+        calStartSession(el.getAttribute("data-id"));
+        break;
+      case "cal-start-confirm":
+        calStartConfirmed(el.getAttribute("data-id"));
+        break;
       case "edit-session":
         if (isLocked()) break;
         flushEdit();
@@ -4944,6 +6302,12 @@
       if (addButton) addButton.disabled = !ui.picker.name.trim();
     } else if (t.matches('[data-el="numberInput"]')) {
       ui.numberDraft = t.value;
+    } else if (t.matches('[data-el="calStart"], [data-el="calEnd"], [data-el="calLabel"]')) {
+      if (!ui.calSheet || ui.calSheet.kind !== "exceptions") return;
+      if (!ui.calExceptionDraft) ui.calExceptionDraft = { start: "", end: "", label: "" };
+      if (t.matches('[data-el="calStart"]')) ui.calExceptionDraft.start = t.value;
+      else if (t.matches('[data-el="calEnd"]')) ui.calExceptionDraft.end = t.value;
+      else ui.calExceptionDraft.label = t.value;
     }
   });
 
@@ -4998,6 +6362,14 @@
 
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
+      if (ui.calSheet) {
+        ui.calSheet = null;
+        ui.calDeleteArmed = null;
+        ui.calExceptionDraft = null;
+        ui.calExceptionError = "";
+        render(false);
+        return;
+      }
       if (ui.expanded) {
         ui.expanded = false;
         syncIsland(true);

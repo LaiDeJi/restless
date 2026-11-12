@@ -1,0 +1,159 @@
+# Calendar reorder reset: a drag in SESSIONS restarts the upcoming cadence at
+# the new first session while today's record stays. A reorder moves the anchor;
+# a record and a running session do not. This is a fragment: it restarts the
+# app, waits with `tool: await-ui-element` steps, and taps by coordinate.
+# Same-day fragment: it assumes the calendar starts its week on Monday and that
+# tomorrow is a training day.
+executionPrerequisite: "Restless is installed; the calendar starts its week on Monday and tomorrow is a training day."
+steps:
+  - tool: restart-app
+    args:
+      bundleId: com.whc.restless
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  # Record one set today, so today is a recorded day and the sequence restarts
+  # at tomorrow.
+  - tap:
+      x: 0.5
+      y: 0.869
+  - tap:
+      x: 0.5
+      y: 0.869
+  - wait: 800
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  - wait: 800
+  # Create a second session; it appends at the end of the list.
+  - tap:
+      x: 0.5
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 6000
+  - wait: 800
+  - tap:
+      x: 0.89
+      y: 0.125
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: BLOCKS
+      timeoutMs: 6000
+  - wait: 800
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+      timeoutMs: 6000
+  - wait: 800
+  # Drag the new card's grip above the first card; the order is the program.
+  - tool: gesture-custom
+    args:
+      events:
+        - type: Down
+          x: 0.888
+          y: 0.33
+        - type: Move
+          x: 0.888
+          y: 0.33
+          delayMs: 900
+        - type: Move
+          x: 0.888
+          y: 0.28
+          delayMs: 250
+        - type: Move
+          x: 0.888
+          y: 0.22
+          delayMs: 250
+        - type: Up
+          x: 0.888
+          y: 0.22
+          delayMs: 500
+  - wait: 800
+  - tap:
+      x: 0.717
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: UP NEXT
+      timeoutMs: 8000
+  # The upcoming day restarts at the new first session, and the record stays.
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: NEW SESSION · TOMORROW
+      timeoutMs: 6000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: Chest record
+      timeoutMs: 6000
+  - wait: 800
+  # Clean up: delete the session this fragment created.
+  - tap:
+      x: 0.5
+      y: 0.941
+  - wait: 800
+  - tap:
+      x: 0.4
+      y: 0.21
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: DELETE SESSION
+      timeoutMs: 6000
+  - wait: 800
+  - tap:
+      x: 0.2
+      y: 0.627
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: TAP AGAIN TO DELETE
+      timeoutMs: 5000
+  - wait: 800
+  - tap:
+      x: 0.2
+      y: 0.627
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 6000
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: New session
+      timeoutMs: 5000

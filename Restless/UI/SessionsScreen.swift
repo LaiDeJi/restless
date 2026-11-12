@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionsScreen: View {
     @Environment(SessionEngine.self) private var engine
     @Environment(AppRouter.self) private var router
+    @Environment(CalendarSettingsModel.self) private var calendarSettings
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query(sort: \PresetRecord.createdAt) private var records: [PresetRecord]
@@ -317,6 +318,21 @@ struct SessionsScreen: View {
     private func persistOrder() {
         guard !isLocked else { return }
         try? context.save()
+        resetRotationAfterReorder()
+    }
+
+    /// The order is the program. After it saves, the upcoming sequence starts
+    /// again at the first session from the next unstarted day; records and a
+    /// running session keep their state. A cancelled drag never reaches here.
+    private func resetRotationAfterReorder() {
+        let today = Date.now
+        let calendar = Calendar.current
+        let hasRecord = !WorkoutRepository.records(on: today, in: context).isEmpty
+        calendarSettings.restartRotation(
+            today: today,
+            recordedDays: hasRecord ? [calendar.startOfDay(for: today)] : [],
+            sessions: orderedRecords.map { RotationSession(id: $0.id, name: $0.name) }
+        )
     }
 
     private func addSession() {

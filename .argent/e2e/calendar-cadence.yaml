@@ -1,0 +1,292 @@
+# Calendar cadence: a per-date change leaves the next date's code, the picker
+# resets on the scheduled session, a skip hides the plan and unskip restores it,
+# a new round on a future rest day re-phases the codes, and a past date and a
+# past record offer no round. The calendar projects one session every rest gap
+# plus one days from its anchor; exceptions are a dated range or one repeating
+# weekday; a new round is offered only today or later. This is a fragment: it
+# restarts the app, waits with `tool: await-ui-element` steps, and taps by
+# coordinate. Same-day fragment: it assumes the calendar has no exceptions,
+# starts its week on Sunday, and SESSIONS holds Chest, Arms and Legs in that
+# order. It normalizes the gap and the anchor itself.
+executionPrerequisite: "Restless is installed; the calendar starts its week on Sunday and has no exceptions; SESSIONS is Chest, Arms, Legs."
+steps:
+  - tool: restart-app
+    args:
+      bundleId: com.whc.restless
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  - wait: 800
+  - tap:
+      x: 0.717
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: UP NEXT
+      timeoutMs: 8000
+  - wait: 800
+  # Normalize the gap to 0: the stepper clamps at zero.
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - tap: { x: 0.677, y: 0.8285 }
+  - wait: 500
+  # A round on today clears skips, changes and the old anchor.
+  - tap:
+      x: 0.6295
+      y: 0.3965
+  - wait: 700
+  # Today may be planned or may sit before a future anchor. The NO RECORD sheet
+  # puts NEW ROUND at 0.697; the planned sheet puts it at 0.829. Tap both: the
+  # one that is not a button is inert, the other makes today slot 0.
+  - tap:
+      x: 0.50
+      y: 0.697
+  - wait: 700
+  - tap:
+      x: 0.795
+      y: 0.829
+  - wait: 700
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  # Tomorrow is Arms. Change it to Chest: the day after stays Legs.
+  - tap:
+      x: 0.7575
+      y: 0.3965
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: CHANGE
+      timeoutMs: 6000
+  - wait: 500
+  - tap:
+      x: 0.20
+      y: 0.829
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: CHANGE EXERCISE
+      timeoutMs: 6000
+  - wait: 500
+  - tap:
+      x: 0.50
+      y: 0.595
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: CHANGED
+      timeoutMs: 5000
+  - wait: 500
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 14, Legs planned
+      timeoutMs: 6000
+  - wait: 500
+  # Picking the scheduled Arms resets the change.
+  - tap:
+      x: 0.7575
+      y: 0.3965
+  - wait: 500
+  - tap:
+      x: 0.20
+      y: 0.829
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SCHEDULED
+      timeoutMs: 5000
+  - tap:
+      x: 0.50
+      y: 0.656
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: CHANGED
+      timeoutMs: 5000
+  - wait: 500
+  # Skip Arms; the next date keeps Legs. Unskip restores Arms.
+  - tap:
+      x: 0.50
+      y: 0.829
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: SKIPPED
+      timeoutMs: 5000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: UNSKIP
+      timeoutMs: 5000
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 13, session skipped
+      timeoutMs: 6000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 14, Legs planned
+      timeoutMs: 6000
+  - wait: 500
+  - tap:
+      x: 0.7575
+      y: 0.3965
+  - wait: 500
+  - tap:
+      x: 0.28
+      y: 0.771
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START
+      timeoutMs: 5000
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 13, Arms planned
+      timeoutMs: 6000
+  - wait: 500
+  # A gap of one makes tomorrow a rest day; a round there makes it session 1.
+  - tap:
+      x: 0.851
+      y: 0.8285
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 13, rest day
+      timeoutMs: 6000
+  - wait: 500
+  - tap:
+      x: 0.7575
+      y: 0.3965
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: REST DAY
+      timeoutMs: 5000
+  - wait: 500
+  - tap:
+      x: 0.50
+      y: 0.751
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START
+      timeoutMs: 5000
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 13, Chest planned
+      timeoutMs: 6000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 14, rest day
+      timeoutMs: 6000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: November 15, Arms planned
+      timeoutMs: 6000
+  - wait: 500
+  # A past date offers no round, and a past record stays read-only.
+  - tap:
+      x: 0.3715
+      y: 0.3965
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: NO RECORD
+      timeoutMs: 5000
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: NEW ROUND
+      timeoutMs: 3000
+  - tap:
+      x: 0.50
+      y: 0.30
+  - wait: 600
+  - wait: 500
+  - tap:
+      x: 0.4995
+      y: 0.3965
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: RECORDED
+      timeoutMs: 5000
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: STARTED
+      timeoutMs: 5000
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: START
+        role: button
+      timeoutMs: 3000
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: CHANGE
+      textMatch: equals
+      timeoutMs: 3000

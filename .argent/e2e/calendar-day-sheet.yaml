@@ -1,0 +1,133 @@
+# Calendar day sheet: a planned day's START opens TIMER at the gate, a run with
+# a set asks before it is discarded, and Cancel changes nothing. The calendar
+# projects one session every rest gap plus one days from the anchor, so a
+# planned sheet offers CHANGE, SKIP and NEW ROUND beside START. This is a
+# fragment: it restarts the app, waits with `tool: await-ui-element` steps, and
+# taps by coordinate. Same-day fragment: it assumes the calendar shows the
+# current date planned tomorrow and today's record in a 7-column grid.
+executionPrerequisite: "Restless is installed; the calendar starts its week on Monday and shows tomorrow as a planned day."
+steps:
+  - tool: restart-app
+    args:
+      bundleId: com.whc.restless
+  # Start from the gate so the first START has nothing to discard.
+  - tool: open-url
+    args:
+      url: restless://restart
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  - wait: 800
+  - tap:
+      x: 0.717
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: UP NEXT
+      timeoutMs: 8000
+  - wait: 800
+  # Tomorrow's cell (fourth column of the third week, Monday-first).
+  - tap:
+      x: 0.50
+      y: 0.476
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: text
+      selector:
+        text: START
+        role: button
+      expectedText: START
+      textMatch: equals
+      timeoutMs: 6000
+  - wait: 800
+  # START activates the session and opens TIMER at the gate.
+  - tap:
+      x: 0.5
+      y: 0.70
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: START SESSION
+      timeoutMs: 8000
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.869
+  - tap:
+      x: 0.5
+      y: 0.869
+  - wait: 800
+  # The same planned day now has a completed set, so START asks first.
+  - tap:
+      x: 0.717
+      y: 0.941
+  - wait: 800
+  - tap:
+      x: 0.50
+      y: 0.476
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: text
+      selector:
+        text: START
+        role: button
+      expectedText: START
+      textMatch: equals
+      timeoutMs: 6000
+  - wait: 800
+  - tap:
+      x: 0.5
+      y: 0.70
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: Start Chest?
+      timeoutMs: 5000
+  - wait: 800
+  # Cancel leaves the sheet, the set, and the plan untouched.
+  - tap:
+      x: 0.32
+      y: 0.596
+  - tool: await-ui-element
+    args:
+      condition: hidden
+      selector:
+        text: Start Chest?
+      timeoutMs: 5000
+  - wait: 800
+  - tool: await-ui-element
+    args:
+      condition: text
+      selector:
+        text: START
+        role: button
+      expectedText: START
+      textMatch: equals
+      timeoutMs: 5000
+  - tool: gesture-swipe
+    args:
+      fromX: 0.5
+      fromY: 0.12
+      toX: 0.5
+      toY: 0.85
+      durationMs: 350
+  - wait: 800
+  - tap:
+      x: 0.284
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 OF 9 SETS
+      timeoutMs: 6000

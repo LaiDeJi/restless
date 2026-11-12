@@ -105,12 +105,17 @@ Tapping a rounds or sets-per-round value SHALL open numeric entry for that value
 
 ### Requirement: Bottom tab navigation
 
-The app SHALL have two persistent bottom tabs, TIMER and SESSIONS. TIMER SHALL be the default tab. Switching tabs MUST NOT pause, reset, or lose a running rest. The timer's EDIT action SHALL open the active session in SESSIONS.
+The app SHALL have three persistent bottom tabs, TIMER, SESSIONS, and CALENDAR, in that order. TIMER SHALL be the default tab. Switching tabs MUST NOT pause, reset, or lose a running rest. The timer's EDIT action SHALL open the active session in SESSIONS.
 
 #### Scenario: Launch opens the timer
 
 - **WHEN** the app launches
 - **THEN** the TIMER tab is selected
+
+#### Scenario: The tab order
+
+- **WHEN** the tab bar is shown
+- **THEN** the tabs read TIMER, SESSIONS, CALENDAR from left to right
 
 #### Scenario: Switching tabs during rest
 
@@ -187,7 +192,7 @@ A new session SHALL NOT be saved when its editor opens. DONE at the top-right SH
 
 ### Requirement: Session management
 
-From the session editor a user SHALL be able to rename, activate, and delete a session. The last remaining session MUST NOT be deleted. Deleting a session SHALL require two taps on the delete action.
+From the session editor a user SHALL be able to rename, activate, and delete a session. The last remaining session MUST NOT be deleted. Deleting a session SHALL require two taps on the delete action. Deleting a session SHALL remove it from the CALENDAR rotation and keep the history records made from it.
 
 #### Scenario: Activating a session
 
@@ -201,6 +206,12 @@ From the session editor a user SHALL be able to rename, activate, and delete a s
 - **WHEN** the user taps delete once and then confirms
 - **THEN** the session is removed and another session becomes active
 
+#### Scenario: Deleting a session updates the rotation
+
+- **GIVEN** the order Chest, Arms, Legs with Arms records on past days
+- **WHEN** the user deletes Arms
+- **THEN** upcoming days use Chest and Legs only and the Arms records remain
+
 #### Scenario: Refusing to delete the last session
 
 - **GIVEN** one saved session
@@ -209,7 +220,7 @@ From the session editor a user SHALL be able to rename, activate, and delete a s
 
 ### Requirement: Sessions are ordered manually
 
-The SESSIONS list SHALL show saved sessions in a persisted manual order. Drag and drop SHALL reorder the list, a new session SHALL append at the end, and the order SHALL survive relaunch. The active session SHALL keep its ACTIVE badge on its own card and MUST NOT be pinned to the top. Reordering SHALL NOT activate, edit, or reset any session.
+The SESSIONS list SHALL show saved sessions in a persisted manual order. Drag and drop SHALL reorder the list, a new session SHALL append at the end, and the order SHALL survive relaunch. The active session SHALL keep its ACTIVE badge on its own card and MUST NOT be pinned to the top. The order SHALL define the CALENDAR rotation. Reordering SHALL NOT activate, edit, or reset any session or record, and SHALL recalculate only unstarted upcoming days.
 
 #### Scenario: Dragging a session to the top
 
@@ -222,6 +233,12 @@ The SESSIONS list SHALL show saved sessions in a persisted manual order. Drag an
 - **GIVEN** Arms is active and sits second
 - **WHEN** the user drags Arms to first
 - **THEN** Arms is first and still carries the ACTIVE badge, and the running timer is unchanged
+
+#### Scenario: A reorder changes only upcoming days
+
+- **GIVEN** a Monday Chest record, a running Legs session, and Thursday as the next unstarted day
+- **WHEN** the user moves Legs above Chest
+- **THEN** Monday keeps its Chest record, the running Legs session is unchanged, and Thursday follows the new order
 
 #### Scenario: A new session appends
 

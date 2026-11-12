@@ -3,9 +3,11 @@
 Rest timer for iPhone: untimed sets, a set rest, a longer round rest, and the
 same state mirrored on the Dynamic Island. A session is an ordered list of
 blocks of movements; after a block's last set its round rest leads into the next
-block. Two bottom tabs — TIMER and SESSIONS — replace the old setup sheet. A set
-ends on MANUAL (SET DONE) or TIME (a phone countdown); the movement library is a
-name-only list shared by every block.
+block. Three bottom tabs — TIMER, SESSIONS and CALENDAR — replace the old setup
+sheet. CALENDAR projects the saved SESSIONS order onto training days and shows
+the history of the runs actually started. A set ends on MANUAL (SET DONE) or
+TIME (a phone countdown); the movement library is a name-only list shared by
+every block.
 
 ## Source of truth
 
@@ -20,6 +22,10 @@ name-only list shared by every block.
   machine, the island contract, the platform limits and how to verify a Lock
   Screen or Dynamic Island change. Read it before changing anything that decides
   which rest comes next.
+- `Shared/TrainingRotation.swift` owns the calendar projection and
+  `Shared/CalendarSettings.swift` owns the settings document
+  (`restless.calendar.v1` in `UserDefaults`). `Restless/Data/WorkoutRecord.swift`
+  and `WorkoutHistoryStore.swift` own the history records.
 - `project.yml` generates the Xcode project. Never edit `Restless.xcodeproj` by hand.
 - `openspec/` is the planning home: one directory per change under
   `openspec/changes/`, plus the specs they derive from. Plan a change there
@@ -74,11 +80,17 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
   `.argent/e2e/session-start-and-draggable-lists.yaml` already waits on
   `await-ui-element` text selectors and taps by label; extend it (or copy its
   shape) before writing raw coordinates, and never repeat a tap you already made.
+  `.argent/e2e/calendar-day-sheet.yaml`, `calendar-reorder-reset.yaml` and
+  `calendar-cadence.yaml` cover the calendar's START, reorder, cadence,
+  exception, skip, per-date change and new-round flows; each is a same-day
+  fragment with the device week start, plan and gap it assumes in its header.
 - Prototype changes get checked in headless Chrome: `python3
   tools/prototype-check.py [driver.js]` serves the prototype on an ephemeral
   localhost port and prints the DOM after 6 s of virtual time. A driver runs
   before the dump, so it can seed `localStorage`, click, and write the strings it
   asserts into the page. Pass `--budget N` to change the wait.
+  `tools/prototype-driver-calendar.js` asserts the calendar grid, day sheets,
+  settings and reorder boundary.
 - If `xcodebuild test` says "The test runner hung before establishing
   connection", do not retry it unchanged. Terminate the app, shut down extra
   booted simulators, then rerun; after a second hang, reboot the destination or
@@ -132,14 +144,35 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
     in a block's add-movement picker and managed from MOVEMENTS by rename and
     delete; it has no profile, recording action, or watch count. A used movement
     cannot be deleted. Do not add a second set-ending path.
+12. The persisted SESSIONS order is the program: CALENDAR projects it onto a
+    fixed cadence of one session every `restDaysBetween + 1` days from one
+    anchor, taking the next session at each slot. Exceptions are a dated range
+    or one repeating weekday; a closed or skipped date keeps its slot and takes
+    no session, so that session is dropped for the lap. A reorder or a new round
+    moves the anchor; a record and a running session never move, and adding,
+    renaming, deleting or a settings edit keeps the anchor. A planned date can
+    show another exercise without moving the schedule. A new round is offered
+    only today or later.
+13. A history record starts with the first completed set and keeps its own plan
+    snapshot. It is read-only apart from a two-tap delete; editing or deleting
+    the session never changes it. START exists only in a planned day's sheet.
 
 ## Layout
 
-- `Shared/` — session and block maths, rest plan, session snapshot and
+- `Shared/` — session and block maths, rest plan, the v2 calendar document
+  (rest gap, dated or weekday exceptions, skipped days, per-date changes, v1
+  migration), the arithmetic rotation projection, session snapshot and
   transitions, store, activity attributes, coordinator, palette.
 - `Restless/` — app entry, router and root tab shell, engine, draft store,
-  SwiftData session record, timer and sessions screens.
+  calendar settings model, SwiftData session and history records, timer,
+  sessions, calendar and settings screens. `CalendarScreen`, `CalendarCellView`,
+  `CalendarDaySheet`, `CalendarChangePicker`, `CalendarRecordCard`,
+  `CalendarActionFooter`, `CalendarSettingsScreens` and `CalendarCopy` are the
+  calendar surface; `WorkoutRecord`, `WorkoutRepository` and `WorkoutHistoryStore`
+  are the history.
 - `RestlessWidget/` — Live Activity and Dynamic Island, built from the shared
   session snapshot.
 - `RestlessTests/` — rest plan across blocks, session transitions, draft
-  debouncing, record migration, and end-condition decoding.
+  debouncing, record migration, end-condition decoding, calendar settings and
+  its v1 migration, rotation, the calendar settings model, and the history
+  record lifecycle.
