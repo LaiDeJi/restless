@@ -86,16 +86,7 @@ struct SetMap: View {
 
     private var block: WorkoutBlock { snapshot.currentBlock }
     private var position: WorkoutPosition { snapshot.position }
-
-    private var blockStart: Int {
-        snapshot.preset.blocks
-            .prefix(position.blockIndex)
-            .reduce(0) { safeSum($0, $1.totalSets) }
-    }
-
-    private var doneInBlock: Int {
-        min(max(snapshot.doneSets - blockStart, 0), block.totalSets)
-    }
+    private var progress: BlockProgress { snapshot.blockProgress }
 
     private var layout: SetMapLayout {
         SetMapLayout(block: block, position: position, phase: snapshot.phase)
@@ -155,8 +146,8 @@ struct SetMap: View {
     }
 
     private func dot(order: Int) -> some View {
-        let isDone = order < doneInBlock
-        let isCurrent = order == doneInBlock && snapshot.phase != .done
+        let isDone = order < progress.done
+        let isCurrent = order == progress.done && snapshot.phase != .done
 
         return Circle()
             .fill(isDone ? Color.white.opacity(0.7) : Color.white.opacity(0.11))
@@ -170,7 +161,7 @@ struct SetMap: View {
                 }
             }
             .scaleEffect(isCurrent ? 1.18 : 1)
-            .animation(.easeOut(duration: 0.3), value: doneInBlock)
+            .animation(.easeOut(duration: 0.3), value: progress.done)
     }
 
     // MARK: Bar
@@ -184,23 +175,18 @@ struct SetMap: View {
 
                     Capsule()
                         .fill(snapshot.accentColor)
-                        .frame(width: proxy.size.width * fraction)
+                        .frame(width: proxy.size.width * progress.fraction)
                         .shadow(color: snapshot.accentColor.opacity(0.35), radius: 5)
                 }
             }
             .frame(width: 220, height: 6)
 
-            Text("\(doneInBlock) OF \(block.totalSets) SETS IN THIS BLOCK")
+            Text("\(progress.done) OF \(progress.total) SETS IN THIS BLOCK")
                 .font(Theme.TypeScale.micro)
                 .tracking(1.2)
                 .monospacedDigit()
                 .foregroundStyle(Theme.secondaryText)
         }
-        .animation(.easeOut(duration: 0.3), value: doneInBlock)
-    }
-
-    private var fraction: Double {
-        guard block.totalSets > 0 else { return 0 }
-        return min(max(Double(doneInBlock) / Double(block.totalSets), 0), 1)
+        .animation(.easeOut(duration: 0.3), value: progress.done)
     }
 }

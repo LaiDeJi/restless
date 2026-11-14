@@ -256,3 +256,67 @@ func payloadResolvesMovementName() {
     #expect(payload.movementName == "Bench press")
     #expect(payload.position.set == 1)
 }
+
+private func pairPreset() -> WorkoutPreset {
+    WorkoutPreset(
+        name: "Pair",
+        blocks: [
+            WorkoutBlock(
+                name: "First",
+                rounds: 4,
+                setsPerRound: 4,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: watchMovementID, endCondition: .manual)]
+            ),
+            WorkoutBlock(
+                name: "Second",
+                rounds: 2,
+                setsPerRound: 4,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: watchMovementID, endCondition: .manual)]
+            )
+        ]
+    )
+}
+
+@Test("The wrist reads the current block and the session as separate counts")
+func wristBlockCountDiffersFromSessionCount() {
+    var snapshot = SessionSnapshot.initial(pairPreset(), now: .now)
+    snapshot.doneSets = 5
+    snapshot.phase = .resting
+    snapshot.restKind = .set
+    snapshot.duration = 60
+
+    #expect(snapshot.blockProgress.done == 5)
+    #expect(snapshot.blockProgress.total == 16)
+    #expect(snapshot.doneSets == 5)
+    #expect(snapshot.totalSets == 24)
+}
+
+@Test("A thousand-set block keeps one block bar")
+func wristLargeBlockUsesOneBar() {
+    let large = WorkoutPreset(
+        name: "Large",
+        blocks: [
+            WorkoutBlock(
+                name: "Large",
+                rounds: 40,
+                setsPerRound: 25,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: watchMovementID, endCondition: .manual)]
+            )
+        ]
+    )
+    var snapshot = SessionSnapshot.initial(large, now: .now)
+    snapshot.doneSets = 250
+    snapshot.phase = .resting
+    snapshot.restKind = .set
+    snapshot.duration = 60
+
+    #expect(snapshot.blockProgress.done == 250)
+    #expect(snapshot.blockProgress.total == 1000)
+    #expect(snapshot.blockProgress.fraction == 0.25)
+}

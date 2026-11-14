@@ -433,7 +433,7 @@ struct CalendarDaySheet: View {
     }
 
     private func activate(_ preset: WorkoutPreset) {
-        ActivePresetStore.id = preset.id
+        ActivePresetStore.activate(id: preset.id, on: .now)
         engine.use(preset)
         dismiss()
         router.showTimer()

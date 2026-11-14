@@ -1,8 +1,12 @@
 import Combine
+import SwiftData
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @Environment(SessionEngine.self) private var engine
+    @Environment(CalendarSettingsModel.self) private var calendarSettings
+    @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var router = AppRouter()
@@ -49,7 +53,12 @@ struct RootView: View {
         .environment(router)
         .onChange(of: scenePhase) { _, phase in
             engine.setActive(phase == .active)
-            if phase == .active { engine.refreshFromStore() }
+            if phase == .active {
+                // Restore a Live Activity intent before deciding, so a running
+                // session the intent advanced is not mistaken for a stale gate.
+                engine.refreshFromStore()
+                followPlan()
+            }
         }
         .onOpenURL { url in
             router.showTimer()
@@ -59,8 +68,27 @@ struct RootView: View {
             router.showTimer()
             engine.refreshFromStore()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            followPlan()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            followPlan()
+        }
         .task {
             engine.setActive(scenePhase == .active)
+            followPlan()
         }
+    }
+
+    /// The timer follows the session the calendar plans for today, unless the
+    /// session is running or was picked by hand today.
+    private func followPlan() {
+        ActiveSessionFollower.follow(
+            today: .now,
+            calendar: .current,
+            context: context,
+            calendarSettings: calendarSettings,
+            engine: engine
+        )
     }
 }

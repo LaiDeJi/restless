@@ -51,14 +51,8 @@ struct WatchRemoteView: View {
                     .padding(.top, 2)
             }
 
-            WatchSetBar(done: snapshot.doneSets, total: snapshot.totalSets, accent: snapshot.accentColor)
+            WatchBlockBar(snapshot: snapshot)
                 .padding(.top, 8)
-
-            Text(countLabel(snapshot))
-                .font(Theme.TypeScale.micro)
-                .tracking(0.8)
-                .foregroundStyle(Theme.tertiaryText)
-                .padding(.top, 4)
 
             if model.sendFailed {
                 Text("NOT SENT · TRY AGAIN")
@@ -136,39 +130,67 @@ struct WatchRemoteView: View {
         let text = snapshot.roundSetCopy.text
         return text.isEmpty ? nil : text
     }
-
-    private func countLabel(_ snapshot: SessionSnapshot) -> String {
-        "\(snapshot.doneSets) OF \(plural(snapshot.totalSets, "SET", "SETS"))"
-    }
 }
 
-/// The completed-set count as segments, never as a clock. Long sessions keep
-/// the same width by folding several sets into one segment.
-struct WatchSetBar: View {
-    let done: Int
-    let total: Int
-    let accent: Color
+/// The current block's completed sets as one continuous bar, never a clock.
+/// Every block size uses the same form: the block count above, the block's bar,
+/// then the session-wide count. The two numbers differ in a multi-block session,
+/// which is why both labels are explicit.
+struct WatchBlockBar: View {
+    let snapshot: SessionSnapshot
 
-    private var slots: Int {
-        min(max(total, 1), 24)
+    private var progress: BlockProgress { snapshot.blockProgress }
+
+    private var blockCount: String {
+        "\(progress.done) / \(progress.total)"
     }
 
-    private var filled: Int {
-        guard total > 0 else { return 0 }
-        if total <= slots { return min(max(done, 0), slots) }
-        let ratio = Double(done) / Double(total)
-        return min(max(Int((ratio * Double(slots)).rounded()), 0), slots)
+    private var sessionCount: String {
+        "\(snapshot.doneSets) OF \(plural(snapshot.totalSets, "SET", "SETS"))"
     }
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<slots, id: \.self) { index in
-                Capsule()
-                    .fill(index < filled ? accent : Theme.hairline)
-                    .frame(height: 4)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(blockCount)
+                    .font(.system(size: 26, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                Text("SETS IN THIS BLOCK")
+                    .font(.system(size: 8, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Theme.hairline)
+
+                    Capsule()
+                        .fill(snapshot.accentColor)
+                        .frame(width: proxy.size.width * progress.fraction)
+                }
+            }
+            .frame(height: 8)
+
+            Text(sessionCount)
+                .font(.system(size: 8, weight: .semibold))
+                .tracking(0.6)
+                .monospacedDigit()
+                .foregroundStyle(Theme.tertiaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(done) of \(total) sets")
+        .accessibilityLabel(
+            "\(progress.done) of \(progress.total) sets in this block, "
+                + "\(snapshot.doneSets) of \(snapshot.totalSets) in the session"
+        )
     }
 }

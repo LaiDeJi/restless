@@ -38,19 +38,67 @@ enum SessionStore {
 }
 
 enum ActivePresetStore {
-    private static let key = "restless.activePreset.v1"
-
-    private static var defaults: UserDefaults {
-        UserDefaults(suiteName: SessionStore.appGroup) ?? .standard
+    private static var storage: ActivePresetStorage {
+        ActivePresetStorage(defaults: UserDefaults(suiteName: SessionStore.appGroup) ?? .standard)
     }
 
     static var id: UUID? {
+        get { storage.id }
+        set { storage.id = newValue }
+    }
+
+    /// The local day the active id was chosen for. Nil means stale, including
+    /// installs that predate the marker.
+    static var day: Date? {
+        get { storage.day }
+        set { storage.day = newValue }
+    }
+
+    /// A manual pick: the id and the local day it was chosen for, together.
+    static func activate(id: UUID, on day: Date = .now) {
+        storage.activate(id: id, on: day)
+    }
+
+    /// True only when the marker names this local day.
+    static func marks(_ day: Date, calendar: Calendar = .current) -> Bool {
+        storage.marks(day, calendar: calendar)
+    }
+}
+
+/// The active session and its day marker. A value with an injectable defaults
+/// suite so the follower's rules can be tested without the live app defaults.
+struct ActivePresetStorage {
+    static let defaultIDKey = "restless.activePreset.v1"
+    static let defaultDayKey = "restless.activePresetDay.v1"
+
+    let defaults: UserDefaults
+    var idKey: String = ActivePresetStorage.defaultIDKey
+    var dayKey: String = ActivePresetStorage.defaultDayKey
+
+    var id: UUID? {
         get {
-            guard let raw = defaults.string(forKey: key) else { return nil }
+            guard let raw = defaults.string(forKey: idKey) else { return nil }
             return UUID(uuidString: raw)
         }
-        set {
-            defaults.set(newValue?.uuidString, forKey: key)
+        nonmutating set {
+            defaults.set(newValue?.uuidString, forKey: idKey)
         }
+    }
+
+    var day: Date? {
+        get { defaults.object(forKey: dayKey) as? Date }
+        nonmutating set { defaults.set(newValue, forKey: dayKey) }
+    }
+
+    func activate(id: UUID, on day: Date) {
+        self.id = id
+        self.day = day
+    }
+
+    /// A missing marker is stale, so the first launch after the upgrade
+    /// follows today's plan.
+    func marks(_ day: Date, calendar: Calendar = .current) -> Bool {
+        guard let stored = self.day else { return false }
+        return calendar.isDate(stored, inSameDayAs: day)
     }
 }

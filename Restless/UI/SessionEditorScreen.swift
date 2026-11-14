@@ -467,13 +467,13 @@ struct SessionEditorScreen: View {
         case .existing(let id):
             flushAll()
             let session = NameRules.normalize(draft.session)
-            ActivePresetStore.id = id
+            ActivePresetStore.activate(id: id, on: .now)
             engine.use(session)
             router.showTimer()
             router.sessionsPath.removeAll()
         case .draft:
             guard !isLocked, let record = commitDraft() else { return }
-            ActivePresetStore.id = record.id
+            ActivePresetStore.activate(id: record.id, on: .now)
             engine.use(record.preset)
             router.showTimer()
             router.sessionsPath.removeAll()
@@ -501,7 +501,7 @@ struct SessionEditorScreen: View {
 
         if ActivePresetStore.id == existingID,
            let next = records.first(where: { $0.id != existingID }) {
-            ActivePresetStore.id = next.id
+            ActivePresetStore.activate(id: next.id, on: .now)
             engine.use(next.preset)
         }
         router.sessionsPath.removeAll()

@@ -60,6 +60,19 @@ struct SessionSnapshot: Codable, Hashable, Sendable {
         return block.movements[index]
     }
 
+    /// Completed sets inside the current block, clamped to that block. The one
+    /// arithmetic the phone's map and the wrist share.
+    var blockProgress: BlockProgress {
+        let index = min(max(position.blockIndex, 0), max(preset.blocks.count - 1, 0))
+        guard preset.blocks.indices.contains(index) else {
+            return BlockProgress(blockIndex: 0, done: 0, total: 0)
+        }
+        let block = preset.blocks[index]
+        let blockStart = preset.blocks.prefix(index).reduce(0) { safeSum($0, $1.totalSets) }
+        let done = min(max(doneSets - blockStart, 0), block.totalSets)
+        return BlockProgress(blockIndex: index, done: done, total: block.totalSets)
+    }
+
     /// The round and set segments for the current position.
     var roundSetCopy: RoundSetCopy { position.roundSetCopy(in: currentBlock) }
 
@@ -161,6 +174,20 @@ struct SessionSnapshot: Codable, Hashable, Sendable {
         pausedRemaining = 0
         setDuration = 0
         setDeadline = nil
+    }
+}
+
+/// Completed sets inside one block. A pure value so the phone's map and the
+/// wrist cannot disagree about which set in the block is next.
+struct BlockProgress: Equatable, Sendable {
+    let blockIndex: Int
+    let done: Int
+    let total: Int
+
+    /// 0...1, and zero for an empty block.
+    var fraction: Double {
+        guard total > 0 else { return 0 }
+        return min(max(Double(done) / Double(total), 0), 1)
     }
 }
 

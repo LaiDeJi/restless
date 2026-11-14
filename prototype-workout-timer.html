@@ -2056,19 +2056,41 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .w-block {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .w-block b {
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .w-block span {
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: rgba(255,255,255,.42);
+    text-transform: uppercase;
+  }
   .w-bar {
-    display: grid;
-    grid-template-columns: repeat(16, minmax(0, 1fr));
-    gap: 2px;
-    margin-top: 9px;
+    height: 6px;
+    margin-top: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.12);
+    overflow: hidden;
   }
   .w-bar i {
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255,255,255,.12);
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: #C8FF4D;
   }
-  .w-bar i.on { background: #C8FF4D; }
-  .w-bar i.on.amber { background: #FFB84D; }
+  .w-bar i.amber { background: #FFB84D; }
   .w-count {
     margin-top: 5px;
     font-size: 8px;
@@ -2511,7 +2533,8 @@
               <div class="w-phase">READY</div>
               <div class="w-move">Bench press</div>
               <div class="w-pos">ROUND 1 OF 4 · SET 1 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>0 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"></div>
               <div class="w-count">0 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions"><span class="w-primary">START SESSION</span></div>
@@ -2527,7 +2550,8 @@
               <div class="w-phase">WORK</div>
               <div class="w-move">Bench press</div>
               <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>5 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:31.25%"></i></div>
               <div class="w-count">5 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions"><span class="w-primary">SET DONE</span></div>
@@ -2543,7 +2567,8 @@
               <div class="w-phase">SET REST</div>
               <div class="w-move">Bench press</div>
               <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>5 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:31.25%"></i></div>
               <div class="w-count">5 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions">
@@ -2559,10 +2584,51 @@
           <div class="watch">
             <span class="watch-crown"></span>
             <div class="watch-screen">
+              <div class="w-phase">SET REST</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
+              <div class="w-block"><b>5 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:31.25%"></i></div>
+              <div class="w-count">5 OF 24 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions">
+                <span class="w-primary">PAUSE</span>
+                <span class="w-skip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg></span>
+              </div>
+            </div>
+          </div>
+          <figcaption>TWO BLOCKS · 16 THEN 8</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase amber">ROUND REST</div>
+              <div class="w-move">Dead hang</div>
+              <div class="w-pos">ROUND 11 OF 40 · SET 1 OF 25</div>
+              <div class="w-block"><b>250 / 1000</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i class="amber" style="width:25%"></i></div>
+              <div class="w-count">250 OF 1000 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions">
+                <span class="w-primary amber">PAUSE</span>
+                <span class="w-skip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg></span>
+              </div>
+            </div>
+          </div>
+          <figcaption>LARGE BLOCK · SAME BAR</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
               <div class="w-phase amber">ROUND REST</div>
               <div class="w-move">Incline press</div>
               <div class="w-pos">ROUND 1 OF 4 · SET 1 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>8 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i class="amber" style="width:50%"></i></div>
               <div class="w-count">8 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions">
@@ -2581,7 +2647,8 @@
               <div class="w-phase">PAUSED</div>
               <div class="w-move">Bench press</div>
               <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>5 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:31.25%"></i></div>
               <div class="w-count">5 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions"><span class="w-primary">RESUME</span></div>
@@ -2597,7 +2664,8 @@
               <div class="w-phase">SESSION COMPLETE</div>
               <div class="w-move">Chest</div>
               <div class="w-done-meta">1 BLOCK · 1 MOVEMENT · 18:00 TOTAL REST</div>
-              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+              <div class="w-block"><b>16 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:100%"></i></div>
               <div class="w-count">16 OF 16 SETS</div>
               <div class="w-spacer"></div>
               <div class="w-actions"><span class="w-primary">START AGAIN</span></div>
@@ -2613,7 +2681,8 @@
               <div class="w-phase">SET REST</div>
               <div class="w-move">Bench press</div>
               <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
-              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-block"><b>5 / 16</b><span>SETS IN THIS BLOCK</span></div>
+              <div class="w-bar" aria-hidden="true"><i style="width:31.25%"></i></div>
               <div class="w-count">5 OF 16 SETS</div>
               <div class="w-note">NOT SENT · TRY AGAIN</div>
               <div class="w-spacer"></div>

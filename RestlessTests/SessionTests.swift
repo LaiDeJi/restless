@@ -507,3 +507,72 @@ func endConditionEditorOrder() {
     #expect(EndCondition.editorOrder == [.manual, .time])
     #expect(EndCondition.editorOrder.map(\.label) == ["MANUAL", "TIME"])
 }
+
+// MARK: - Block progress
+
+private let evenBlocks = WorkoutPreset(
+    name: "Even",
+    blocks: [
+        block(rounds: 1, setsPerRound: 5, setRest: 60, roundRest: 120, movements: [
+            BlockMovement(movementId: benchID, endCondition: .manual)
+        ], name: "First"),
+        block(rounds: 1, setsPerRound: 5, setRest: 60, roundRest: 120, movements: [
+            BlockMovement(movementId: curlID, endCondition: .manual)
+        ], name: "Second")
+    ]
+)
+
+@Test("Block progress starts the first block at zero")
+func blockProgressFirstBlock() {
+    var snapshot = ready(evenBlocks)
+    var progress = snapshot.blockProgress
+    #expect(progress.blockIndex == 0)
+    #expect(progress.done == 0)
+    #expect(progress.total == 5)
+    #expect(progress.fraction == 0)
+
+    snapshot.doneSets = 3
+    progress = snapshot.blockProgress
+    #expect(progress.blockIndex == 0)
+    #expect(progress.done == 3)
+    #expect(progress.total == 5)
+    #expect(progress.fraction == 0.6)
+}
+
+@Test("Block progress counts only the current block in a later block")
+func blockProgressLaterBlock() {
+    var snapshot = ready(evenBlocks)
+    snapshot.doneSets = 8
+
+    let progress = snapshot.blockProgress
+
+    #expect(progress.blockIndex == 1)
+    #expect(progress.done == 3)
+    #expect(progress.total == 5)
+}
+
+@Test("A done session fills the last block")
+func blockProgressDone() {
+    var snapshot = ready(evenBlocks)
+    runToDone(&snapshot)
+
+    let progress = snapshot.blockProgress
+
+    #expect(progress.blockIndex == 1)
+    #expect(progress.done == progress.total)
+    #expect(progress.total == 5)
+}
+
+@Test("Block progress clamps past either end")
+func blockProgressClamps() {
+    var snapshot = ready(evenBlocks)
+
+    snapshot.doneSets = -3
+    #expect(snapshot.blockProgress.blockIndex == 0)
+    #expect(snapshot.blockProgress.done == 0)
+
+    snapshot.doneSets = evenBlocks.totalSets + 10
+    #expect(snapshot.blockProgress.blockIndex == 1)
+    #expect(snapshot.blockProgress.done == 5)
+    #expect(snapshot.blockProgress.total == 5)
+}
