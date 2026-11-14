@@ -1,9 +1,13 @@
-// Driver for the calendar prototype change: the rest gap, the closed slot,
-// the weekday and dated exceptions, the skip mark, the per-date exercise
-// change, the new round, the fixed Monday grid, and the reorder boundary. Run:
+// Driver for the calendar prototype: the round-based rest gap, the closed
+// session day, the weekday and dated exceptions, the skip mark, the per-date
+// exercise change, the new round, the fixed Monday grid, and the reorder
+// boundary. Run:
 //   python3 tools/prototype-check.py tools/prototype-driver-calendar.js
 // The page reloads once so the persisted anchor, skips and settings are read
 // back through the same paths the app uses.
+// Expected on the demo order Chest, Arms, Core: a gap of 1 plans Chest, Arms,
+// Core then REST; a gap of 2 plans Chest, Arms, Core then two REST days; a
+// closed or skipped session day keeps its place and the rest day stays.
 (function () {
   "use strict";
 
@@ -203,14 +207,30 @@
     stepGap(-1);
     log.push("gapBackToZero=" + gapValue(), "gapZeroTomorrow=" + cellMark(tomorrowKey));
 
-    // 3. A dated closure drops its slots and the next open day carries on.
+    // 2b. A gap of 2 leaves two rest days after the round's last session.
+    stepGap(1);
+    stepGap(1);
+    log.push(
+      "gapTwo=" + gapValue(),
+      "gapTwoDay2=" + cellMark(keyPlus(2)),
+      "gapTwoDay3=" + cellMark(keyPlus(3)),
+      "gapTwoDay4=" + cellMark(keyPlus(4)),
+      "gapTwoDay5=" + cellMark(keyPlus(5))
+    );
+    stepGap(-1);
+    stepGap(-1);
+    log.push("gapBackToZeroAfterTwo=" + gapValue());
+
+    // 3. With a gap of 1 a closure of two session days leaves their places and
+    // the round's rest day, and the next open day carries the next session.
+    stepGap(1);
     click('[data-act="open-cal-setting"][data-kind="exceptions"]');
     log.push(
       "exceptionModes=" + $$(".cal-mode").map(function (el) { return el.textContent.trim(); }).join(","),
       "datedForm=" + (!!$('[data-el="calStart"]') && !!$('[data-el="calEnd"]'))
     );
-    setInput("calStart", keyPlus(2));
-    setInput("calEnd", keyPlus(3));
+    setInput("calStart", keyPlus(1));
+    setInput("calEnd", keyPlus(2));
     setInput("calLabel", "Gym closed");
     press("cal-add-exception");
     log.push(
@@ -220,9 +240,11 @@
     );
     press("close-cal-sheet");
     log.push(
+      "closedDay1=" + cellMark(keyPlus(1)),
       "closedDay2=" + cellMark(keyPlus(2)),
-      "closedDay3=" + cellMark(keyPlus(3)),
-      "day4AfterClosure=" + cellMark(keyPlus(4))
+      "closedRestDay=" + cellMark(keyPlus(3)),
+      "day4AfterClosure=" + cellMark(keyPlus(4)),
+      "day5AfterClosure=" + cellMark(keyPlus(5))
     );
 
     // 4. Both exception kinds share one list; a weekday closes every match.
@@ -262,7 +284,6 @@
       "day2AfterRemove=" + cellMark(keyPlus(2)),
       "day3AfterRemove=" + cellMark(keyPlus(3))
     );
-
     // 5. SKIP hides the plan, leaves the next day, and UNSKIP restores it.
     openDay(tomorrowKey);
     log.push(
@@ -318,8 +339,7 @@
     press("close-cal-sheet");
 
     // 7. A new round on a future rest day re-phases the codes and clears facts.
-    stepGap(1);
-    openDay(tomorrowKey);
+    openDay(keyPlus(3));
     log.push(
       "restTitle=" + sheetTitle(),
       "restMeta=" + text(".cal-sheet-meta"),
@@ -329,10 +349,11 @@
     press("cal-new-round");
     var afterRound = savedCalendar();
     log.push(
-      "roundTomorrow=" + cellMark(tomorrowKey),
-      "roundDay2=" + cellMark(keyPlus(2)),
       "roundDay3=" + cellMark(keyPlus(3)),
+      "roundDay4=" + cellMark(keyPlus(4)),
       "roundDay5=" + cellMark(keyPlus(5)),
+      "roundDay6=" + cellMark(keyPlus(6)),
+      "roundDay7=" + cellMark(keyPlus(7)),
       "roundSkips=" + (afterRound.skippedDays || []).length,
       "roundChanges=" + (afterRound.dayChanges || []).length,
       "roundAnchor=" + afterRound.anchor
@@ -356,7 +377,7 @@
       "recordFooter=" + footer()
     );
     press("close-cal-sheet");
-    openDay(keyPlus(2));
+    openDay(keyPlus(6));
     log.push("futureRestFooter=" + footer());
     press("close-cal-sheet");
 
@@ -370,8 +391,10 @@
     log.push(
       "orderBefore=" + orderBefore,
       "orderAfter=" + sessionOrder(),
-      "reorderTomorrow=" + cellMark(tomorrowKey),
       "reorderDay3=" + cellMark(keyPlus(3)),
+      "reorderDay4=" + cellMark(keyPlus(4)),
+      "reorderDay5=" + cellMark(keyPlus(5)),
+      "reorderDay6=" + cellMark(keyPlus(6)),
       "pastRecordBefore=" + recordTextBefore,
       "pastRecordAfter=" + cellMark(recordKey),
       "pastFillBefore=" + recordFillBefore,
@@ -379,7 +402,7 @@
     );
 
     // 10. START opens TIMER at the gate; a run with a set asks first.
-    var startKey = keyPlus(3);
+    var startKey = keyPlus(4);
     openDay(startKey);
     press("cal-start");
     var gatePrimary = text(".btn-main");

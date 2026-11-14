@@ -71,6 +71,10 @@
       var cap = input.getAttribute("maxlength");
       input.value = LONG_NAME + " and more text";
       input.dispatchEvent(new Event("input", { bubbles: true }));
+      // A draft cannot be saved empty: add a movement before DONE.
+      click('[data-act="open-block"]');
+      click('[data-act="add-from-library"]');
+      click('[data-act="back-session"]');
       click('[data-act="done-session"]');
       var cards = document.querySelectorAll(".session-row .sc-name");
       var savedLength = cards.length ? cards[cards.length - 1].textContent.length : 0;

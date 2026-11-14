@@ -47,11 +47,11 @@ enum CalendarCopy {
     }
 
     /// The gap's own words on the calendar row. The number lives in the stepper.
-    static let restGapRowValue = "BETWEEN SESSIONS"
+    static let restGapRowValue = "BETWEEN ROUNDS"
 
     static func gapSummary(_ gap: Int) -> String {
         guard gap > 0 else { return "SESSIONS EVERY DAY" }
-        return "\(plural(gap, "REST DAY", "REST DAYS")) BETWEEN SESSIONS"
+        return "\(plural(gap, "REST DAY", "REST DAYS")) BETWEEN ROUNDS"
     }
 
     static func blockRestSummary(_ block: WorkoutBlock) -> String {

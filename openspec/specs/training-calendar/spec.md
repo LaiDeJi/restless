@@ -8,41 +8,77 @@ the month grid and day sheet, and owns the rest-gap and exception settings.
 
 ### Requirement: Training days take the rotation in order
 
-The cadence SHALL give every local day an offset from the rotation anchor. A day whose offset is a multiple of the rest gap plus one SHALL be a session slot. An open slot SHALL be a training day and plan the next session in the persisted SESSIONS order, wrapping. A day without a slot SHALL be REST and plan no session.
+The cadence SHALL give every local day an offset from the rotation anchor. A
+session round SHALL consist of one consecutive session day for each saved
+session, in SESSIONS order, followed by the configured number of rest days. An
+open session day SHALL be a training day and plan that round's session. A rest
+day SHALL be REST and plan no session. The order SHALL wrap after the last
+saved session, and the next round SHALL start after the rest days.
 
 #### Scenario: Three sessions cycle over four training days
 
 - **GIVEN** the order Chest, Arms, Legs, a rest gap of 0 and no exceptions
-- **WHEN** four consecutive days are shown
+- **WHEN** four consecutive days from the anchor are shown
 - **THEN** they are planned as Chest, Arms, Legs, Chest
 
-#### Scenario: One session repeats
+#### Scenario: The gap follows the whole round
 
-- **GIVEN** a single saved session named Chest
-- **WHEN** consecutive training days are shown
-- **THEN** every training day is planned as Chest
+- **GIVEN** the order Chest, Arms, Legs and a rest gap of 1
+- **WHEN** five consecutive days from the anchor are shown
+- **THEN** Monday is Chest, Tuesday is Arms, Wednesday is Legs, Thursday is
+  REST, and Friday is Chest
+
+#### Scenario: Two rest days follow two sessions
+
+- **GIVEN** the order Chest, Arms and a rest gap of 2
+- **WHEN** four consecutive days from the anchor are shown
+- **THEN** Monday is Chest, Tuesday is Arms, Wednesday is REST, and Thursday is
+  REST
 
 #### Scenario: Rest days do not consume a session
 
 - **GIVEN** the order Chest, Arms, Legs and a rest gap of 1
-- **WHEN** Monday is Chest, Tuesday is shown, and Wednesday follows
-- **THEN** Tuesday is REST and Wednesday is Arms
+- **WHEN** Monday is Chest, Tuesday is Arms, and Wednesday is Legs
+- **THEN** Thursday is REST and Friday is Chest
 
-### Requirement: Rest gap sets the days between sessions
+#### Scenario: One session repeats
 
-The user SHALL set one rest gap of 0 to 6 days, the number of days between one session and the next. The app MUST clamp the value to that range. Changing the gap SHALL keep the rotation anchor and recalculate every planned day.
+- **GIVEN** a single saved session named Chest and a rest gap of 0
+- **WHEN** consecutive days from the anchor are shown
+- **THEN** every day is planned as Chest
+
+#### Scenario: One session still takes the gap
+
+- **GIVEN** a single saved session named Chest and a rest gap of 1
+- **WHEN** three consecutive days from the anchor are shown
+- **THEN** Monday is Chest, Tuesday is REST, and Wednesday is Chest
+
+### Requirement: Rest gap sets the rest days between rounds
+
+The user SHALL set one rest gap of 0 to 6 days, the number of rest days after
+the last session of a round and before the next round. The app MUST clamp the
+value to that range. Changing the gap SHALL keep the rotation anchor and
+recalculate every planned day. The CALENDAR row SHALL read BETWEEN ROUNDS.
 
 #### Scenario: A gap change reshapes the week
 
 - **GIVEN** the anchor on Monday, the order Chest, Arms, Legs and a rest gap of 0
 - **WHEN** the user sets the gap to 1
-- **THEN** Tuesday is REST, Wednesday is Arms, and Friday is Legs
+- **THEN** Monday is Chest, Tuesday is Arms, Wednesday is Legs, Thursday is
+  REST, and Friday is Chest
 
 #### Scenario: The gap stops at six
 
 - **GIVEN** a rest gap of 6
 - **WHEN** the user steps up again
 - **THEN** the gap stays 6
+
+#### Scenario: The setting names rounds
+
+- **GIVEN** a rest gap of 1
+- **WHEN** the CALENDAR screen is shown
+- **THEN** the REST DAYS row reads BETWEEN ROUNDS with the value 1, and its
+  summary reads 1 REST DAY BETWEEN ROUNDS
 
 ### Requirement: Edits recalculate only unstarted days
 
@@ -113,19 +149,25 @@ An exception SHALL be either a dated range or one repeating weekday. A dated ran
 
 ### Requirement: Start a new round from a date
 
-Any open date on or after today SHALL offer a new round from that date. Starting a round SHALL make that date the first session of the persisted SESSIONS order, recalculate every later slot from there, and clear skipped days and per-date exercise changes. It MUST NOT activate a session, change a record, or alter a session in progress.
+Any open date on or after today SHALL offer a new round from that date. Starting
+a round SHALL make that date the first session of the persisted SESSIONS order,
+recalculate every later session and rest day from there, and clear skipped days
+and per-date exercise changes. It MUST NOT activate a session, change a record,
+or alter a session in progress.
 
 #### Scenario: A round starts on a rest day
 
 - **GIVEN** a rest gap of 1 and Monday shown as REST
 - **WHEN** the user starts a new round on Monday
-- **THEN** Monday is Chest, Tuesday is REST, and Wednesday is Arms
+- **THEN** Monday is Chest, Tuesday is Arms, Wednesday is Legs, Thursday is
+  REST, and Friday is Chest
 
 #### Scenario: A round moves the upcoming order
 
 - **GIVEN** a rest gap of 1 and Thursday planned as Legs
 - **WHEN** the user starts a new round on Thursday
-- **THEN** Thursday is Chest, Friday is REST, and Saturday is Arms
+- **THEN** Thursday is Chest, Friday is Arms, Saturday is Legs, Sunday is REST,
+  and Monday is Chest
 
 #### Scenario: Records and a running session stay
 
@@ -153,13 +195,18 @@ Any open date on or after today SHALL offer a new round from that date. Starting
 
 ### Requirement: Change the exercise on a date
 
-A planned day from today forward SHALL offer a change of exercise. Choosing a session SHALL plan that session on that date only, mark the date CHANGED, and leave the order, the anchor, the gap, the dates and every other day unchanged. The slot SHALL still consume the session the schedule assigned. Choosing the scheduled session SHALL clear the change; a new round SHALL clear every change.
+A planned day from today forward SHALL offer a change of exercise. Choosing a
+session SHALL plan that session on that date only, mark the date CHANGED, and
+leave the order, the anchor, the gap, the dates and every other day unchanged.
+The slot SHALL still consume the session the schedule assigned. Choosing the
+scheduled session SHALL clear the change; a new round SHALL clear every change.
 
 #### Scenario: A change leaves the schedule
 
-- **GIVEN** a rest gap of 2, the order Chest, Arms, Legs, Sat 14 planned as Arms and Tue 17 as Legs
+- **GIVEN** a rest gap of 2, the order Chest, Arms, Legs, Sat 14 planned as Arms
+  and Sun 15 as Legs
 - **WHEN** the user changes Sat 14 to Chest
-- **THEN** Sat 14 shows Chest with CHANGED, and Tue 17 is still Legs
+- **THEN** Sat 14 shows Chest with CHANGED, and Sun 15 is still Legs
 
 #### Scenario: The scheduled session clears the change
 
@@ -169,7 +216,7 @@ A planned day from today forward SHALL offer a change of exercise. Choosing a se
 
 #### Scenario: A rest day offers no change
 
-- **GIVEN** Fri 13 is a rest day
+- **GIVEN** Mon 16 is a rest day
 - **WHEN** its sheet is shown
 - **THEN** no CHANGE action is offered
 
@@ -187,13 +234,24 @@ A planned day from today forward SHALL offer a change of exercise. Choosing a se
 
 ### Requirement: Skip a planned session
 
-A planned day SHALL offer SKIP from its sheet. A skipped date SHALL show a skip mark, offer no START, and persist. Skipping MUST NOT change the rest gap, the rotation anchor, the order, or another day's plan. A skipped date SHALL offer UNSKIP, and clearing the skip SHALL restore its plan.
+A planned day SHALL offer SKIP from its sheet. A skipped date SHALL show a skip
+mark, offer no START, and persist. Skipping MUST NOT change the rest gap, the
+rotation anchor, the order, or another day's plan. A skipped date SHALL offer
+UNSKIP, and clearing the skip SHALL restore its plan.
 
 #### Scenario: Skipping keeps the next session
 
-- **GIVEN** a rest gap of 0, the order Chest, Arms, Legs, Thursday planned as Arms and Friday as Legs
+- **GIVEN** a rest gap of 0, the order Chest, Arms, Legs, Thursday planned as
+  Arms and Friday as Legs
 - **WHEN** the user skips Thursday
 - **THEN** Thursday shows the skip mark and Friday is still Legs
+
+#### Scenario: A skipped session keeps its place in the round
+
+- **GIVEN** a rest gap of 1, the order Chest, Arms, Legs, Monday planned as
+  Chest, Tuesday as Arms and Wednesday as Legs
+- **WHEN** the user skips Tuesday
+- **THEN** Wednesday is still Legs, Thursday is REST, and Friday is Chest
 
 #### Scenario: A skip is reversible
 

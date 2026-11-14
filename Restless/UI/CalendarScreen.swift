@@ -370,7 +370,7 @@ struct CalendarScreen: View {
             HStack(spacing: 2) {
                 gapButton(
                     "minus",
-                    label: "One rest day fewer",
+                    label: "Fewer rest days between rounds",
                     delta: -1,
                     disabled: calendarSettings.settings.restDaysBetween == 0
                 )
@@ -378,10 +378,12 @@ struct CalendarScreen: View {
                     .font(Theme.TypeScale.value.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(minWidth: 22)
-                    .accessibilityLabel(Text("\(calendarSettings.settings.restDaysBetween) rest days"))
+                    .accessibilityLabel(
+                        Text("\(plural(calendarSettings.settings.restDaysBetween, "rest day", "rest days")) between rounds")
+                    )
                 gapButton(
                     "plus",
-                    label: "One rest day more",
+                    label: "More rest days between rounds",
                     delta: 1,
                     disabled: calendarSettings.settings.restDaysBetween == CalendarSettings.maxRestDaysBetween
                 )

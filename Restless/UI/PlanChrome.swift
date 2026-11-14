@@ -46,6 +46,22 @@ extension View {
     }
 }
 
+/// One confirmation for both restart entry points. The timer has its own copy
+/// of the same alert; the words must stay identical.
+struct RestartConfirmationAlert: ViewModifier {
+    @Binding var isPresented: Bool
+    let onConfirm: () -> Void
+
+    func body(content: Content) -> some View {
+        content.alert("Restart this session?", isPresented: $isPresented) {
+            Button("Restart Session", role: .destructive, action: onConfirm)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears all completed sets, cancels the current rest, and returns to block 1, set 1.")
+        }
+    }
+}
+
 /// A header action whose whole visible capsule is the Button's label, so a
 /// center tap fires. No padding-only content shape sits inside the label.
 struct PlanPillButton: View {

@@ -58,6 +58,12 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         blocks.reduce(0) { safeSum($0, $1.totalSets) }
     }
 
+    /// A draft is saveable only when every block has a movement. An empty block
+    /// has zero sets and no rest, so the timer could never run it.
+    var canCommit: Bool {
+        !blocks.isEmpty && blocks.allSatisfy { !$0.movements.isEmpty }
+    }
+
     /// Movement slots across every block, used by the done summary.
     var movementCount: Int {
         blocks.reduce(0) { safeSum($0, $1.movements.count) }

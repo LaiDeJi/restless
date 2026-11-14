@@ -268,7 +268,7 @@ func newSessionAppends() throws {
 
     var draft = WorkoutPreset(name: "Core", blocks: [.fallback])
     draft.name = "Core"
-    let saved = SessionDraftCommit.save(draft, usedNames: ["Chest", "Arms"], in: context)
+    let saved = try #require(SessionDraftCommit.save(draft, usedNames: ["Chest", "Arms"], in: context))
 
     let ordered = PresetRepository.fetchAll(context)
     #expect(ordered.map(\.name) == ["Chest", "Arms", "Core"])

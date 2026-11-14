@@ -10,6 +10,10 @@ struct TimerScreen: View {
     @ScaledMetric(relativeTo: .largeTitle) private var largeCountdown: CGFloat = 78
     @ScaledMetric(relativeTo: .largeTitle) private var smallCountdown: CGFloat = 52
     @State private var showingRestartConfirmation = false
+    @State private var celebrating = false
+    @State private var pendingCompletion = false
+    @State private var lastSeenCompletion = 0
+    @State private var celebrationTask: Task<Void, Never>?
 
     var body: some View {
         let snapshot = engine.snapshot
@@ -49,10 +53,33 @@ struct TimerScreen: View {
                 .scrollBounceBehavior(.basedOnSize)
                 .scrollIndicators(.hidden)
             }
+
+            if celebrating {
+                SessionCelebration()
+                    .zIndex(1)
+            }
         }
         .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.4), value: snapshot.phase)
         .animation(.easeInOut(duration: 0.4), value: snapshot.restKind)
+        .onAppear {
+            syncCompletionEvent()
+            startPendingCelebration()
+        }
+        .onChange(of: engine.completionEvent) { _, _ in
+            syncCompletionEvent()
+        }
+        .onChange(of: router.tab) { _, tab in
+            if tab == .timer {
+                syncCompletionEvent()
+                startPendingCelebration()
+            } else {
+                pauseCelebration()
+            }
+        }
+        .onChange(of: snapshot.phase) { _, phase in
+            if phase != .done { stopCelebration() }
+        }
         .onChange(of: snapshot.phase) { _, _ in
             showingRestartConfirmation = false
         }
@@ -396,6 +423,52 @@ struct TimerScreen: View {
                 .accessibilityLabel("Skip rest")
             }
         }
+    }
+
+    // MARK: Celebration
+
+    /// The event counter is view state, so the first count this view sees must
+    /// not celebrate: a restored done session starts at zero. A newer count on
+    /// appear means the completion happened while another tab was showing.
+    private func syncCompletionEvent() {
+        let event = engine.completionEvent
+        guard event != lastSeenCompletion else { return }
+        lastSeenCompletion = event
+        guard router.tab == .timer else {
+            pendingCompletion = true
+            return
+        }
+        startCelebration()
+    }
+
+    private func startPendingCelebration() {
+        guard pendingCompletion, router.tab == .timer else { return }
+        startCelebration()
+    }
+
+    private func startCelebration() {
+        guard engine.snapshot.phase == .done else { return }
+        pendingCompletion = false
+        celebrationTask?.cancel()
+        celebrating = true
+        celebrationTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(SessionCelebration.lifetime))
+            guard !Task.isCancelled else { return }
+            celebrating = false
+        }
+    }
+
+    private func stopCelebration() {
+        pauseCelebration()
+        pendingCompletion = false
+    }
+
+    /// Leaving TIMER drops the effect but keeps a completion that still owes a
+    /// celebration for the next visit.
+    private func pauseCelebration() {
+        celebrationTask?.cancel()
+        celebrationTask = nil
+        celebrating = false
     }
 
     // MARK: Names

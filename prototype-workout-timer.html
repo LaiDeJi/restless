@@ -417,6 +417,48 @@
     color: rgba(255,255,255,.72);
   }
 
+  /* ---------------------------------------------------------------- done celebration */
+  .celebration {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .confetti {
+    position: absolute;
+    top: 30%;
+    width: 7px;
+    height: 12px;
+    border-radius: 2px;
+    opacity: 0;
+    animation: confettiFall 2.5s cubic-bezier(.2,.6,.4,1) both;
+  }
+  @keyframes confettiFall {
+    0% { opacity: 0; transform: translate(0,-14px) rotate(0deg); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--drift), 58vh) rotate(var(--spin)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .confetti { display: none; }
+    .celebration::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 38%;
+      width: 520px;
+      height: 520px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(200,255,77,.24) 0%, rgba(255,184,77,.10) 45%, transparent 68%);
+      animation: celebrationGlow 2.5s ease-out both;
+    }
+    @keyframes celebrationGlow {
+      0% { opacity: 0; }
+      25% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  }
+
   /* ---------------------------------------------------------------- rest timer screen */
   .app-screen {
     --accent: #C8FF4D;
@@ -2394,6 +2436,8 @@
     debugSig: "",
     draft: null,
     stagedBlock: null,
+    celebration: false,
+    celebrationTimer: 0,
     restartConfirm: null,
     alert: null,
     calMonth: null,
@@ -3178,19 +3222,28 @@
     var to = startOfDay(keyToDate(toKey));
     return Math.round((to - from) / 86400000);
   }
-  function cadenceStep() { return calendar.restDaysBetween + 1; }
-  function isSessionSlot(key) {
-    if (!calendar.anchor || key < calendar.anchor) return false;
-    return dayOffset(calendar.anchor, key) % cadenceStep() === 0;
+  /// The cadence is one round of every session on consecutive days, then the
+  /// configured rest days before the next round. A rest day has no slot, so it
+  /// consumes no session; a closed or skipped session day keeps its own slot.
+  function roundLength() { return sessions.length + calendar.restDaysBetween; }
+  function roundPosition(key) {
+    if (!calendar.anchor || !sessions.length || key < calendar.anchor) return null;
+    var offset = dayOffset(calendar.anchor, key);
+    var length = roundLength();
+    var roundIndex = Math.floor(offset / length);
+    var dayInRound = offset % length;
+    if (dayInRound >= sessions.length) return null;
+    return { round: roundIndex, dayInRound: dayInRound, slot: roundIndex * sessions.length + dayInRound };
   }
+  function isSessionSlot(key) { return roundPosition(key) !== null; }
   function slotNumber(key) {
-    if (!isSessionSlot(key)) return -1;
-    return dayOffset(calendar.anchor, key) / cadenceStep();
+    var position = roundPosition(key);
+    return position ? position.slot : -1;
   }
   function scheduledPlanForKey(key) {
-    var slot = slotNumber(key);
-    if (slot < 0 || !sessions.length) return null;
-    return sessions[slot % sessions.length];
+    var position = roundPosition(key);
+    if (!position) return null;
+    return sessions[position.dayInRound];
   }
   function exceptionFor(key) {
     var i;
@@ -3405,8 +3458,9 @@
     html += calMonthMarkup();
     html += calUpNextMarkup();
     html += calSettingsMarkup();
-    html += '<div class="sessions-foot">One session falls every rest gap plus one days, ' +
-      'taking the SESSIONS order in turn. A closed or skipped date keeps its slot and takes no session.</div>';
+    html += '<div class="sessions-foot">One session falls on each day through the SESSIONS order, ' +
+      'then the rest days follow before the next round. A closed or skipped date keeps its place ' +
+      'in the round and takes no session.</div>';
     html += '</div>';
     return html + calSheetMarkup();
   }
@@ -3520,7 +3574,7 @@
   function calRestGapRow() {
     return '<div class="cal-setting-row static" data-kind="restDays">' +
       '<span class="cal-setting-main"><span class="cal-setting-label">REST DAYS</span>' +
-        '<span class="cal-setting-value">BETWEEN SESSIONS</span></span>' +
+        '<span class="cal-setting-value">BETWEEN ROUNDS</span></span>' +
       '<span class="cal-gap">' +
         '<button class="cal-step" data-act="cal-gap-step" data-value="-1" aria-label="One rest day fewer">−</button>' +
         '<span class="cal-step-value" data-el="calGapValue">' + calendar.restDaysBetween + '</span>' +
@@ -3670,7 +3724,7 @@
     }
     if (calRenderBoundary && key >= calRenderBoundary && !isSessionSlot(key)) {
       html += '<div class="cal-sheet-title">REST DAY</div>' +
-        '<div class="cal-sheet-meta">' + plural(calendar.restDaysBetween, "DAY", "DAYS") + ' BETWEEN SESSIONS</div>' +
+        '<div class="cal-sheet-meta">' + plural(calendar.restDaysBetween, "REST DAY", "REST DAYS") + ' BETWEEN ROUNDS</div>' +
         '<div class="cal-sheet-note">No session is planned on a rest day.</div>' +
         calNextMarkup(key) +
         calFooterMarkup([round]);
@@ -3984,27 +4038,16 @@
     }
     return base;
   }
+  /// A new session copies the active block's schedule only: the movements are
+  /// the user's to choose, so the draft opens empty.
   function cloneBlock(source, name) {
     var base = source || {
       name: "Untitled block",
       rounds: DEFAULT_ROUNDS,
       setsPerRound: DEFAULT_SETS_PER_ROUND,
       setRest: DEFAULT_SET_REST,
-      roundRest: DEFAULT_ROUND_REST,
-      movements: []
+      roundRest: DEFAULT_ROUND_REST
     };
-    var list = base.movements.map(function (bm) {
-      return {
-        id: uid("bm"),
-        movementId: bm.movementId,
-        endCondition: bm.endCondition,
-        target: bm.target
-      };
-    });
-    if (!list.length && movements.length) {
-      var m = movements[0];
-      list.push({ id: uid("bm"), movementId: m.id, endCondition: m.defaultCondition, target: m.defaultTarget });
-    }
     return {
       id: uid("b"),
       name: name || base.name,
@@ -4012,7 +4055,7 @@
       setsPerRound: base.setsPerRound,
       setRest: base.setRest,
       roundRest: base.roundRest,
-      movements: list
+      movements: []
     };
   }
   function newSession() {
@@ -4022,7 +4065,6 @@
     var source = activeSession();
     var base = source && source.blocks[0] ? source.blocks[0] : null;
     var block = cloneBlock(base, "Untitled block");
-    if (!block.movements.length) return;
     // The draft stays out of `sessions` and localStorage until DONE or USE.
     ui.draft = { id: uid("s"), name: "New session", blocks: [block] };
     ui.tab = "sessions";
@@ -4032,9 +4074,15 @@
     ui.editingNumber = null;
     render(false);
   }
+  /// Every block needs a movement; an empty plan has zero sets and no rest.
+  function canCommitDraft() {
+    var draft = ui.draft;
+    if (!draft || !draft.blocks.length) return false;
+    return draft.blocks.every(function (block) { return block.movements.length > 0; });
+  }
   function commitDraft() {
     var draft = ui.draft;
-    if (!draft) return null;
+    if (!draft || !canCommitDraft()) return null;
     flushEdit();
     draft.name = trimName(draft.name, "Untitled");
     if (draft.name === "New session") draft.name = uniqueSessionName("New session");
@@ -4555,6 +4603,7 @@
     state.rest = null;
     ui.restartConfirm = null;
     ui.alert = null;
+    stopCelebration();
   }
   function startSession() {
     if (state.status !== "notStarted") return;
@@ -4591,6 +4640,7 @@
       state.duration = 0;
       state.deadline = 0;
       state.rest = null;
+      startCelebration();
       render(true);
       return;
     }
@@ -4667,6 +4717,20 @@
     state.status = "resting";
     state.deadline = performance.now() + state.remaining * 1000;
     sync();
+  }
+  function startCelebration() {
+    if (ui.celebrationTimer) clearTimeout(ui.celebrationTimer);
+    ui.celebration = true;
+    ui.celebrationTimer = setTimeout(function () {
+      ui.celebration = false;
+      ui.celebrationTimer = 0;
+      render(false);
+    }, 2500);
+  }
+  function stopCelebration() {
+    if (ui.celebrationTimer) clearTimeout(ui.celebrationTimer);
+    ui.celebrationTimer = 0;
+    ui.celebration = false;
   }
   function again() {
     flushEdit();
@@ -4775,10 +4839,30 @@
     var screenClass = sessionsView ? " sessions-screen" : (calendarView ? " calendar-screen" : " timer-screen");
     return '<div class="app-screen' + screenClass + '" data-phase="' + phase + '">' +
       body +
+      celebrationMarkup() +
       completionAlertMarkup() +
       restartDialogMarkup() +
       tabbarMarkup() +
     '</div>';
+  }
+
+  /// The one-shot done effect: 48 accent pieces that fall over 2.5 seconds.
+  /// It is inert to the pointer and hidden from assistive technology; Reduce
+  /// Motion swaps the pieces for a static accent glow.
+  function celebrationMarkup() {
+    if (!ui.celebration || state.status !== "done" || ui.tab !== "timer") return "";
+    var colors = ["#C8FF4D", "#FFFFFF", "#FFB84D"];
+    var pieces = "";
+    for (var i = 0; i < 48; i++) {
+      var left = (i * 37) % 100;
+      var drift = ((i * 53) % 120) - 60;
+      var spin = ((i * 47) % 540) + 180;
+      var delay = (i % 8) * 40;
+      pieces += '<span class="confetti" style="left:' + left + '%;--drift:' + drift +
+        'px;--spin:' + spin + 'deg;animation-delay:' + delay + 'ms;background:' +
+        colors[i % colors.length] + '"></span>';
+    }
+    return '<div class="celebration" aria-hidden="true">' + pieces + '</div>';
   }
 
   /// The prototype's visual stand-in for the system local notification. It is
@@ -5012,16 +5096,21 @@
     var total = sessionTotals(session);
     var isActive = session.id === activeSessionId;
     var isDraft = ui.route.draft === true;
+    var commitBlocked = isDraft && !canCommitDraft();
     var html = '<div class="sessions-scroll">';
     html += '<div class="editor-head">' +
       '<button class="back-pill" data-act="back-list">‹ SESSIONS</button>' +
-      '<button class="sheet-done" data-act="done-session">DONE</button>' +
+      '<button class="sheet-done" data-act="done-session"' +
+        (commitBlocked ? " disabled" : "") + '>DONE</button>' +
     '</div>';
     html += '<div class="editor-kicker">SESSION</div>';
     html += '<input class="preset-name" data-el="sessionName" value="' + esc(session.name) +
       '" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Session name"' + (locked ? " disabled" : "") + '>';
     html += '<div class="sheet-note">' + plural(session.blocks.length, "BLOCK", "BLOCKS") + ' · ' +
       plural(total.sets, "SET", "SETS") + ' · ' + fmtLong(total.rest) + ' TOTAL REST</div>';
+    if (commitBlocked) {
+      html += '<div class="sheet-warn">ADD A MOVEMENT TO SAVE THIS SESSION.</div>';
+    }
     if (isActive && state.doneSets > 0 && !locked) {
       html += '<div class="sheet-warn">EDITING THIS SESSION RESTARTS IT.</div>';
     }
@@ -5052,7 +5141,7 @@
     html += '<div class="editor-foot">';
     if (isDraft) {
       html += '<button class="use-btn" data-act="use-session"' +
-        (locked ? " disabled" : "") + '>USE THIS SESSION</button>';
+        (locked || commitBlocked ? " disabled" : "") + '>USE THIS SESSION</button>';
     } else if (isActive) {
       if (state.doneSets > 0) {
         html += '<button class="use-btn" data-act="restart-session"' + (locked ? " disabled" : "") + '>RESTART SESSION</button>';

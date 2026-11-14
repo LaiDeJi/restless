@@ -34,6 +34,7 @@ struct SessionEditorScreen: View {
     private var isLocked: Bool { engine.snapshot.isLocked }
     private var isDraft: Bool { if case .draft = mode { true } else { false } }
     private var existingID: UUID? { if case .existing(let id) = mode { id } else { nil } }
+    private var draftCanCommit: Bool { !isDraft || (draft?.session.canCommit ?? false) }
     private var isActive: Bool {
         guard let existingID else { return false }
         return ActivePresetStore.id == existingID
@@ -105,6 +106,10 @@ struct SessionEditorScreen: View {
                 nameField
                 sessionSummary(draft.session)
 
+                if isDraft && !draft.session.canCommit {
+                    draftSaveHint()
+                }
+
                 if isActive && engine.snapshot.doneSets > 0 && !isLocked {
                     Text("EDITING THIS SESSION RESTARTS IT.")
                         .font(Theme.TypeScale.meta.weight(.semibold))
@@ -155,7 +160,7 @@ struct SessionEditorScreen: View {
 
             Spacer()
 
-            PlanPillButton(title: "DONE", prominent: true) {
+            PlanPillButton(title: "DONE", prominent: true, enabled: !isLocked && draftCanCommit) {
                 done()
             }
         }
@@ -292,7 +297,7 @@ struct SessionEditorScreen: View {
                     footerButtonLabel("USE THIS SESSION", prominent: true)
                 }
                 .buttonStyle(.plain)
-                .disabled(isLocked)
+                .disabled(isLocked || !draft.session.canCommit)
             } else if isActive {
                 if engine.snapshot.doneSets > 0 {
                     Button {
@@ -440,7 +445,7 @@ struct SessionEditorScreen: View {
 
     private func done() {
         if isDraft {
-            commitDraft()
+            guard commitDraft() != nil else { return }
             dismiss()
         } else {
             close()
@@ -450,10 +455,11 @@ struct SessionEditorScreen: View {
     @discardableResult
     private func commitDraft() -> PresetRecord? {
         guard case .draft = mode, !committed, let draft else { return nil }
-        committed = true
         commitName()
         let used = PresetRepository.fetchAll(context).map(\.name)
-        return SessionDraftCommit.save(draft.session, usedNames: used, in: context)
+        let record = SessionDraftCommit.save(draft.session, usedNames: used, in: context)
+        committed = record != nil
+        return record
     }
 
     private func use(_ draft: SessionDraftStore) {
@@ -573,22 +579,6 @@ private extension SessionEditorScreen {
     }
 }
 
-/// One confirmation for both restart entry points. The timer has its own copy
-/// of the same alert; the words must stay identical.
-private struct RestartConfirmationAlert: ViewModifier {
-    @Binding var isPresented: Bool
-    let onConfirm: () -> Void
-
-    func body(content: Content) -> some View {
-        content.alert("Restart this session?", isPresented: $isPresented) {
-            Button("Restart Session", role: .destructive, action: onConfirm)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This clears all completed sets, cancels the current rest, and returns to block 1, set 1.")
-        }
-    }
-}
-
 /// The editor's one-line totals. Kept out of the view body so the screen type
 /// stays inside its length budget.
 private func sessionSummary(_ session: WorkoutPreset) -> some View {
@@ -596,5 +586,14 @@ private func sessionSummary(_ session: WorkoutPreset) -> some View {
         .font(Theme.TypeScale.body)
         .tracking(0.2)
         .foregroundStyle(Theme.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+}
+
+/// A draft with no movement cannot be saved; the line names what is missing.
+private func draftSaveHint() -> some View {
+    Text("ADD A MOVEMENT TO SAVE THIS SESSION.")
+        .font(Theme.TypeScale.meta.weight(.semibold))
+        .tracking(0.6)
+        .foregroundStyle(Theme.roundAccent)
         .fixedSize(horizontal: false, vertical: true)
 }

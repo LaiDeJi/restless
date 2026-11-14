@@ -5,6 +5,10 @@ import Observation
 @Observable
 final class SessionEngine {
     private(set) var snapshot: SessionSnapshot
+    /// Bumped once each time a transition enters `done`. The timer uses it to
+    /// play the one-shot celebration; it is view state, never persisted, so a
+    /// restored done session does not replay the effect.
+    private(set) var completionEvent = 0
     private(set) var isActive = true
     private var ticker: Task<Void, Never>?
 
@@ -48,7 +52,9 @@ final class SessionEngine {
 
     func perform(_ action: SessionAction) {
         let now = Date.now
+        let wasDone = snapshot.phase == .done
         SessionTransitions.apply(action, to: &snapshot, now: now)
+        noteCompletion(from: wasDone)
         alertCenter.sessionChanged(snapshot, isActive: isActive)
         persist()
         recordHistory(now: now)
@@ -60,7 +66,9 @@ final class SessionEngine {
     /// that would cancel it.
     private func performDeadline(_ action: SessionAction) {
         let now = Date.now
+        let wasDone = snapshot.phase == .done
         SessionTransitions.apply(action, to: &snapshot, now: now)
+        noteCompletion(from: wasDone)
         persist()
         recordHistory(now: now)
         restartTicker()
@@ -94,8 +102,10 @@ final class SessionEngine {
         let now = Date.now
         _ = restored.reconcile(now: now)
         guard restored != snapshot else { return }
+        let wasDone = snapshot.phase == .done
         alertCenter.cancelAll()
         snapshot = restored
+        noteCompletion(from: wasDone)
         alertCenter.sessionChanged(snapshot, isActive: isActive)
         SessionStore.save(snapshot)
         recordHistory(now: now)
@@ -128,6 +138,13 @@ final class SessionEngine {
 
     private func recordHistory(now: Date = .now) {
         historyRecorder?.record(snapshot, now: now)
+    }
+
+    /// One event per arrival in done. Initialisation, `use` and `restart` never
+    /// pass through here.
+    private func noteCompletion(from wasDone: Bool) {
+        guard !wasDone, snapshot.phase == .done else { return }
+        completionEvent += 1
     }
 
     private var movementNames: [UUID: String] {

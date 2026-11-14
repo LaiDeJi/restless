@@ -208,7 +208,7 @@ struct CalendarDaySheet: View {
                 .font(Theme.TypeScale.body)
                 .foregroundStyle(Theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            note("This date is closed. It skips the session on its slot and does not move the schedule.")
+            note("This date is closed. It skips that session's place in the round and does not move the schedule.")
             nextLine
         case .none:
             Text("This date is before the next planned session.")

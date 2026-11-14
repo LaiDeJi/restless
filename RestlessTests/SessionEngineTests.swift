@@ -142,6 +142,120 @@ func v4SnapshotOpensTheGate() throws {
 }
 
 @MainActor
+@Test("A completed run bumps the completion event once")
+func completionEventBumpsOnce() {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+    let oneSet = WorkoutPreset(
+        name: "One",
+        blocks: [
+            WorkoutBlock(
+                name: "One",
+                rounds: 1,
+                setsPerRound: 1,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            )
+        ]
+    )
+    let engine = SessionEngine(preset: oneSet)
+    #expect(engine.completionEvent == 0)
+
+    engine.perform(.startSession)
+    engine.perform(.setDone)
+    #expect(engine.snapshot.phase == .done)
+    #expect(engine.completionEvent == 1)
+}
+
+@MainActor
+@Test("A relaunch of a done snapshot does not bump the completion event")
+func completionEventSurvivesRelaunch() {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+    let oneSet = WorkoutPreset(
+        name: "One",
+        blocks: [
+            WorkoutBlock(
+                name: "One",
+                rounds: 1,
+                setsPerRound: 1,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            )
+        ]
+    )
+    let engine = SessionEngine(preset: oneSet)
+    engine.perform(.startSession)
+    engine.perform(.setDone)
+    #expect(engine.completionEvent == 1)
+
+    let relaunched = SessionEngine(preset: oneSet)
+    #expect(relaunched.snapshot.phase == .done)
+    #expect(relaunched.completionEvent == 0)
+}
+
+@MainActor
+@Test("A restart after done does not bump the completion event")
+func completionEventIgnoresRestart() {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+    let oneSet = WorkoutPreset(
+        name: "One",
+        blocks: [
+            WorkoutBlock(
+                name: "One",
+                rounds: 1,
+                setsPerRound: 1,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            )
+        ]
+    )
+    let engine = SessionEngine(preset: oneSet)
+    engine.perform(.startSession)
+    engine.perform(.setDone)
+    #expect(engine.completionEvent == 1)
+
+    engine.perform(.restart)
+    #expect(engine.snapshot.phase == .ready)
+    #expect(engine.completionEvent == 1)
+}
+
+@MainActor
+@Test("A store refresh into done bumps the completion event")
+func completionEventFromStoreRefresh() {
+    SessionStore.clear()
+    defer { SessionStore.clear() }
+    let oneSet = WorkoutPreset(
+        name: "One",
+        blocks: [
+            WorkoutBlock(
+                name: "One",
+                rounds: 1,
+                setsPerRound: 1,
+                setRest: 60,
+                roundRest: 120,
+                movements: [BlockMovement(movementId: UUID(), endCondition: .manual)]
+            )
+        ]
+    )
+    let engine = SessionEngine(preset: oneSet)
+    engine.perform(.startSession)
+
+    var done = engine.snapshot
+    done.doneSets = done.totalSets
+    done.phase = .done
+    SessionStore.save(done)
+    engine.refreshFromStore()
+
+    #expect(engine.snapshot.phase == .done)
+    #expect(engine.completionEvent == 1)
+}
+
+@MainActor
 @Test("A saved running snapshot with a REPS row loads at the same position")
 func storedRepsSnapshotLoads() throws {
     SessionStore.clear()

@@ -24,20 +24,31 @@ enum TrainingDayMark: Hashable, Sendable {
 /// Projects the persisted session order onto a fixed cadence:
 ///
 /// ```
-/// offset = whole local days from the anchor
-/// slot   = offset % (restGap + 1) == 0
-/// index  = offset / (restGap + 1) % sessions.count
+/// roundLength = sessions.count + restDaysBetween
+/// offset      = whole local days from the anchor
+/// roundIndex  = offset / roundLength
+/// dayInRound  = offset % roundLength
+/// session day when dayInRound < sessions.count
+/// slot        = roundIndex * sessions.count + dayInRound
 /// ```
 ///
-/// A slot is a session day unless an exception closes it or the user skipped
-/// it. Because the index comes from the offset, a closed or skipped slot keeps
-/// its index: the session it would have taken is dropped for that lap, and no
-/// other date moves. A per-date change replaces only the session drawn on that
-/// date; the slot still consumes the scheduled session.
+/// A round runs every saved session on consecutive days, then the rest days.
+/// A session day is a training day unless an exception closes it or the user
+/// skipped it. Because the index comes from the day's position in the round, a
+/// closed or skipped session day keeps its place: the session it would have
+/// taken is dropped for that round, and no other date moves. A per-date change
+/// replaces only the session drawn on that date; the slot still consumes the
+/// scheduled session. Rest days have no slot, so they consume nothing.
 struct TrainingRotation: Sendable {
     var settings: CalendarSettings
     let sessions: [RotationSession]
     var calendar: Calendar
+
+    private struct RoundPosition {
+        let roundIndex: Int
+        let dayInRound: Int
+        let slot: Int
+    }
 
     init(
         settings: CalendarSettings,
@@ -49,8 +60,6 @@ struct TrainingRotation: Sendable {
         self.calendar = calendar
     }
 
-    private var step: Int { settings.restDaysBetween + 1 }
-
     /// Whole local days from one date to another, DST-safe.
     func dayOffset(from anchor: Date, to day: Date) -> Int {
         let start = calendar.startOfDay(for: anchor)
@@ -58,26 +67,49 @@ struct TrainingRotation: Sendable {
         return calendar.dateComponents([.day], from: start, to: end).day ?? 0
     }
 
-    /// A day whose offset from the anchor is a multiple of the gap plus one.
+    /// The day's round and position inside it, or nil before the anchor, on a
+    /// rest day, or when the order is empty.
+    private func roundPosition(for day: Date) -> RoundPosition? {
+        guard let anchor = settings.rotationAnchor, !sessions.isEmpty else { return nil }
+        let offset = dayOffset(from: anchor, to: day)
+        guard offset >= 0 else { return nil }
+        let length = sessions.count + settings.restDaysBetween
+        guard length > 0 else { return nil }
+        let roundIndex = offset / length
+        let dayInRound = offset % length
+        guard dayInRound < sessions.count else { return nil }
+        return RoundPosition(
+            roundIndex: roundIndex,
+            dayInRound: dayInRound,
+            slot: roundIndex * sessions.count + dayInRound
+        )
+    }
+
+    /// The round number from the anchor, or nil on a rest day.
+    func roundIndex(for day: Date) -> Int? {
+        roundPosition(for: day)?.roundIndex
+    }
+
+    /// The zero-based position in the round, or nil on a rest day.
+    func dayInRound(for day: Date) -> Int? {
+        roundPosition(for: day)?.dayInRound
+    }
+
+    /// A day that carries one of the round's sessions.
     func isSessionSlot(_ day: Date) -> Bool {
-        guard let anchor = settings.rotationAnchor else { return false }
-        let offset = dayOffset(from: anchor, to: day)
-        guard offset >= 0 else { return false }
-        return offset % step == 0
+        roundPosition(for: day) != nil
     }
 
-    /// The slot number from the anchor, or nil when the day is not a slot.
+    /// The slot number from the anchor, or nil when the day is not a session day.
     func slotNumber(for day: Date) -> Int? {
-        guard let anchor = settings.rotationAnchor else { return nil }
-        let offset = dayOffset(from: anchor, to: day)
-        guard offset >= 0, offset % step == 0 else { return nil }
-        return offset / step
+        roundPosition(for: day)?.slot
     }
 
-    /// The schedule's session on a slot, before a closure, a skip or a change.
+    /// The schedule's session on a session day, before a closure, a skip or a
+    /// change.
     func scheduledPlan(for day: Date) -> RotationSession? {
-        guard !sessions.isEmpty, let slot = slotNumber(for: day) else { return nil }
-        return sessions[slot % sessions.count]
+        guard let position = roundPosition(for: day) else { return nil }
+        return sessions[position.dayInRound]
     }
 
     /// The chosen session for a date, when the preset still exists. A deleted
@@ -119,14 +151,16 @@ struct TrainingRotation: Sendable {
         if settings.isSkipped(target, calendar: calendar) { return .skipped }
         guard let boundary else { return .none }
         guard target >= calendar.startOfDay(for: boundary) else { return .none }
+        guard !sessions.isEmpty else { return .none }
         guard isSessionSlot(target) else { return .rest }
         guard let plan = plan(for: target) else { return .none }
         return .planned(plan)
     }
 
-    /// The first open slot at or after today with no record and no skip. Rest
-    /// days, closures, skips and recorded slots are passed over.
+    /// The first open session day at or after today with no record and no skip.
+    /// Rest days, closures, skips and recorded days are passed over.
     func nextUnstartedDay(today: Date, recordedDays: Set<Date> = []) -> Date? {
+        guard !sessions.isEmpty else { return nil }
         let start = calendar.startOfDay(for: today)
         let recorded = Set(recordedDays.map { calendar.startOfDay(for: $0) })
         for offset in 0..<3_660 {
@@ -152,9 +186,9 @@ struct TrainingRotation: Sendable {
         )
     }
 
-    /// The selected date becomes slot 0, so every upcoming slot re-phases
-    /// around it. A closed or past date is refused. Records and a running
-    /// session are untouched.
+    /// The selected date becomes the first session of a round, so every
+    /// upcoming session and rest day re-phases around it. A closed or past date
+    /// is refused. Records and a running session are untouched.
     @discardableResult
     mutating func startNewRound(on day: Date, today: Date) -> Bool {
         let target = calendar.startOfDay(for: day)
@@ -167,7 +201,7 @@ struct TrainingRotation: Sendable {
         return true
     }
 
-    /// Only a planned session can be skipped; the day keeps its slot.
+    /// Only a planned session can be skipped; the day keeps its place in the round.
     mutating func skip(_ day: Date) {
         let target = calendar.startOfDay(for: day)
         guard plan(for: target) != nil else { return }
