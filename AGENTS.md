@@ -1,41 +1,21 @@
 # AGENTS.md — Restless
 
-Rest timer for iPhone: untimed sets, a set rest, a longer round rest, and the
-same state mirrored on the Dynamic Island. A session is an ordered list of
-blocks of movements; after a block's last set its round rest leads into the next
-block. Three bottom tabs — TIMER, SESSIONS and CALENDAR — replace the old setup
-sheet. CALENDAR projects the saved SESSIONS order onto training days and shows
-the history of the runs actually started. A set ends on MANUAL (SET DONE) or
-TIME (a phone countdown); the movement library is a name-only list shared by
-every block.
+Restless is an iPhone rest timer, mirrored on the Dynamic Island. A session is an ordered list of blocks of movements. A set ends on MANUAL (SET DONE) or TIME (a phone countdown), and a rest follows it except after the last set. Three bottom tabs: TIMER, SESSIONS and CALENDAR. CALENDAR projects the SESSIONS order onto training days and lists the runs actually started.
 
-## Source of truth
+## Source of truth and layout
 
-- `prototype-workout-timer.html` is the behaviour and visual reference. It is
-  about 5,000 lines, so `grep -n '/\* -' prototype-workout-timer.html` prints its
-  40 section headings (CSS and JS); read the matched range with `offset`/`limit`
-  instead of paging the whole file.
-- Change timing, copy, layout or colour in `prototype-workout-timer.html`
-  first, then the skill and code. Deadline maths, persistence, notifications
-  and intents do not touch the prototype.
-- `.agents/skills/restless-rest-timer/SKILL.md` owns the timing rules, the state
-  machine, the island contract, the platform limits and how to verify a Lock
-  Screen or Dynamic Island change. Read it before changing anything that decides
-  which rest comes next.
-- `Shared/TrainingRotation.swift` owns the calendar projection and
-  `Shared/CalendarSettings.swift` owns the settings document
-  (`restless.calendar.v1` in `UserDefaults`). `Restless/Data/WorkoutRecord.swift`
-  and `WorkoutHistoryStore.swift` own the history records.
-- `project.yml` generates the Xcode project. Never edit `Restless.xcodeproj` by hand.
-- `openspec/` is the planning home: one directory per change under
-  `openspec/changes/`, plus the specs they derive from. Plan a change there
-  before writing code; the `openspec-*` skills under `.agents/skills/` run the
-  workflow.
+- `.agents/skills/restless-rest-timer/SKILL.md` is the rule set for a session: timing, state machine, editing, navigation, Live Activity, alerts, persistence and copy. Read it before changing anything that decides which rest comes next. Where it and the prototype disagree, the prototype wins.
+- `prototype-workout-timer.html` is the behaviour and visual reference, over 6,000 lines. `grep -n '/\* -' prototype-workout-timer.html` lists its section headings; read one range with `offset`/`limit`.
+- Change order: prototype first for timing, copy, layout or colour, then skill, then code. Deadline maths, persistence, notifications and intents skip the prototype. For a UI change, draw before/after or the options as a page before asking the user to choose.
+- Calendar: `Shared/CalendarSettings.swift` (document `restless.calendar.v2` in `UserDefaults`; v1 migrates on load) and `Shared/TrainingRotation.swift` (projection). History: `Restless/Data/WorkoutRecord.swift` and `WorkoutHistoryStore.swift`. Rules 12 and 13 summarise both.
+- Code map: `Shared/` is the pure model, with `SessionTransitions` in `SessionSnapshot.swift`, the rest plan in `WorkoutPreset.swift`, `LiveActivityCoordinator` in `RestlessActivity.swift`, and the palette and type scale in `Theme.swift`. `Restless/` holds `App/`, `Session/` (`SessionEngine`, `SessionDraftStore`), `Data/`, `Alerts/` and `UI/` (screens; `Calendar*.swift` is the calendar surface). `RestlessWidget/` is the Live Activity and Dynamic Island, and `RestlessTests/` holds the Swift Testing suites.
+- `project.yml` generates `Restless.xcodeproj`; never edit the project by hand. Swift 6 with complete strict concurrency, iOS 18.0 minimum.
+- `openspec/` holds one directory per change under `openspec/changes/` and the main specs under `openspec/specs/`. Plan a change there before writing code; the `openspec-*` skills in `.agents/skills/` run the workflow.
 
 ## Commands
 
 ```bash
-xcodegen generate
+xcodegen generate   # after editing project.yml or adding or removing source files
 
 xcodebuild -project Restless.xcodeproj -scheme Restless \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
@@ -46,19 +26,11 @@ xcodebuild -project Restless.xcodeproj -scheme Restless \
   -derivedDataPath build test
 ```
 
-Use that one simulator for everything, including Argent. A second booted
-simulator is what makes the test runner hang, and `iPhone 18 Pro Max` hung twice
-in the last session where `iPhone 18 Pro` ran 189 tests in two seconds. If the
-runner does hang, follow the remedy under Verification rather than switching
-device.
+Use the `iPhone 18 Pro` simulator for everything, Argent included. A second booted simulator makes the test runner hang (`iPhone 18 Pro Max` did in an earlier session); if the runner hangs, follow Verification.
 
-SwiftLint runs as a script phase on the `Restless` target; run it on demand with
-`swiftlint`. Rules live in `.swiftlint.yml`, and warnings do not fail the build.
-That target sets `ENABLE_USER_SCRIPT_SANDBOXING: NO` because the phase reads the
-repository; the other targets keep the sandbox on.
-
-The repository is under git. `git config core.hooksPath .githooks` installs the
-pre-commit gate: SwiftLint plus `openspec validate --all --strict`.
+- Tests use Swift Testing (`import Testing`, `@Test`).
+- SwiftLint runs as a script phase on the `Restless` target, configured by `.swiftlint.yml`; warnings do not fail the build. Only that target disables script sandboxing, because the phase reads the repo.
+- Once per clone, run `git config core.hooksPath .githooks`. The pre-commit hook runs SwiftLint and `openspec validate --all --strict`, so both tools must be on PATH.
 
 Device build (iPhone 15 Pro Max, team `VMZG879ZU8`):
 
@@ -70,109 +42,36 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
   "$TMPDIR/restless-device-dd/Build/Products/Debug-iphoneos/Restless.app"
 ```
 
-## Verification
-
-- The simulator keeps state between runs. Do destructive checks (delete,
-  reorder, big plan edits) on a throwaway simulator, or restore the fixture
-  afterwards; do not burn the only session you still need.
-- A flow longer than a couple of taps belongs in one Argent e2e sequence. Read
-  the accessibility tree at checkpoints, not after every tap.
-  `.argent/e2e/session-start-and-draggable-lists.yaml` already waits on
-  `await-ui-element` text selectors and taps by label; extend it (or copy its
-  shape) before writing raw coordinates, and never repeat a tap you already made.
-  `.argent/e2e/calendar-day-sheet.yaml`, `calendar-reorder-reset.yaml` and
-  `calendar-cadence.yaml` cover the calendar's START, reorder, cadence,
-  exception, skip, per-date change and new-round flows; each is a same-day
-  fragment with the device week start, plan and gap it assumes in its header.
-- Prototype changes get checked in headless Chrome: `python3
-  tools/prototype-check.py [driver.js]` serves the prototype on an ephemeral
-  localhost port and prints the DOM after 6 s of virtual time. A driver runs
-  before the dump, so it can seed `localStorage`, click, and write the strings it
-  asserts into the page. Pass `--budget N` to change the wait.
-  `tools/prototype-driver-calendar.js` asserts the calendar grid, day sheets,
-  settings and reorder boundary.
-- If `xcodebuild test` says "The test runner hung before establishing
-  connection", do not retry it unchanged. Terminate the app, shut down extra
-  booted simulators, then rerun; after a second hang, reboot the destination or
-  use another simulator.
-- Before debugging widget content, check which bundle owns the screen with
-  `xcrun simctl listapps <udid>`. An older `Rounds` (`com.whc.rounds`) install
-  can own the Dynamic Island.
-- End a task with `swiftlint lint --quiet --reporter summary` from the repo root
-  and `openspec validate <change> --strict` when the work ran through an OpenSpec
-  change. Warnings do not fail the build, so neither gate is automatic. For a
-  spec-shape housekeeping edit, `openspec validate --all --strict` must report
-  5 passed, 0 failed.
-
 ## Rules
 
-1. `Shared/` is pure model plus ActivityKit; no SwiftUI except `Shared/Theme.swift`.
-   Keep it free of iOS-only frameworks.
-2. Time is a deadline, never a decrementing counter. A ticker only triggers
-   redraws and deadline reconciliation.
-3. Every mutation goes through `SessionTransitions.apply` — the app button, the
-   island link and the URL handler must not have separate logic.
-4. `setDone` is valid only in `ready`; a double tap must not consume two sets,
-   including at a block boundary.
-5. The team is a free Apple Developer account. **App Groups are not configured**;
-   `SessionStore` falls back to `.standard`, so the widget extension cannot read
-   the session. Apple lists App Groups as available to free accounts, but this
-   project has not tested provisioning one; do not repeat the old "free team
-   cannot use App Groups" claim without a clean build. Island controls are
-   `Link`s to `restless://<action>` and the app applies them in `onOpenURL`.
-6. A session is an ordered list of blocks and always keeps at least one block.
-   The last saved session cannot be deleted, and a session's last block has no
-   delete action. Blocks persist as JSON on the SwiftData record, with the
-   legacy single-part columns kept readable for migration and rollback.
-7. Rounds and sets per round are unbounded (minimum 1); rests stay 15–600
-   seconds in steps of 15. Only rests clamp.
-8. Editing is local-first: a stepper tap or keystroke updates the draft, and
-   persistence, the session reset and the Live Activity refresh are coalesced
-   after 350 ms of idle, then flushed on dismissal, Done and background. Never
-   put a synchronous save or `engine.use` inside the tap handler.
-9. Editing is locked while the session is performing, resting, or paused; the
-   timer hides EDIT and SESSIONS is read-only with its lock banner. Switching
-   tabs must not change or pause the set or rest.
-10. The prototype is silent. Completion alerts are decided: Restless in the
-    foreground plays one phone haptic; in the background one local notification
-    is scheduled when the app backgrounds and left for the system to deliver at
-    the deadline, including while the app is still executing. iOS mirrors it to
-    a paired watch, so the app sends no watch alert of its own. No alerting Live
-    Activity update and no system alarm is scheduled. The prototype simulates
-    the notification card visually and adds no audio.
-11. The movement library is a name list. A movement is created by typing its name
-    in a block's add-movement picker and managed from MOVEMENTS by rename and
-    delete; it has no profile, recording action, or watch count. A used movement
-    cannot be deleted. Do not add a second set-ending path.
-12. The persisted SESSIONS order is the program: CALENDAR projects it onto a
-    fixed cadence of one session every `restDaysBetween + 1` days from one
-    anchor, taking the next session at each slot. Exceptions are a dated range
-    or one repeating weekday; a closed or skipped date keeps its slot and takes
-    no session, so that session is dropped for the lap. A reorder or a new round
-    moves the anchor; a record and a running session never move, and adding,
-    renaming, deleting or a settings edit keeps the anchor. A planned date can
-    show another exercise without moving the schedule. A new round is offered
-    only today or later.
-13. A history record starts with the first completed set and keeps its own plan
-    snapshot. It is read-only apart from a two-tap delete; editing or deleting
-    the session never changes it. START exists only in a planned day's sheet.
+1. `Shared/` stays pure: Foundation, ActivityKit and OSLog only, and SwiftUI only in `Shared/Theme.swift`. `SharedPurityTests` checks SwiftUI and SwiftData imports.
+2. Time is a deadline, never a decrementing counter. A ticker only triggers redraws and deadline reconciliation.
+3. Every mutation goes through `SessionTransitions.apply`. The app button, the island link and the URL handler have no separate logic.
+4. `setDone` is valid only in `ready` and `performing`, where it ends a timed set early; ignore it elsewhere. A double tap must not consume two sets, including at a block boundary.
+5. The team is a free Apple Developer account, and **App Groups are not configured**: `SessionStore` falls back to `.standard`, so the widget cannot read the session. Island controls are `Link`s to `restless://<action>`, applied in `onOpenURL`. Apple lists App Groups as available to free accounts, but this project has not tested provisioning one. Do not assert either way; verify with a clean build first.
+6. A session is an ordered list of blocks and always keeps at least one block. The last saved session cannot be deleted, and a session's last block has no delete action. Blocks persist as JSON on the SwiftData record; the legacy single-part columns stay readable for migration and rollback.
+7. Rounds and sets per round are unbounded integers, minimum 1. Round rest is 15–600 s; set rest is 0 or 15–600 s. Rests step by 15 s, and only rests clamp.
+8. Editing is local-first. A stepper tap or keystroke changes the draft only. Persistence, the session reset and the Live Activity refresh coalesce after 350 ms of idle, then flush on dismissal, Done and background. Never save synchronously or call `engine.use` inside a tap handler.
+9. Editing is locked while the session is performing, resting or paused: the timer hides EDIT, and SESSIONS and the editors are read-only behind their lock banner. Switching tabs must not change or pause the set or rest.
+10. Completion alerts are decided. Foreground: one phone haptic. Background: one local notification, scheduled when the app backgrounds and left for the system to deliver at the deadline. iOS mirrors it to a paired watch, so the app sends no watch alert. No alerting Live Activity update, system alarm or custom audio. Keep `CountdownNotificationDelegate` on the completion-handler `UNUserNotificationCenterDelegate` methods; the async variants crashed a physical iPhone.
+11. The movement library is a name list. A movement is created by typing its name in a block's add-movement picker and managed from MOVEMENTS (rename, delete). It has no profile, recording action or watch count. A used movement cannot be deleted. Do not add a second set-ending path.
+12. The persisted SESSIONS order is the program. CALENDAR projects it onto a fixed cadence of one session every `restDaysBetween + 1` days from one anchor, taking the next session at each slot. Exceptions are a dated range or one repeating weekday. A closed or skipped date keeps its slot and takes no session, so that session is dropped for the lap. A reorder or a new round moves the anchor. A record and a running session never move; adding, renaming, deleting or a settings edit keeps the anchor. A planned date can show another exercise without moving the schedule. A new round is offered only today or later.
+13. A history record starts with the first completed set and keeps its own plan snapshot. It is read-only apart from a two-tap delete; editing or deleting the session never changes it. START exists only in a planned day's sheet.
 
-## Layout
+## Verification
 
-- `Shared/` — session and block maths, rest plan, the v2 calendar document
-  (rest gap, dated or weekday exceptions, skipped days, per-date changes, v1
-  migration), the arithmetic rotation projection, session snapshot and
-  transitions, store, activity attributes, coordinator, palette.
-- `Restless/` — app entry, router and root tab shell, engine, draft store,
-  calendar settings model, SwiftData session and history records, timer,
-  sessions, calendar and settings screens. `CalendarScreen`, `CalendarCellView`,
-  `CalendarDaySheet`, `CalendarChangePicker`, `CalendarRecordCard`,
-  `CalendarActionFooter`, `CalendarSettingsScreens` and `CalendarCopy` are the
-  calendar surface; `WorkoutRecord`, `WorkoutRepository` and `WorkoutHistoryStore`
-  are the history.
-- `RestlessWidget/` — Live Activity and Dynamic Island, built from the shared
-  session snapshot.
-- `RestlessTests/` — rest plan across blocks, session transitions, draft
-  debouncing, record migration, end-condition decoding, calendar settings and
-  its v1 migration, rotation, the calendar settings model, and the history
-  record lifecycle.
+- Simulator state persists between runs. Do destructive checks (delete, reorder, big plan edits) on a throwaway simulator, or restore the fixture afterwards. Reinstalling the app reseeds the demo sessions; some e2e files leave a session or library movement behind (`movement-major-timer-walk.yaml` does), so reinstall before running them again.
+- Return to the start gate with `open-url restless://restart`.
+- `.argent/e2e/` holds Argent step lists. Read a file's header first: it states any fixture, week start or SESSIONS order it assumes, and whether it is a fragment. Waits use `await-ui-element` on visible text; taps use coordinates unless the file uses an accessibility id. Put a flow longer than a couple of taps in one sequence, read the accessibility tree at checkpoints rather than after every tap, add `wait: 800` after each transition, and never repeat a tap you already made.
+- Prototype changes: `python3 tools/prototype-check.py [driver.js]` serves the prototype on an ephemeral localhost port and prints the DOM after 6 s of virtual time; `--budget N` (ms) changes the wait. A driver can seed `localStorage` and click before the dump. `tools/prototype-driver-calendar.js` asserts the calendar grid, day sheets, settings and the reorder boundary.
+- Completion alert on a physical iPhone: complete a set, press Home while the rest runs, wait out the rest, then pull Notification Center from the top edge and tap the RESTLESS cell. Then check for new `Restless-*.ips` crash reports.
+- If `xcodebuild test` says the test runner hung before establishing connection, do not retry unchanged. Terminate the app, shut down extra booted simulators and rerun. After a second hang, reboot the destination or use another simulator.
+- Before debugging widget content, check which bundle owns the screen with `xcrun simctl listapps <udid>`. An older `Rounds` (`com.whc.rounds`) install can own the Dynamic Island.
+- For a Lock Screen or Dynamic Island change, follow the skill's "Verifying a panel change" section.
+
+## Before finishing
+
+Run both gates at the end of every task; the pre-commit hook only covers commits.
+
+- `swiftlint lint --quiet --reporter summary` from the repo root, even when no Swift file changed.
+- `openspec validate <change> --strict` when the work went through an OpenSpec change, or `openspec validate --all --strict` when it edited main specs. A bare `openspec validate --strict` validates nothing. `--all --strict` must report 0 failed, and any failure is real.
