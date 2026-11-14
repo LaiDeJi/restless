@@ -168,7 +168,7 @@ A pending completion alert SHALL be cancelled when its countdown is paused, skip
 
 ### Requirement: Tapping a completion alert opens Restless
 
-Tapping a delivered rest or timed-work completion alert SHALL bring Restless to the foreground on the TIMER tab and SHALL NOT terminate the app. The tap SHALL NOT complete a set, skip a rest, or raise a second completion alert.
+Tapping a delivered rest or timed-work completion alert SHALL open the app on the device where it was tapped: on the phone, Restless in the foreground on the TIMER tab; on the watch, the watch app on the running session. Neither tap SHALL start, pause, complete or skip anything, SHALL NOT terminate the app, and SHALL NOT raise a second completion alert.
 
 #### Scenario: The app is suspended in the background
 
@@ -193,3 +193,15 @@ Tapping a delivered rest or timed-work completion alert SHALL bring Restless to 
 - **GIVEN** a delivered WORK SET OVER alert for the last timed set of a block
 - **WHEN** the user taps the alert
 - **THEN** Restless opens on the TIMER tab showing the rest that followed or the finished session, with the same completed-set count as before the tap
+
+#### Scenario: The alert is tapped on the watch
+
+- **GIVEN** a running rest with a watch app installed and the phone locked
+- **WHEN** the user taps the rest-end alert on the watch
+- **THEN** the watch app opens on the current phase with its buttons, the phone stays locked, and neither device changes the completed-set count
+
+#### Scenario: The watch has no app installed
+
+- **GIVEN** a running rest and a paired watch without the watch app
+- **WHEN** the rest reaches zero
+- **THEN** the alert appears on the watch as before and tapping it offers no watch app to open

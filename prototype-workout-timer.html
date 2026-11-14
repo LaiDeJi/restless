@@ -1950,6 +1950,207 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  /* ---------------------------------------------------------------- watch remote */
+  .wrist {
+    width: 100%;
+    max-width: 1000px;
+    margin: 34px auto 0;
+    padding: 0 2px;
+  }
+  .wrist-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .wrist-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    color: rgba(255,255,255,.55);
+    text-transform: uppercase;
+  }
+  .wrist-note {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    color: rgba(255,255,255,.28);
+  }
+  .wrist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+    gap: 16px 12px;
+  }
+  .wrist-item { margin: 0; }
+  .wrist-item figcaption {
+    margin-top: 9px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    color: rgba(255,255,255,.3);
+    text-transform: uppercase;
+  }
+  .watch {
+    position: relative;
+    width: 176px;
+    height: 210px;
+    margin: 0 auto;
+    padding: 9px;
+    border-radius: 48px;
+    background: linear-gradient(150deg, #4a4a50 0%, #17171a 26%, #25252a 52%, #111114 76%, #35353b 100%);
+    box-shadow:
+      0 22px 34px -18px rgba(0,0,0,.9),
+      0 0 0 1px rgba(255,255,255,.10),
+      inset 0 0 0 1.5px rgba(255,255,255,.08);
+  }
+  .watch-crown {
+    position: absolute;
+    right: -3px;
+    top: 68px;
+    width: 4px;
+    height: 26px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #161619, #3c3c42 60%, #141416);
+  }
+  .watch-screen {
+    position: relative;
+    width: 158px;
+    height: 192px;
+    border-radius: 40px;
+    overflow: hidden;
+    background: #070708;
+    padding: 15px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    isolation: isolate;
+  }
+  .w-phase {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    color: #C8FF4D;
+    text-transform: uppercase;
+  }
+  .w-phase.amber { color: #FFB84D; }
+  .w-move {
+    margin-top: 5px;
+    font-size: 16px;
+    line-height: 1.1;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .w-pos {
+    margin-top: 4px;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.46);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .w-bar {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+    gap: 2px;
+    margin-top: 9px;
+  }
+  .w-bar i {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,.12);
+  }
+  .w-bar i.on { background: #C8FF4D; }
+  .w-bar i.on.amber { background: #FFB84D; }
+  .w-count {
+    margin-top: 5px;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: rgba(255,255,255,.32);
+    font-variant-numeric: tabular-nums;
+  }
+  .w-spacer { flex: 1; }
+  .w-actions { display: flex; gap: 7px; align-items: stretch; }
+  .w-primary {
+    flex: 1;
+    min-height: 32px;
+    border-radius: 16px;
+    background: #C8FF4D;
+    color: #070708;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 0 5px;
+  }
+  .w-primary.amber { background: #FFB84D; }
+  .w-skip {
+    width: 32px;
+    min-height: 32px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.12);
+    color: rgba(255,255,255,.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .w-skip svg { width: 13px; height: 13px; }
+  .w-note {
+    margin-top: 8px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-align: center;
+    color: #FFB84D;
+    text-transform: uppercase;
+  }
+  .w-alert {
+    margin-top: 12px;
+    padding: 9px 9px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(26,26,30,.96);
+  }
+  .w-alert-app {
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    color: rgba(255,255,255,.42);
+  }
+  .w-alert-title {
+    margin-top: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: #C8FF4D;
+  }
+  .w-alert-body {
+    margin-top: 3px;
+    font-size: 8px;
+    line-height: 1.35;
+    color: rgba(255,255,255,.68);
+  }
+  .watch-screen .w-done-meta {
+    margin-top: 5px;
+    font-size: 8px;
+    line-height: 1.35;
+    font-weight: 500;
+    letter-spacing: .04em;
+    color: rgba(255,255,255,.38);
+  }
+
   /* ---------------------------------------------------------------- footer */
   .debug {
     margin-top: 14px;
@@ -2296,6 +2497,152 @@
         </div>
       </div>
     </div>
+
+    <section class="wrist" id="wrist" aria-labelledby="wristTitle">
+      <div class="wrist-head">
+        <div class="wrist-kicker" id="wristTitle">WRIST · WATCH REMOTE</div>
+        <div class="wrist-note">Fed by the phone · no countdown · no alerts</div>
+      </div>
+      <div class="wrist-grid">
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">READY</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 1 OF 4 · SET 1 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">0 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions"><span class="w-primary">START SESSION</span></div>
+            </div>
+          </div>
+          <figcaption>READY</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">WORK</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">5 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions"><span class="w-primary">SET DONE</span></div>
+            </div>
+          </div>
+          <figcaption>WORK</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">SET REST</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">5 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions">
+                <span class="w-primary">PAUSE</span>
+                <span class="w-skip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg></span>
+              </div>
+            </div>
+          </div>
+          <figcaption>SET REST</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase amber">ROUND REST</div>
+              <div class="w-move">Incline press</div>
+              <div class="w-pos">ROUND 1 OF 4 · SET 1 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i class="on amber"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">8 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions">
+                <span class="w-primary amber">PAUSE</span>
+                <span class="w-skip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg></span>
+              </div>
+            </div>
+          </div>
+          <figcaption>ROUND REST</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">PAUSED</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">5 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions"><span class="w-primary">RESUME</span></div>
+            </div>
+          </div>
+          <figcaption>PAUSED</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">SESSION COMPLETE</div>
+              <div class="w-move">Chest</div>
+              <div class="w-done-meta">1 BLOCK · 1 MOVEMENT · 18:00 TOTAL REST</div>
+              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+              <div class="w-count">16 OF 16 SETS</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions"><span class="w-primary">START AGAIN</span></div>
+            </div>
+          </div>
+          <figcaption>DONE</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-phase">SET REST</div>
+              <div class="w-move">Bench press</div>
+              <div class="w-pos">ROUND 2 OF 4 · SET 2 OF 4</div>
+              <div class="w-bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="w-count">5 OF 16 SETS</div>
+              <div class="w-note">NOT SENT · TRY AGAIN</div>
+              <div class="w-spacer"></div>
+              <div class="w-actions">
+                <span class="w-primary">PAUSE</span>
+                <span class="w-skip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6.1v11.8a1 1 0 0 0 1.56.83l8.06-5.9a1 1 0 0 0 0-1.66L6.56 5.27A1 1 0 0 0 5 6.1z"/><rect x="16.6" y="4.9" width="3" height="14.2" rx="1.3"/></svg></span>
+              </div>
+            </div>
+          </div>
+          <figcaption>NOT SENT</figcaption>
+        </figure>
+
+        <figure class="wrist-item">
+          <div class="watch">
+            <span class="watch-crown"></span>
+            <div class="watch-screen">
+              <div class="w-alert" role="alert">
+                <div class="w-alert-app">RESTLESS</div>
+                <div class="w-alert-title">SET REST OVER</div>
+                <div class="w-alert-body">AFTER SET 2<br>NEXT SET 3 OF 4</div>
+              </div>
+              <div class="w-spacer"></div>
+              <div class="w-note">TAP TO OPEN · NO ACTIONS</div>
+            </div>
+          </div>
+          <figcaption>NOTIFICATION</figcaption>
+        </figure>
+      </div>
+    </section>
 
     <button class="chrome-toggle" data-act="toggle-chrome" aria-pressed="true">CHROME · LIQUID GLASS</button>
     <div class="debug" id="debug"></div>

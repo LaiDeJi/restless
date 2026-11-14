@@ -6,6 +6,7 @@ struct RestlessApp: App {
     private let container: ModelContainer
     @State private var engine: SessionEngine
     @State private var calendarSettings: CalendarSettingsModel
+    @State private var watchBridge: WatchSessionBridge
 
     init() {
         do {
@@ -29,6 +30,7 @@ struct RestlessApp: App {
             engine.historyRecorder = WorkoutHistoryStore(context: context)
             _engine = State(initialValue: engine)
             _calendarSettings = State(initialValue: CalendarSettingsModel())
+            _watchBridge = State(initialValue: WatchSessionBridge(engine: engine))
         } catch {
             fatalError("Could not open the preset store: \(error)")
         }

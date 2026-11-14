@@ -4,6 +4,7 @@ options:
   bundleIdPrefix: com.whc
   deploymentTarget:
     iOS: "18.0"
+    watchOS: "11.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
@@ -53,6 +54,8 @@ targets:
     dependencies:
       - target: RestlessWidgetExtension
         embed: true
+      - target: RestlessWatch
+        embed: true
     postCompileScripts:
       - name: SwiftLint
         basedOnDependencyAnalysis: false
@@ -88,6 +91,30 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.widget
         SKIP_INSTALL: YES
 
+  RestlessWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: RestlessWatch
+      - path: Shared/WorkoutPreset.swift
+      - path: Shared/WorkoutBlock.swift
+      - path: Shared/SessionSnapshot.swift
+      - path: Shared/Theme.swift
+      - path: Shared/WatchRemote.swift
+    info:
+      path: RestlessWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Restless
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.whc.restless
+        WKRunsIndependentlyOfCompanionApp: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whc.restless.watch
+        TARGETED_DEVICE_FAMILY: "4"
+
   RestlessTests:
     type: bundle.unit-test
     platform: iOS
@@ -106,6 +133,7 @@ schemes:
       targets:
         Restless: all
         RestlessWidgetExtension: all
+        RestlessWatch: all
         RestlessTests: [test]
     run:
       config: Debug

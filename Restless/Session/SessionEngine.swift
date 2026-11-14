@@ -16,6 +16,19 @@ final class SessionEngine {
     /// session, not the library, so the app supplies the lookup.
     var movementNamesProvider: (() -> [UUID: String])?
 
+    /// Called after every state change the watch should see. The phone's
+    /// WatchConnectivity bridge publishes the session here; the engine itself
+    /// does not import WatchConnectivity.
+    @ObservationIgnored var sessionDidChange: (() -> Void)?
+
+    /// A wrist tap more than this far ahead of arrival is clock skew, not
+    /// intent: the phone applies it on arrival instead.
+    static let remoteTapFutureTolerance: TimeInterval = 5
+
+    @ObservationIgnored private var appliedActionIDs: Set<UUID> = []
+    @ObservationIgnored private var appliedActionOrder: [UUID] = []
+    private static let appliedActionLimit = 64
+
     /// The history hook. Installing it records the snapshot the engine restored
     /// (a timed set or rest that expired before launch would otherwise be
     /// missed until the next action) and every later state change.
@@ -51,14 +64,33 @@ final class SessionEngine {
     }
 
     func perform(_ action: SessionAction) {
-        let now = Date.now
+        perform(action, at: .now, id: nil)
+    }
+
+    /// The one action path for a tap whose instant is known. The transition is
+    /// applied at `tapTime` and then reconciled to the present, so a delayed
+    /// message lands in the phase the phone would have been in anyway. Returns
+    /// false for an id that already reached the phone.
+    @discardableResult
+    func perform(_ action: SessionAction, at tapTime: Date, id: UUID?) -> Bool {
+        let arrival = Date.now
+        if let id {
+            guard !appliedActionIDs.contains(id) else { return false }
+            markApplied(id)
+        }
+
+        let instant = tapTime > arrival.addingTimeInterval(Self.remoteTapFutureTolerance)
+            ? arrival
+            : tapTime
         let wasDone = snapshot.phase == .done
-        SessionTransitions.apply(action, to: &snapshot, now: now)
+        SessionTransitions.apply(action, to: &snapshot, now: instant)
+        while snapshot.reconcile(now: arrival) {}
         noteCompletion(from: wasDone)
         alertCenter.sessionChanged(snapshot, isActive: isActive)
         persist()
-        recordHistory(now: now)
+        recordHistory(now: arrival)
         restartTicker()
+        return true
     }
 
     /// A deadline transition. The alert centre leaves the notification that is
@@ -93,6 +125,7 @@ final class SessionEngine {
         restartTicker()
         let names = movementNames
         Task { await LiveActivityCoordinator.restart(snapshot, movementNames: names) }
+        notifySessionChange()
     }
 
     /// Picks up changes made by a Live Activity intent while the app was away.
@@ -112,6 +145,7 @@ final class SessionEngine {
         restartTicker()
         let names = movementNames
         Task { await LiveActivityCoordinator.start(snapshot, movementNames: names) }
+        notifySessionChange()
     }
 
     /// Island and Lock Screen controls open the app on a URL that names the action.
@@ -134,6 +168,22 @@ final class SessionEngine {
         let current = snapshot
         let names = movementNames
         Task { await LiveActivityCoordinator.start(current, movementNames: names) }
+        notifySessionChange()
+    }
+
+    /// A wrist tap id is applied at most once. The oldest ids fall out of the
+    /// window rather than growing the set for the life of the process.
+    private func markApplied(_ id: UUID) {
+        appliedActionIDs.insert(id)
+        appliedActionOrder.append(id)
+        while appliedActionOrder.count > Self.appliedActionLimit {
+            let evicted = appliedActionOrder.removeFirst()
+            appliedActionIDs.remove(evicted)
+        }
+    }
+
+    private func notifySessionChange() {
+        sessionDidChange?()
     }
 
     private func recordHistory(now: Date = .now) {
@@ -147,7 +197,7 @@ final class SessionEngine {
         completionEvent += 1
     }
 
-    private var movementNames: [UUID: String] {
+    var movementNames: [UUID: String] {
         movementNamesProvider?() ?? [:]
     }
 

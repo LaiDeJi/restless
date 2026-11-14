@@ -300,6 +300,19 @@ app, so every change to it needs the screen locked with a rest or set running.
 - Completion alerts use one local notification with the system sound when the app is in the background. In-app completion is haptic only; Restless adds no custom audio asset and schedules no system alarm.
 - The local notification is the one background alert. The app does not depend on background execution: the system delivers the notification whether the app is still executing or suspended, and mirrors it to the paired watch.
 
+## Watch remote
+
+The watch is a control surface for the running session, never a second copy of it.
+
+- **No clock.** The wrist shows the phase, the movement, the round and set position, and a segmented bar of completed sets out of the session total. It shows no countdown, no remaining time, no progress ring and no value that changes as time passes. The paused screen does not tick either. One display-only wake at the published deadline may flip the phase (a finished rest becomes ready) while the phone is suspended; it shows no time and sends nothing.
+- **Same actions, same words.** The labelled button is the snapshot's `primaryTitle` with `primaryAction`: `START SESSION`, `START`, `SET DONE`, `PAUSE`, `RESUME`, `START AGAIN`. A running rest adds one skip glyph; a paused rest does not. The watch invents no copy and no order.
+- **One message per tap.** A tap sends `WatchActionMessage` (id, action, tap time). The phone applies it through `SessionTransitions.apply` at the tap instant, then reconciles to the present, so delivery delay does not move a deadline. A tap more than five seconds in the future is clamped to arrival; an id already applied is dropped.
+- **Fed, not synced.** The phone publishes the snapshot, the active preset and the movement names as the WatchConnectivity application context on launch, on every session change and when the wrist becomes reachable. It also returns the post-transition session in the reply to every tap, and falls back to a direct message when the system refuses the context update (a stale `isWatchAppInstalled` state does this even while taps arrive). The newest value replaces the previous one. An unstartable plan publishes nothing, and the wrist reads `NO SESSION` / `OPEN RESTLESS ON YOUR PHONE` with no control.
+- **Display-only reconciliation.** A published rest or work deadline that passed while the wrist was down selects the phase to show; the result is never sent back and never counts as a completed set.
+- **A tap that cannot be delivered is lost.** There is no queue: the wrist shows `NOT SENT · TRY AGAIN` and leaves its screen unchanged. A force-quit phone cannot be woken.
+- **No alert of its own.** The wrist plays no haptic, sound or notification for a deadline and requests no notification permission. It is the phone's one haptic or one mirrored local notification. Tapping that notification opens the watch app on the current phase and performs no action.
+- **No runtime session.** No `HKWorkoutSession`, no extended runtime session, no standalone watch session, no complication or Smart Stack widget, no countdown notifications, no HealthKit. The target compiles only `WorkoutPreset`, `WorkoutBlock`, `SessionSnapshot`, `Theme` and `WatchRemote` from `Shared/`; `RestlessActivity` is excluded because ActivityKit is unavailable on watchOS.
+
 ## Completion alerts
 
 A rest or timed work countdown that reaches zero raises exactly one alert. It
@@ -359,6 +372,8 @@ Blocks and movements: `BLOCKS`, `ROUNDS`, `SETS PER ROUND`, `SETS EACH`, `MOVEME
 Navigation and editing: `TIMER`, `SESSIONS`, `WORKOUTS`, `ACTIVE`, `ACTIVE SESSION`, `USE THIS SESSION`, `RESTART SESSION`, `EDITING THIS SESSION RESTARTS IT.`, `ADD A MOVEMENT TO SAVE THIS SESSION.`, `EDIT`, `ADD BLOCK`, `ADD FROM LIBRARY`, `DELETE BLOCK`, `ADD MOVEMENT`, `TO ADD`, `REMOVE FROM BLOCK`, `TAP AGAIN TO DELETE`, `DELETE SESSION`, `EDITING LOCKED DURING A SET OR REST · SWITCH TO TIMER TO SET DONE OR PAUSE`, `Untitled`, `Untitled block`, `Untitled movement`, `New session`.
 
 The grip is an icon, not copy. VoiceOver reads the row actions as `Move up`, `Move down`, and `Delete`; those labels never appear on screen. The row delete, DELETE SESSION, DELETE BLOCK, and REMOVE FROM BLOCK use the destructive red; `TAP AGAIN TO DELETE` is the armed state.
+
+Watch remote: `NO SESSION`, `OPEN RESTLESS ON YOUR PHONE`, `NOT SENT · TRY AGAIN`.
 
 Retired words: `PART`, `PARTS`, `PART n OF m`, `SETS PER MOVEMENT`, `SETS IN THIS PART`, `ADD PART`, `DELETE PART`, `Untitled part`, `New part`, `NEW BLOCK`, `EDITING LOCKED DURING REST · SWITCH TO TIMER TO PAUSE OR SKIP`, the old arrangement labels, and the recording vocabulary: `REPS`, `WATCH ARMED`, `WATCH UNAVAILABLE`, `PROFILE`, `NO PROFILE`, `RECORD MOVEMENT`, `RE-RECORD ON WATCH`, `START RECORDING`, `TRACE RECEIVED`.
 
