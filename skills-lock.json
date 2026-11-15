@@ -27,129 +27,136 @@
     },
     "argent-android-emulator-setup": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-android-emulator-setup/SKILL.md",
-      "computedHash": "6fa124aaf45d2accd3d8767ea23349ef587c77ec83d09081d6c58e96355a8ca4"
+      "computedHash": "f5026f7ef1bcab59f80fd490b23d518e60cbbb148cab07908c5cc7a521d8095f"
     },
     "argent-create-e2e": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-create-e2e/SKILL.md",
-      "computedHash": "1268361afa73e8ad1676dd0bf5cb10efaa6a430a074f0f5c5b4f8cc396421ac4"
+      "computedHash": "8be94b966452d3dbd536071bd262815d833d1a181d713a61632b458043025d38"
     },
     "argent-device-interact": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-device-interact/SKILL.md",
-      "computedHash": "cde2c9815cb48d35a8f6f23de498dcade811cac78f81adcc900d143ef362c309"
+      "computedHash": "f929e09b51449e0b51a545856a53ca423abb93b6b6943de317298c110db0fb2c"
     },
     "argent-ios-device-interact": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-ios-device-interact/SKILL.md",
-      "computedHash": "a461cc06e0c271a63ff04102395acd33d597925674f2bb42046fc17d44f75b8a"
+      "computedHash": "824f5702157ad609b5c49f8a78ee07b81de7169944c0eea0f0fa4e859ca1fc5c"
     },
     "argent-ios-device-setup": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-ios-device-setup/SKILL.md",
-      "computedHash": "124d617cb9f01e4c331a3ac55d456e4be2d174496b91f9d97a5e77dd659d9377"
+      "computedHash": "9387b594b7a21de94142d2b4135f6234518684f6f8499d4709671a93e961de09"
     },
     "argent-ios-simulator-setup": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-ios-simulator-setup/SKILL.md",
-      "computedHash": "dab55a17d90dc9f364c87bd37b6f1826bdf7d2ef783fa7e020939953baa1cdfa"
+      "computedHash": "3e29bcb2919b46634409351eb43296d736cd93f98e13ee38c7f92759fe41a301"
     },
     "argent-lens": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-lens/SKILL.md",
-      "computedHash": "7e4a3f9f6f521f86af522316a9eaaf53417ad0692fa9e87c6b3e2126bcb5b3f1"
+      "computedHash": "e98830e76a1b3232c3a2634f785257b38a5d8c7dd0a4aa4694d0a415445165f4"
+    },
+    "argent-macos-app-interact": {
+      "source": "software-mansion/argent",
+      "ref": "v0.33.0",
+      "sourceType": "github",
+      "skillPath": "packages/skills/skills/argent-macos-app-interact/SKILL.md",
+      "computedHash": "e8cea2ea8aaa78bdb341a7ab30888173841d623fe65e53e11093f20a3a3656ae"
     },
     "argent-metro-debugger": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-metro-debugger/SKILL.md",
-      "computedHash": "e0e49e7e67c31ebeb517aa86ca388205548dc79e271e88bd14316c9c3f93dc52"
+      "computedHash": "2e97e3c095f5dea4e52e56d3b231b44be7204df5ee04a8ac1925d245b7c64823"
     },
     "argent-native-profiler": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-native-profiler/SKILL.md",
-      "computedHash": "2b6b274373c4fb2374de423ff1133d9983a7cd4135a7248b03a5561e80dae611"
+      "computedHash": "83995b38c30015c851a3187be0372d06aa12eeca386c8ea9c3f8ebf05760404b"
     },
     "argent-qa-e2e": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-qa-e2e/SKILL.md",
-      "computedHash": "6c50939c63bef3083bf898576cf1bb11ab9021b3b5443593e1a51427631e0bb0"
+      "computedHash": "949165e3a6be8665079ab52e613bb5e1f2a0d16db392170ab054aec8e8b413ed"
     },
     "argent-react-native-app-workflow": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-react-native-app-workflow/SKILL.md",
-      "computedHash": "e83aae056a295a22b90b44fbc2b02eaf8f4bd0675a557e628de2e3ee29c54bd1"
+      "computedHash": "96db53c9b15e8e9147855e66acea5ffbcf2c4c8f7ff7092793771aeb37429ec7"
     },
     "argent-react-native-optimization": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-react-native-optimization/SKILL.md",
-      "computedHash": "93f8b70aa7f4adf4c2ff3286b9182ca40895f1744dda7f9b9cc16f3162f69a2a"
+      "computedHash": "cdd6db8f0b7bef05977fe2b91e41a885bebc3f831e1fdb5eb49b8c3cfba3e136"
     },
     "argent-react-native-profiler": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-react-native-profiler/SKILL.md",
-      "computedHash": "0558a067c2a64ffbbc6cf32c7c0502d1e5352d9976fe6c08595dd8ff50e4cee5"
+      "computedHash": "6a6990f82637b4da3a8646c97637450686f7e8d3e60eda9c46a002bebd9cfdea"
     },
     "argent-screen-recording": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-screen-recording/SKILL.md",
-      "computedHash": "f3df21f4a11d357e689e191e48412d6159713db5837b3a6cfab893eb3d586864"
+      "computedHash": "c0e23ce7d7e6e053bff072734b597ac00ccd126812e0c05f2b66de1542c386b9"
     },
     "argent-screenshot-diff": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-screenshot-diff/SKILL.md",
-      "computedHash": "51578d0ccd500ed42efdb554a27a853ef8b6b11df70ed1de151c54f2a9dd78a1"
+      "computedHash": "457b5b6aa591cdf7f973bfa391a8a8a4b535c3765068ed1fd283400e4ebd74cc"
     },
     "argent-settings-permissions": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-settings-permissions/SKILL.md",
-      "computedHash": "ec24339ae9c6f12c3d205531047b84aa8954dc3a72019a39181228d9cb8b8220"
+      "computedHash": "afd4e84d3af7120b5a53b4288035f9f6376c99e1daef0cf690b74336b6fbf191"
     },
     "argent-test-ui-flow": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-test-ui-flow/SKILL.md",
-      "computedHash": "549daeb8417a5cdc6460b7e9ff2ee904e52f7b84304b416b32bcf7ed28180575"
+      "computedHash": "ee70371747f44b65d6043aae0dd486455b49f41e76aa75ca1f7a91197ded0071"
     },
     "argent-tv-interact": {
       "source": "software-mansion/argent",
-      "ref": "v0.32.0",
+      "ref": "v0.33.0",
       "sourceType": "github",
       "skillPath": "packages/skills/skills/argent-tv-interact/SKILL.md",
-      "computedHash": "7bb0b79d34aab37cf781cc5fa99d6720f25d269ff3e72213ff53b1feb7edf007"
+      "computedHash": "142bed9ebe65fb2304cd5e8822d3c8fafcdb6a677516fa88767729cdaf05abba"
     },
     "axiom-watchos": {
       "source": "charleswiltgen/axiom",

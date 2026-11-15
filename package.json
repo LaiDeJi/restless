@@ -9,6 +9,6 @@
   "keywords": [],
   "type": "commonjs",
   "devDependencies": {
-    "@swmansion/argent": "^0.32.0"
+    "@swmansion/argent": "^0.33.0"
   }
 }
