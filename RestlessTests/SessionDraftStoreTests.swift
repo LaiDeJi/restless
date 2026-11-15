@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test("Several rapid edits produce one commit")
 func rapidEditsCoalesce() async throws {
-    let store = SessionDraftStore(session: .chest, delay: .milliseconds(60))
+    let store = SessionDraftStore(session: .seeded, delay: .milliseconds(60))
     var commits: [WorkoutPreset] = []
     store.commit = { commits.append($0) }
 
@@ -26,7 +26,7 @@ func rapidEditsCoalesce() async throws {
 @MainActor
 @Test("flush commits immediately")
 func flushCommitsImmediately() {
-    let store = SessionDraftStore(session: .chest, delay: .seconds(10))
+    let store = SessionDraftStore(session: .seeded, delay: .seconds(10))
     var commits = 0
     store.commit = { _ in commits += 1 }
 
@@ -41,7 +41,7 @@ func flushCommitsImmediately() {
 @MainActor
 @Test("A flushed draft does not commit again when its timer would have fired")
 func cancelledDraftDoesNotCommit() async throws {
-    let store = SessionDraftStore(session: .chest, delay: .milliseconds(60))
+    let store = SessionDraftStore(session: .seeded, delay: .milliseconds(60))
     var commits = 0
     store.commit = { _ in commits += 1 }
 
@@ -56,7 +56,7 @@ func cancelledDraftDoesNotCommit() async throws {
 @MainActor
 @Test("Flushing a clean draft does nothing")
 func cleanFlushDoesNothing() {
-    let store = SessionDraftStore(session: .chest)
+    let store = SessionDraftStore(session: .seeded)
     var commits = 0
     store.commit = { _ in commits += 1 }
 
@@ -98,7 +98,7 @@ func moveMovementReorders() {
     let first = UUID()
     let second = UUID()
     let third = UUID()
-    let block = draftBlock("Chest", movementIDs: [first, second, third])
+    let block = draftBlock("Push", movementIDs: [first, second, third])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
     let firstID = block.movements[0].id
     let secondID = block.movements[1].id
@@ -114,7 +114,7 @@ func moveMovementReorders() {
 @MainActor
 @Test("A row delete removes the item and dirties the draft")
 func rowDeleteRemoves() {
-    let firstBlock = draftBlock("Chest", movementIDs: [UUID(), UUID()])
+    let firstBlock = draftBlock("Push", movementIDs: [UUID(), UUID()])
     let secondBlock = draftBlock("Arms", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "Two", blocks: [firstBlock, secondBlock]))
 
@@ -142,9 +142,9 @@ func lastItemGuard() {
 @MainActor
 @Test("Appending a movement leaves a one-round block at one")
 func appendMovementKeepsOneRound() {
-    let first = Movement(name: "Chest")
+    let first = Movement(name: "Push")
     let second = Movement(name: "Cable Fly")
-    let block = draftBlock("Chest", movementIDs: [first.id])
+    let block = draftBlock("Push", movementIDs: [first.id])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(store.appendMovement(second, toBlock: block.id, condition: .time, target: 10))
@@ -158,10 +158,10 @@ func appendMovementKeepsOneRound() {
 @MainActor
 @Test("Appending to a multi-movement block keeps its rounds")
 func appendMovementKeepsRounds() {
-    let first = Movement(name: "Chest")
+    let first = Movement(name: "Push")
     let second = Movement(name: "Curl")
     let third = Movement(name: "Pushdown")
-    var block = draftBlock("Chest", movementIDs: [first.id, second.id])
+    var block = draftBlock("Push", movementIDs: [first.id, second.id])
     block.rounds = 3
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
@@ -175,7 +175,7 @@ func appendMovementKeepsRounds() {
 @Test("Appending to a missing block changes nothing")
 func appendMovementMissingBlock() {
     let movement = Movement(name: "Cable Fly")
-    let block = draftBlock("Chest", movementIDs: [UUID()])
+    let block = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(!store.appendMovement(movement, toBlock: UUID(), condition: .time, target: 45))
@@ -196,7 +196,7 @@ private func addition(
 func appendMovementsBatchOrder() {
     let first = Movement(name: "Cable Fly")
     let second = Movement(name: "Bench Press")
-    let block = draftBlock("Chest", movementIDs: [])
+    let block = draftBlock("Push", movementIDs: [])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [block]),
         delay: .seconds(10)
@@ -220,7 +220,7 @@ func appendMovementsBatchOrder() {
 @MainActor
 @Test("A batch that brings an empty block to two movements keeps its one round")
 func appendMovementsKeepsEmptyBlockRounds() {
-    let block = draftBlock("Chest", movementIDs: [])
+    let block = draftBlock("Push", movementIDs: [])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(store.appendMovements(
@@ -234,7 +234,7 @@ func appendMovementsKeepsEmptyBlockRounds() {
 @MainActor
 @Test("A batch that brings a one-movement block to two movements keeps its one round")
 func appendMovementsKeepsSingleMovementBlockRounds() {
-    let block = draftBlock("Chest", movementIDs: [UUID()])
+    let block = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(store.appendMovements([addition("Cable Fly")], toBlock: block.id))
@@ -245,7 +245,7 @@ func appendMovementsKeepsSingleMovementBlockRounds() {
 @MainActor
 @Test("A batch on a multi-movement block keeps its rounds")
 func appendMovementsKeepsMultiMovementRounds() {
-    var block = draftBlock("Chest", movementIDs: [UUID(), UUID()])
+    var block = draftBlock("Push", movementIDs: [UUID(), UUID()])
     block.rounds = 3
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
@@ -257,7 +257,7 @@ func appendMovementsKeepsMultiMovementRounds() {
 @MainActor
 @Test("An empty batch changes nothing")
 func appendEmptyBatch() {
-    let block = draftBlock("Chest", movementIDs: [UUID()])
+    let block = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(!store.appendMovements([], toBlock: block.id))
@@ -268,7 +268,7 @@ func appendEmptyBatch() {
 @MainActor
 @Test("A batch for a missing block changes nothing")
 func appendBatchMissingBlock() {
-    let block = draftBlock("Chest", movementIDs: [UUID()])
+    let block = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [block]))
 
     #expect(!store.appendMovements([addition("Cable Fly")], toBlock: UUID()))
@@ -279,7 +279,7 @@ func appendBatchMissingBlock() {
 @MainActor
 @Test("Appending a block keeps its settings and leaves the others untouched")
 func appendBlockKeepsSettings() {
-    let first = draftBlock("Chest", movementIDs: [UUID()])
+    let first = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "Two", blocks: [first]),
         delay: .seconds(10)
@@ -314,7 +314,7 @@ func appendBlockKeepsSettings() {
 @MainActor
 @Test("A two-movement block appended with one round keeps its round")
 func appendBlockKeepsOneRound() {
-    let first = draftBlock("Chest", movementIDs: [UUID()])
+    let first = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [first]))
     let block = draftBlock("Arms", movementIDs: [UUID(), UUID()])
 
@@ -326,7 +326,7 @@ func appendBlockKeepsOneRound() {
 @MainActor
 @Test("A block with no movements cannot be appended")
 func appendEmptyBlock() {
-    let first = draftBlock("Chest", movementIDs: [UUID()])
+    let first = draftBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [first]))
     let empty = draftBlock("Empty", movementIDs: [])
 
@@ -351,7 +351,7 @@ private func restedBlock(name: String, movementID: UUID = UUID()) -> WorkoutBloc
 @MainActor
 @Test("A staged block starts from the documented defaults and inherits the previous rests")
 func stagedBlockDefaults() throws {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     var commits = 0
     store.commit = { _ in commits += 1 }
@@ -376,7 +376,7 @@ func stagedBlockDefaults() throws {
 @MainActor
 @Test("Staged edits and appends never dirty the draft or commit a save")
 func stagedEditsStayOutOfTheSession() async throws {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [previous]),
         delay: .milliseconds(60)
@@ -414,7 +414,7 @@ func stagedEditsStayOutOfTheSession() async throws {
 @MainActor
 @Test("DONE appends a staged block with its edited values and flushes once")
 func commitStagedBlock() throws {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [previous]),
         delay: .seconds(10)
@@ -457,7 +457,7 @@ func commitStagedBlock() throws {
 @MainActor
 @Test("A staged block with no movements cannot be committed")
 func stagedBlockNeedsAMovement() {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     store.beginStagedBlock(after: previous)
 
@@ -470,7 +470,7 @@ func stagedBlockNeedsAMovement() {
 @MainActor
 @Test("Discarding a staged block leaves the session clean")
 func discardStagedBlock() {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     store.beginStagedBlock(after: previous)
     store.editBlock(.staged) { $0.name = "Arms" }
@@ -485,7 +485,7 @@ func discardStagedBlock() {
 @MainActor
 @Test("A staged movement edit and removal leave the session unchanged")
 func stagedMovementEditsStayOutOfTheSession() throws {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     store.beginStagedBlock(after: previous)
     #expect(store.appendMovements([addition("Curl"), addition("Pushdown")], to: .staged))
@@ -512,7 +512,7 @@ func stagedMovementEditsStayOutOfTheSession() throws {
 @MainActor
 @Test("A staged block that gains a second movement commits at one round")
 func stagedBlockKeepsOneRound() {
-    let previous = restedBlock(name: "Chest")
+    let previous = restedBlock(name: "Push")
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [previous]))
     store.beginStagedBlock(after: previous)
     #expect(store.appendMovements([addition("Curl"), addition("Pushdown")], to: .staged))

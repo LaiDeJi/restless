@@ -6,9 +6,9 @@
 # weekday; a new round is offered only today or later. This is a fragment: it
 # restarts the app, waits with `tool: await-ui-element` steps, and taps by
 # coordinate. Same-day fragment: it assumes the calendar has no exceptions,
-# starts its week on Sunday, and SESSIONS holds Chest, Arms and Legs in that
-# order. It normalizes the gap and the anchor itself.
-executionPrerequisite: "Restless is installed; the calendar starts its week on Sunday and has no exceptions; SESSIONS is Chest, Arms, Legs."
+# starts its week on Sunday, and SESSIONS holds the neutral seed. Its setup adds
+# two more sessions, so the rotation is Session 1, New session, New session 2.
+executionPrerequisite: "Restless is installed with the neutral seed; the calendar starts its week on Sunday and has no exceptions."
 steps:
   - tool: restart-app
     args:
@@ -24,6 +24,107 @@ steps:
         text: START SESSION
       timeoutMs: 8000
   - wait: 800
+  # The seed holds Session 1. Build the two sessions the rotation needs: a copy
+  # of the schedule plus the library movement, saved under its default name.
+  - tap:
+      x: 0.5
+      y: 0.941
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: WORKOUTS
+      timeoutMs: 6000
+  - tap:
+      x: 0.89
+      y: 0.125
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: USE THIS SESSION
+      timeoutMs: 6000
+  - tap:
+      x: 0.4
+      y: 0.412
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ADD FROM LIBRARY
+      timeoutMs: 6000
+  - tap:
+      x: 0.5
+      y: 0.701
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 MOVEMENT
+      timeoutMs: 5000
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: USE THIS SESSION
+      timeoutMs: 5000
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session
+      timeoutMs: 6000
+  - tap:
+      x: 0.89
+      y: 0.125
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: USE THIS SESSION
+      timeoutMs: 6000
+  - tap:
+      x: 0.4
+      y: 0.412
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: ADD FROM LIBRARY
+      timeoutMs: 6000
+  - tap:
+      x: 0.5
+      y: 0.701
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: 1 MOVEMENT
+      timeoutMs: 5000
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: USE THIS SESSION
+      timeoutMs: 5000
+  - tap:
+      x: 0.848
+      y: 0.103
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector:
+        text: New session 2
+      timeoutMs: 6000
   - tap:
       x: 0.717
       y: 0.941
@@ -64,7 +165,7 @@ steps:
       x: 0.50
       y: 0.30
   - wait: 600
-  # Tomorrow is Arms. Change it to Chest: the day after stays Legs.
+  # Tomorrow is New session. Change it to Session 1: the day after stays New session 2.
   - tap:
       x: 0.7575
       y: 0.3965
@@ -103,10 +204,10 @@ steps:
     args:
       condition: visible
       selector:
-        text: November 14, Legs planned
+        text: November 14, New session 2 planned
       timeoutMs: 6000
   - wait: 500
-  # Picking the scheduled Arms resets the change.
+  # Picking the scheduled New session resets the change.
   - tap:
       x: 0.7575
       y: 0.3965
@@ -130,7 +231,7 @@ steps:
         text: CHANGED
       timeoutMs: 5000
   - wait: 500
-  # Skip Arms; the next date keeps Legs. Unskip restores Arms.
+  # Skip New session; the next date keeps New session 2. Unskip restores New session.
   - tap:
       x: 0.50
       y: 0.829
@@ -160,7 +261,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: November 14, Legs planned
+        text: November 14, New session 2 planned
       timeoutMs: 6000
   - wait: 500
   - tap:
@@ -184,7 +285,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: November 13, Arms planned
+        text: November 13, New session planned
       timeoutMs: 6000
   - wait: 500
   # A gap of one makes tomorrow a rest day; a round there makes it session 1.
@@ -225,7 +326,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: November 13, Chest planned
+        text: November 13, Session 1 planned
       timeoutMs: 6000
   - tool: await-ui-element
     args:
@@ -237,7 +338,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: November 15, Arms planned
+        text: November 15, New session planned
       timeoutMs: 6000
   - wait: 500
   # A past date offers no round, and a past record stays read-only.

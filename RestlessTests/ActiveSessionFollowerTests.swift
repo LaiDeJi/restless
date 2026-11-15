@@ -32,7 +32,7 @@ private struct FollowerFixture {
     let storage: ActivePresetStorage
     let defaults: UserDefaults
     let suite: String
-    let chest: WorkoutPreset
+    let push: WorkoutPreset
     let arms: WorkoutPreset
 
     init() throws {
@@ -46,13 +46,13 @@ private struct FollowerFixture {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = container.mainContext
-        let chest = session(id: UUID(), name: "Chest")
+        let push = session(id: UUID(), name: "Push")
         let arms = session(id: UUID(), name: "Arms")
-        let chestRecord = PresetRecord(chest)
-        chestRecord.sortIndex = 0
+        let pushRecord = PresetRecord(push)
+        pushRecord.sortIndex = 0
         let armsRecord = PresetRecord(arms)
         armsRecord.sortIndex = 1
-        context.insert(chestRecord)
+        context.insert(pushRecord)
         context.insert(armsRecord)
         try context.save()
 
@@ -60,7 +60,7 @@ private struct FollowerFixture {
         self.context = context
         self.suite = suite
         self.defaults = defaults
-        self.chest = chest
+        self.push = push
         self.arms = arms
         self.storage = ActivePresetStorage(defaults: defaults)
         self.calendarSettings = CalendarSettingsModel(
@@ -76,15 +76,15 @@ private struct FollowerFixture {
 }
 
 @MainActor
-@Test("Tomorrow's plan replaces an idle Chest")
-func tomorrowsPlanReplacesIdleChest() throws {
+@Test("Tomorrow's plan replaces an idle Push")
+func tomorrowsPlanReplacesIdlePush() throws {
     SessionStore.clear()
     let fixture = try FollowerFixture()
     defer { fixture.cleanUp() }
 
     fixture.calendarSettings.initializeRotation(today: dayOne)
-    fixture.storage.activate(id: fixture.chest.id, on: dayOne)
-    let engine = SessionEngine(preset: fixture.chest)
+    fixture.storage.activate(id: fixture.push.id, on: dayOne)
+    let engine = SessionEngine(preset: fixture.push)
 
     let decision = ActiveSessionFollower.follow(
         today: dayTwo,
@@ -136,8 +136,8 @@ func completedSetIsNotReplaced() throws {
     defer { fixture.cleanUp() }
 
     fixture.calendarSettings.initializeRotation(today: dayOne)
-    fixture.storage.activate(id: fixture.chest.id, on: dayOne)
-    let engine = SessionEngine(preset: fixture.chest)
+    fixture.storage.activate(id: fixture.push.id, on: dayOne)
+    let engine = SessionEngine(preset: fixture.push)
     engine.perform(.startSession)
     engine.perform(.setDone)
     #expect(engine.snapshot.doneSets == 1)
@@ -152,10 +152,10 @@ func completedSetIsNotReplaced() throws {
     )
 
     #expect(decision == .keep)
-    #expect(engine.snapshot.preset.id == fixture.chest.id)
+    #expect(engine.snapshot.preset.id == fixture.push.id)
     #expect(engine.snapshot.doneSets == 1)
     #expect(engine.snapshot.phase == .resting)
-    #expect(fixture.storage.id == fixture.chest.id)
+    #expect(fixture.storage.id == fixture.push.id)
     #expect(fixture.storage.marks(dayOne, calendar: calendar))
 }
 
@@ -167,8 +167,8 @@ func samePlanRecordsDay() throws {
     defer { fixture.cleanUp() }
 
     fixture.calendarSettings.initializeRotation(today: dayTwo)
-    fixture.storage.id = fixture.chest.id
-    let engine = SessionEngine(preset: fixture.chest)
+    fixture.storage.id = fixture.push.id
+    let engine = SessionEngine(preset: fixture.push)
 
     let decision = ActiveSessionFollower.follow(
         today: dayTwo,
@@ -180,8 +180,8 @@ func samePlanRecordsDay() throws {
     )
 
     #expect(decision == .recordDay)
-    #expect(engine.snapshot.preset.id == fixture.chest.id)
+    #expect(engine.snapshot.preset.id == fixture.push.id)
     #expect(engine.snapshot.phase == .notStarted)
-    #expect(fixture.storage.id == fixture.chest.id)
+    #expect(fixture.storage.id == fixture.push.id)
     #expect(fixture.storage.marks(dayTwo, calendar: calendar))
 }

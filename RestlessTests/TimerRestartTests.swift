@@ -29,7 +29,7 @@ private let pair = WorkoutPreset(
             rounds: 1,
             setsPerRound: 2,
             movements: [BlockMovement(movementId: benchID, endCondition: .manual)],
-            name: "Chest"
+            name: "Push"
         ),
         block(
             rounds: 1,

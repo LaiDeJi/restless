@@ -26,9 +26,9 @@ private func addition(
 @MainActor
 @Test("A library tap appends one MANUAL movement without a target and flushes once")
 func singleLibraryAddToSavedBlock() {
-    let existing = Movement(name: "Chest")
+    let existing = Movement(name: "Push")
     let added = Movement(name: "Bench press")
-    let saved = block(name: "Chest", movementIDs: [existing.id])
+    let saved = block(name: "Push", movementIDs: [existing.id])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [saved]),
         delay: .seconds(10)
@@ -49,9 +49,9 @@ func singleLibraryAddToSavedBlock() {
 @MainActor
 @Test("A library tap leaves a staged block out of the session until DONE")
 func singleLibraryAddToStagedBlock() {
-    let existing = Movement(name: "Chest")
+    let existing = Movement(name: "Push")
     let added = Movement(name: "Bench press")
-    let saved = block(name: "Chest", movementIDs: [existing.id])
+    let saved = block(name: "Push", movementIDs: [existing.id])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [saved]),
         delay: .seconds(10)
@@ -75,9 +75,9 @@ func singleLibraryAddToStagedBlock() {
 @MainActor
 @Test("A second library movement leaves the rounds alone")
 func secondLibraryAddKeepsRounds() {
-    let existing = Movement(name: "Chest")
+    let existing = Movement(name: "Push")
     let added = Movement(name: "Bench press")
-    let saved = block(name: "Chest", movementIDs: [existing.id], rounds: 1)
+    let saved = block(name: "Push", movementIDs: [existing.id], rounds: 1)
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [saved]))
 
     #expect(store.appendMovements([addition(added)], toBlock: saved.id))
@@ -89,10 +89,10 @@ func secondLibraryAddKeepsRounds() {
 @MainActor
 @Test("The single append clamps a manual target away and a time target up")
 func libraryAddClampsTargets() {
-    let existing = Movement(name: "Chest")
+    let existing = Movement(name: "Push")
     let manual = Movement(name: "Bench press")
     let timed = Movement(name: "Curl")
-    let saved = block(name: "Chest", movementIDs: [existing.id])
+    let saved = block(name: "Push", movementIDs: [existing.id])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [saved]))
 
     #expect(store.appendMovements([
@@ -107,8 +107,8 @@ func libraryAddClampsTargets() {
 @MainActor
 @Test("An empty single append changes nothing and does not flush")
 func emptyLibraryAdd() {
-    let existing = Movement(name: "Chest")
-    let saved = block(name: "Chest", movementIDs: [existing.id])
+    let existing = Movement(name: "Push")
+    let saved = block(name: "Push", movementIDs: [existing.id])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [saved]))
     var commits = 0
     store.commit = { _ in commits += 1 }
@@ -125,7 +125,7 @@ func emptyLibraryAdd() {
 @Test("A single append to a missing block or without a staged block is rejected")
 func libraryAddInvalidTarget() {
     let added = Movement(name: "Bench press")
-    let saved = block(name: "Chest", movementIDs: [UUID()])
+    let saved = block(name: "Push", movementIDs: [UUID()])
     let store = SessionDraftStore(session: WorkoutPreset(name: "One", blocks: [saved]))
 
     #expect(!store.appendMovements([addition(added)], toBlock: UUID()))

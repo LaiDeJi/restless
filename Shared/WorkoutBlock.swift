@@ -1,7 +1,6 @@
 import Foundation
 
-/// How a set ends. Only a phone countdown or a manual tap; the removed `reps`
-/// condition decodes as `manual` so older plans keep opening.
+/// How a set ends: a phone countdown or a manual tap.
 enum EndCondition: String, Hashable, Sendable, CaseIterable, Codable {
     case time
     case manual
@@ -33,8 +32,8 @@ enum EndCondition: String, Hashable, Sendable, CaseIterable, Codable {
 /// A reusable library movement: a name and nothing else. The end condition and
 /// target belong to the block that uses it, not to the library entry.
 struct Movement: Codable, Hashable, Identifiable, Sendable {
-    /// Stable id of the seeded `Chest` movement, shared by the seeded session.
-    static let chestID = UUID(uuidString: "00000000-0000-0000-0000-00000000C4E5")!
+    /// Stable id of the seeded `Movement 1`, shared by the seeded session.
+    static let seededID = UUID(uuidString: "00000000-0000-0000-0000-000000005EED")!
 
     var id: UUID
     var name: String
@@ -47,10 +46,7 @@ struct Movement: Codable, Hashable, Identifiable, Sendable {
         self.name = name
     }
 
-    static let chest = Movement(
-        id: chestID,
-        name: "Chest"
-    )
+    static let seeded = Movement(id: seededID, name: "Movement 1")
 
     func clamped() -> Movement {
         var copy = self
@@ -142,23 +138,18 @@ struct WorkoutBlock: Codable, Hashable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, rounds, setsPerRound, setRest, roundRest, movements
-        // Legacy keys, read only. A plan-level decode uses `StoredBlock` so a
-        // straight multi-movement block can split.
-        case kind, count
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Untitled block"
-        let legacyCount = try container.decodeIfPresent(Int.self, forKey: .count)
         rounds = max(
             try container.decodeIfPresent(Int.self, forKey: .rounds) ?? WorkoutBlock.defaultRounds,
             1
         )
         setsPerRound = max(
             try container.decodeIfPresent(Int.self, forKey: .setsPerRound)
-                ?? legacyCount
                 ?? WorkoutBlock.defaultSetsPerRound,
             1
         )
@@ -235,125 +226,9 @@ struct WorkoutBlock: Codable, Hashable, Identifiable, Sendable {
             setRest: WorkoutBlock.defaultSetRest,
             roundRest: WorkoutBlock.defaultRoundRest,
             movements: [
-                BlockMovement(movementId: Movement.chestID, endCondition: .manual, target: nil)
+                BlockMovement(movementId: Movement.seededID, endCondition: .manual, target: nil)
             ]
         )
-    }
-}
-
-// MARK: - Stored shape and migration
-
-/// The persisted block shape, new or legacy. `WorkoutBlock` writes only
-/// `rounds` and `setsPerRound`; this type also reads the old `kind`/`count`
-/// pair so a stored plan can be migrated at the plan boundary, where a straight
-/// multi-movement block can split into several blocks.
-struct StoredBlock: Decodable, Sendable {
-    enum Kind: String, Decodable, Sendable {
-        case straight
-        case circuit
-    }
-
-    var id: UUID?
-    var name: String?
-    var rounds: Int?
-    var setsPerRound: Int?
-    var kind: Kind?
-    var count: Int?
-    var setRest: Int?
-    var roundRest: Int?
-    var movements: [BlockMovement]?
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, rounds, setsPerRound, kind, count, setRest, roundRest, movements
-    }
-
-    /// Emits one or more blocks in the current shape.
-    func migratedBlocks() -> [WorkoutBlock] {
-        let movements = self.movements ?? []
-        if rounds != nil || setsPerRound != nil {
-            return [
-                block(
-                    rounds: rounds ?? WorkoutBlock.defaultRounds,
-                    setsPerRound: setsPerRound ?? count ?? WorkoutBlock.defaultSetsPerRound,
-                    movements: movements
-                )
-            ]
-        }
-
-        switch kind {
-        case .circuit:
-            return [circuitBlock(movements)]
-        case .straight, nil:
-            if kind == .straight, movements.count > 1 {
-                let storedID = id
-                return movements.enumerated().map { index, movement in
-                    block(
-                        id: index == 0 ? storedID : UUID(),
-                        rounds: 1,
-                        setsPerRound: count ?? WorkoutBlock.defaultSetsPerRound,
-                        movements: [movement]
-                    )
-                }
-            }
-            return [
-                block(
-                    rounds: 1,
-                    setsPerRound: count ?? WorkoutBlock.defaultSetsPerRound,
-                    movements: movements
-                )
-            ]
-        }
-    }
-
-    private func circuitBlock(_ movements: [BlockMovement]) -> WorkoutBlock {
-        let runs = Self.adjacentRuns(movements)
-        let lengths = Set(runs.map(\.count))
-        guard runs.count < movements.count, lengths.count == 1, let perRound = lengths.first else {
-            return block(
-                rounds: count ?? WorkoutBlock.defaultRounds,
-                setsPerRound: 1,
-                movements: movements
-            )
-        }
-        return block(
-            rounds: count ?? WorkoutBlock.defaultRounds,
-            setsPerRound: perRound,
-            movements: runs.compactMap(\.first)
-        )
-    }
-
-    private func block(
-        id: UUID? = nil,
-        rounds: Int,
-        setsPerRound: Int,
-        movements: [BlockMovement]
-    ) -> WorkoutBlock {
-        WorkoutBlock(
-            id: id ?? self.id ?? UUID(),
-            name: name ?? "Untitled block",
-            rounds: max(rounds, 1),
-            setsPerRound: max(setsPerRound, 1),
-            setRest: setRest ?? WorkoutBlock.defaultSetRest,
-            roundRest: roundRest ?? WorkoutBlock.defaultRoundRest,
-            movements: movements
-        )
-    }
-
-    /// Groups adjacent movements that match on library movement, end condition,
-    /// and target. Non-adjacent or differing rows stay separate.
-    private static func adjacentRuns(_ movements: [BlockMovement]) -> [[BlockMovement]] {
-        var runs: [[BlockMovement]] = []
-        for movement in movements {
-            if let last = runs.last?.last,
-               last.movementId == movement.movementId,
-               last.endCondition == movement.endCondition,
-               last.target == movement.target {
-                runs[runs.count - 1].append(movement)
-            } else {
-                runs.append([movement])
-            }
-        }
-        return runs
     }
 }
 

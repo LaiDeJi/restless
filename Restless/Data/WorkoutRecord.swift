@@ -48,9 +48,9 @@ final class WorkoutRecord {
     /// plan, which `preset` turns into the standard block.
     var blocks: [WorkoutBlock] {
         guard let blocksData,
-              let stored = try? JSONDecoder().decode([StoredBlock].self, from: blocksData)
+              let decoded = try? JSONDecoder().decode([WorkoutBlock].self, from: blocksData)
         else { return [] }
-        return stored.flatMap { $0.migratedBlocks() }.compactMap { $0.clamped() }
+        return decoded.compactMap { $0.clamped() }
     }
 
     /// The day sheet's read-only session, built from the record alone.

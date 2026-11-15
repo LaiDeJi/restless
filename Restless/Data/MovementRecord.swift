@@ -1,32 +1,17 @@
 import Foundation
 import SwiftData
 
-/// A reusable movement in the library. The legacy muscle-group, profile and
-/// default-condition columns are kept for store compatibility; only the name is
-/// read or written.
+/// A reusable movement in the library: a name. The end condition and target
+/// belong to a block that uses it, not to the library entry.
 @Model
 final class MovementRecord {
     var id: UUID
     var name: String
-    var group: String
-    var axisRaw: String?
-    var rise: Double?
-    var fall: Double?
-    var minPeriod: Double?
-    var defaultConditionRaw: String
-    var defaultTarget: Int?
     var createdAt: Date
 
     init(_ movement: Movement) {
         id = movement.id
         name = movement.name
-        group = ""
-        axisRaw = nil
-        rise = nil
-        fall = nil
-        minPeriod = nil
-        defaultConditionRaw = EndCondition.manual.rawValue
-        defaultTarget = nil
         createdAt = .now
     }
 
@@ -53,10 +38,10 @@ enum MovementRepository {
     static func seedIfNeeded(in context: ModelContext) -> [Movement] {
         let records = fetchAll(context)
         guard records.isEmpty else { return records.map(\.movement) }
-        let record = MovementRecord(.chest)
-        context.insert(record)
+        let movement = Movement.seeded
+        context.insert(MovementRecord(movement))
         try? context.save()
-        return [.chest]
+        return [movement]
     }
 
     static func fetchAll(_ context: ModelContext) -> [MovementRecord] {
@@ -71,25 +56,6 @@ enum MovementRepository {
     /// Names for the Live Activity attributes, which carry no library.
     static func names(in context: ModelContext) -> [UUID: String] {
         Dictionary(fetchAll(context).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    /// Creates a library entry for every block movement that has no record yet.
-    /// This is the bridge for plans migrated from parts, whose movements carry
-    /// only the old part name.
-    static func ensureLibrary(for presets: [PresetRecord], in context: ModelContext) {
-        var known = Set(fetchAll(context).map(\.id))
-        for preset in presets {
-            for block in preset.blocks {
-                for blockMovement in block.movements where !known.contains(blockMovement.movementId) {
-                    let movement = Movement(
-                        id: blockMovement.movementId,
-                        name: block.name
-                    ).clamped()
-                    context.insert(MovementRecord(movement))
-                    known.insert(movement.id)
-                }
-            }
-        }
     }
 
     @discardableResult

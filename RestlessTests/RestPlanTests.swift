@@ -96,26 +96,31 @@ private func rest(_ kind: RestKind, _ duration: Int, _ transition: RestTransitio
     RestOption(kind: kind, duration: duration, transition: transition)
 }
 
-@Test("Default preset is one Chest block of rounds 1 and 9 sets per round with 60/120 rest")
+@Test("The seeded plan is one neutral block of nine sets with 480 seconds of rest")
 func defaultPresetShape() {
-    let chest = WorkoutPreset.chest
-    #expect(chest.blocks.count == 1)
-    #expect(chest.name == "Chest")
-    let block = chest.blocks[0]
-    #expect(block.name == "Chest")
+    let seeded = WorkoutPreset.seeded
+    #expect(seeded.name == "Session 1")
+    #expect(seeded.blocks.count == 1)
+    let block = seeded.blocks[0]
+    #expect(block.name == "Block 1")
     #expect(block.rounds == 1)
     #expect(block.setsPerRound == 9)
     #expect(block.setRest == 60)
     #expect(block.roundRest == 120)
     #expect(block.movements.count == 1)
-    #expect(block.movements[0].movementId == Movement.chestID)
+    #expect(block.movements[0].movementId == Movement.seededID)
     #expect(block.movements[0].endCondition == .manual)
-    #expect(chest.totalSets == 9)
+    #expect(seeded.totalSets == 9)
+    #expect(seeded.totalRest == 480)
 }
 
-@Test("The 9-set fallback has 8 set rests and no round rest")
+@Test("Nine sets have 8 set rests and no round rest; the fallback stays three sets")
 func fallbackTotalRest() {
-    #expect(WorkoutPreset.chest.totalRest == 480)
+    let nineSets = WorkoutPreset(
+        name: "Nine",
+        blocks: [block(rounds: 1, setsPerRound: 9, setRest: 60, roundRest: 120, movements: [benchID], name: "Block")]
+    )
+    #expect(nineSets.totalRest == 480)
     #expect(WorkoutBlock.fallback.rounds == 1)
     #expect(WorkoutBlock.fallback.setsPerRound == 3)
 }
@@ -362,6 +367,49 @@ func blockMovementCodableDefaults() throws {
     let decoded = try JSONDecoder().decode(BlockMovement.self, from: Data(json.utf8))
     #expect(decoded.endCondition == .manual)
     #expect(decoded.target == nil)
+}
+
+@Test("An unknown stored end condition decodes as MANUAL")
+func unknownConditionDecodesAsManual() throws {
+    let json = #"""
+    {"movementId":"00000000-0000-0000-0000-00000000B3A1","endCondition":"tempo","target":30}
+    """#
+    let movement = try JSONDecoder().decode(BlockMovement.self, from: Data(json.utf8))
+    #expect(movement.endCondition == .manual)
+    #expect(movement.target == nil)
+}
+
+@Test("Encoding writes only manual or time")
+func endConditionEncodesRawValue() throws {
+    let manual = try JSONEncoder().encode(BlockMovement(movementId: benchID, endCondition: .manual))
+    #expect(try #require(String(bytes: manual, encoding: .utf8)).contains("\"manual\""))
+    let timed = try JSONEncoder().encode(
+        BlockMovement(movementId: benchID, endCondition: .time, target: 45)
+    )
+    #expect(try #require(String(bytes: timed, encoding: .utf8)).contains("\"time\""))
+}
+
+@Test("A current preset round-trips through JSON")
+func presetRoundTrip() throws {
+    let preset = WorkoutPreset(
+        name: "Arms",
+        blocks: [
+            WorkoutBlock(
+                name: "Arms",
+                rounds: 2,
+                setsPerRound: 1,
+                setRest: 30,
+                roundRest: 120,
+                movements: [
+                    BlockMovement(movementId: benchID, endCondition: .manual),
+                    BlockMovement(movementId: inclineID, endCondition: .time, target: 45)
+                ]
+            )
+        ]
+    )
+    let data = try JSONEncoder().encode(preset)
+    let decoded = try JSONDecoder().decode(WorkoutPreset.self, from: data)
+    #expect(decoded == preset)
 }
 
 @Test("A 40-round block of 25 sets totals 1000 sets without overflow")

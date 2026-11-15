@@ -30,10 +30,10 @@ private func runSnapshot(
 func containerOpensWithHistory() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    context.insert(PresetRecord(.chest))
-    context.insert(MovementRecord(.chest))
+    context.insert(PresetRecord(.seeded))
+    context.insert(MovementRecord(.seeded))
     context.insert(WorkoutRecord(
-        snapshot: runSnapshot(.chest, doneSets: 1, phase: .resting),
+        snapshot: runSnapshot(.seeded, doneSets: 1, phase: .resting),
         now: now,
         calendar: calendar
     ))
@@ -43,9 +43,9 @@ func containerOpensWithHistory() throws {
     #expect(try context.fetch(FetchDescriptor<MovementRecord>()).count == 1)
     let records = try context.fetch(FetchDescriptor<WorkoutRecord>())
     #expect(records.count == 1)
-    #expect(records[0].sessionName == "Chest")
+    #expect(records[0].sessionName == "Session 1")
     #expect(records[0].doneSets == 1)
-    #expect(records[0].runKey.contains(WorkoutPreset.chest.id.uuidString))
+    #expect(records[0].runKey.contains(WorkoutPreset.seeded.id.uuidString))
 }
 
 @MainActor
@@ -54,7 +54,7 @@ func recordLifecycle() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
     let store = WorkoutHistoryStore(context: context, calendar: calendar)
-    let preset = WorkoutPreset.chest
+    let preset = WorkoutPreset.seeded
 
     var snapshot = SessionSnapshot.initial(preset, now: now)
     store.record(snapshot, now: now)
@@ -103,10 +103,10 @@ func recordKeepsItsSnapshot() throws {
     let bench = UUID()
     let curl = UUID()
     let preset = WorkoutPreset(
-        name: "Chest",
+        name: "Push",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Push",
                 rounds: 2,
                 setsPerRound: 3,
                 setRest: 45,
@@ -145,8 +145,8 @@ func recordKeepsItsSnapshot() throws {
     try context.save()
 
     let record = try #require(WorkoutRepository.fetchAll(in: context).first)
-    #expect(record.sessionName == "Chest")
-    #expect(record.preset.name == "Chest")
+    #expect(record.sessionName == "Push")
+    #expect(record.preset.name == "Push")
     #expect(record.preset.blocks == preset.blocks)
     #expect(record.preset.blocks[0].setRest == 45)
     #expect(record.preset.blocks[0].roundRest == 90)
@@ -159,7 +159,7 @@ func recordBelongsToStartDate() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
     let store = WorkoutHistoryStore(context: context, calendar: calendar)
-    let preset = WorkoutPreset.chest
+    let preset = WorkoutPreset.seeded
     let start = calendar.date(
         from: DateComponents(year: 2026, month: 11, day: 10, hour: 23, minute: 50)
     )!
@@ -188,7 +188,7 @@ func deleteRecordOnly() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
     let store = WorkoutHistoryStore(context: context, calendar: calendar)
-    let preset = WorkoutPreset.chest
+    let preset = WorkoutPreset.seeded
     context.insert(PresetRecord(preset))
 
     store.record(runSnapshot(preset, doneSets: 1, phase: .ready), now: now)

@@ -75,11 +75,11 @@ func restingPrefixesUpNext() {
 @Test("A single block names itself when its name differs from the movement")
 func singleBlockNamesItself() {
     let copy = TimerPositionCopy(
-        snapshot: snapshot([block(name: "Chest", setsPerRound: 3)]),
+        snapshot: snapshot([block(name: "Push", setsPerRound: 3)]),
         movementName: "Bench press"
     )
 
-    #expect(groups(copy.leading) == ["CHEST", "BENCH PRESS"])
+    #expect(groups(copy.leading) == ["PUSH", "BENCH PRESS"])
 }
 
 @Test("A block named like its movement is not repeated")
@@ -96,7 +96,7 @@ func singleBlockSameNameAppearsOnce() {
 @Test("A block with several rounds shows only the round group")
 func roundOnly() {
     let copy = TimerPositionCopy(
-        snapshot: snapshot([block(name: "Chest", rounds: 2, setsPerRound: 1)], doneSets: 1),
+        snapshot: snapshot([block(name: "Push", rounds: 2, setsPerRound: 1)], doneSets: 1),
         movementName: "Bench press"
     )
 
@@ -106,7 +106,7 @@ func roundOnly() {
 @Test("A block with several sets per round shows only the set group")
 func setOnly() {
     let copy = TimerPositionCopy(
-        snapshot: snapshot([block(name: "Chest", rounds: 1, setsPerRound: 3)], doneSets: 2),
+        snapshot: snapshot([block(name: "Push", rounds: 1, setsPerRound: 3)], doneSets: 2),
         movementName: "Bench press"
     )
 
@@ -116,12 +116,12 @@ func setOnly() {
 @Test("A one-round one-set block has no position segments")
 func oneByOne() {
     let copy = TimerPositionCopy(
-        snapshot: snapshot([block(name: "Chest", rounds: 1, setsPerRound: 1)]),
+        snapshot: snapshot([block(name: "Push", rounds: 1, setsPerRound: 1)]),
         movementName: "Bench press"
     )
 
     #expect(groups(copy.trailing).isEmpty)
-    #expect(groups(copy.leading) == ["CHEST", "BENCH PRESS"])
+    #expect(groups(copy.leading) == ["PUSH", "BENCH PRESS"])
 }
 
 @Test("A later movement names the movement and both segments")

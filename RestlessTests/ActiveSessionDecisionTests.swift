@@ -22,7 +22,7 @@ private func preset(_ name: String) -> WorkoutPreset {
     )
 }
 
-private let chest = preset("Chest")
+private let push = preset("Push")
 private let arms = preset("Arms")
 private let legs = preset("Legs")
 
@@ -68,10 +68,10 @@ private func decide(
 @Test("A stale day at the gate switches to today's plan")
 func staleDayAtGateSwitches() {
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: yesterday,
         plan: armsPlan,
-        snapshot: atGate(chest)
+        snapshot: atGate(push)
     )
 
     #expect(decision == .switchTo(armsPlan))
@@ -80,10 +80,10 @@ func staleDayAtGateSwitches() {
 @Test("The same plan with a stale day only records the day")
 func samePlanWithStaleDayRecordsDay() {
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: yesterday,
-        plan: RotationSession(id: chest.id, name: chest.name),
-        snapshot: atGate(chest)
+        plan: RotationSession(id: push.id, name: push.name),
+        snapshot: atGate(push)
     )
 
     #expect(decision == .recordDay)
@@ -91,11 +91,11 @@ func samePlanWithStaleDayRecordsDay() {
 
 @Test("A ready session with no sets and a stale day switches")
 func readySessionWithNoSetsSwitches() {
-    var snapshot = atGate(chest)
+    var snapshot = atGate(push)
     snapshot.startSession()
 
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: yesterday,
         plan: armsPlan,
         snapshot: snapshot
@@ -158,22 +158,22 @@ func doneSessionWithAnotherPlanSwitches() {
 @Test("A done single-session rotation starts fresh")
 func doneSingleSessionRotationStartsFresh() {
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: yesterday,
-        plan: RotationSession(id: chest.id, name: chest.name),
-        snapshot: done(chest)
+        plan: RotationSession(id: push.id, name: push.name),
+        snapshot: done(push)
     )
 
-    #expect(decision == .switchTo(RotationSession(id: chest.id, name: chest.name)))
+    #expect(decision == .switchTo(RotationSession(id: push.id, name: push.name)))
 }
 
 @Test("A day with no plan keeps the session")
 func noPlanKeeps() {
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: yesterday,
         plan: nil,
-        snapshot: atGate(chest)
+        snapshot: atGate(push)
     )
 
     #expect(decision == .keep)
@@ -182,10 +182,10 @@ func noPlanKeeps() {
 @Test("A first launch with no marker follows today's plan")
 func missingMarkerFollowsThePlan() {
     let decision = decide(
-        active: chest,
+        active: push,
         activeDay: nil,
         plan: armsPlan,
-        snapshot: atGate(chest)
+        snapshot: atGate(push)
     )
 
     #expect(decision == .switchTo(armsPlan))

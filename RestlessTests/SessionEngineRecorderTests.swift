@@ -4,10 +4,10 @@ import Testing
 @testable import Restless
 
 private let manualPreset = WorkoutPreset(
-    name: "Chest",
+    name: "Push",
     blocks: [
         WorkoutBlock(
-            name: "Chest",
+            name: "Push",
             rounds: 1,
             setsPerRound: 3,
             setRest: 60,

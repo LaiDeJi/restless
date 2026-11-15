@@ -10,10 +10,10 @@ enum WatchPreviewFixtures {
 
     static func preset() -> WorkoutPreset {
         WorkoutPreset(
-            name: "Chest",
+            name: "Push",
             blocks: [
                 WorkoutBlock(
-                    name: "Chest",
+                    name: "Push",
                     rounds: 4,
                     setsPerRound: 4,
                     setRest: 60,
@@ -30,10 +30,10 @@ enum WatchPreviewFixtures {
     /// differ. Five done in the first block reads 5 / 16 above and 5 OF 24 below.
     static func twoBlockPreset() -> WorkoutPreset {
         WorkoutPreset(
-            name: "Chest + Arms",
+            name: "Push + Arms",
             blocks: [
                 WorkoutBlock(
-                    name: "Chest",
+                    name: "Push",
                     rounds: 4,
                     setsPerRound: 4,
                     setRest: 60,

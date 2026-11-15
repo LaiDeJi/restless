@@ -2,9 +2,27 @@
 
 ## Purpose
 
-Saved workout sessions made of ordered body-part blocks, each with its own rounds, sets, and rest values, managed through the app's timer and sessions pages.
+Saved workout sessions made of ordered blocks of movements, each with its own rounds, sets, and rest values, managed through the app's timer and sessions pages.
 
 ## Requirements
+
+### Requirement: First run seeds one neutral session
+
+An empty store SHALL be seeded with exactly one session named `Session 1`, holding one block named `Block 1` with one movement named `Movement 1`. Seeding MUST NOT create any other session, movement, history record or demo data. A store that already holds a session SHALL NOT be seeded.
+
+#### Scenario: First launch on an empty store
+
+- **GIVEN** a store with no sessions and no movements
+- **WHEN** the app opens
+- **THEN** SESSIONS lists one session named Session 1 and the app opens on it
+- **AND** the movement library holds one movement named Movement 1
+- **AND** the timer shows Block 1 ready to start
+
+#### Scenario: A store that already has sessions
+
+- **GIVEN** a store that holds at least one session
+- **WHEN** the app opens
+- **THEN** no session and no movement is created
 
 ### Requirement: Session plans are ordered blocks
 
@@ -480,72 +498,6 @@ DELETE SESSION and the block and movement row delete actions SHALL use the destr
 - **GIVEN** a block with two movements
 - **WHEN** the user taps a movement's delete action once
 - **THEN** the row shows TAP AGAIN TO DELETE in the stronger red
-
-### Requirement: Stored plans migrate to rounds and sets per round
-
-Stored plans SHALL read into the new block shape without losing sets or rest. A legacy part R × S SHALL become one block with rounds R, sets per round S, one manual movement, and its name and rests. A straight block with count C SHALL become rounds 1, sets per round C; with several movements it SHALL split into one block per movement. A circuit with count C SHALL become rounds C, sets per round 1. The active session SHALL survive; an unreadable plan SHALL fall back to the Chest seed.
-
-#### Scenario: Legacy part
-
-- **GIVEN** a stored part named Chest with 3 rounds, 3 sets, 60 set rest, 120 round rest
-- **WHEN** the app opens it after the update
-- **THEN** it is one block named Chest with rounds 3, sets per round 3, and those rests
-
-#### Scenario: Straight block
-
-- **GIVEN** a stored straight block with count 9 and one movement
-- **WHEN** it is read
-- **THEN** it has rounds 1 and sets per round 9
-
-#### Scenario: Straight block with two movements
-
-- **GIVEN** a stored straight block with Bench and Incline, count 3
-- **WHEN** it is read
-- **THEN** it becomes two blocks, Bench then Incline, each with rounds 1 and sets per round 3
-
-#### Scenario: Circuit block
-
-- **GIVEN** a stored circuit block with Biceps and Triceps, count 3
-- **WHEN** it is read
-- **THEN** it has rounds 3 and sets per round 1
-
-### Requirement: Stored REPS sets become MANUAL
-
-A stored block movement whose end condition is the removed `reps` value SHALL decode as `manual` with no target. Decoding SHALL preserve its movement id, order, block, rounds, sets, and rests, so a saved session and a saved running snapshot remain usable.
-
-#### Scenario: A stored REPS row decodes as MANUAL
-
-- **GIVEN** a stored block movement with `endCondition` set to `reps` and target 10
-- **WHEN** the block is decoded
-- **THEN** its end condition is MANUAL and its target is empty
-
-#### Scenario: A saved session keeps all blocks
-
-- **GIVEN** a stored session whose second block contains a REPS movement
-- **WHEN** the session is opened
-- **THEN** both blocks, every movement, rounds, sets, and rests remain, and the REPS movement is MANUAL
-
-#### Scenario: A running snapshot survives
-
-- **GIVEN** a saved running snapshot whose plan contains a REPS movement
-- **WHEN** the app launches
-- **THEN** the snapshot loads at the same position with the REPS movement shown as MANUAL
-
-### Requirement: Duplicate movement rows collapse
-
-Adjacent duplicate movements in a stored circuit SHALL collapse into one movement with sets per round equal to the duplicate count when they share the same library movement, end condition, and target. Duplicates that are not adjacent or differ SHALL remain separate movements.
-
-#### Scenario: Four Biceps rows
-
-- **GIVEN** a stored circuit with four adjacent Biceps rows, count 4, same end condition and target
-- **WHEN** it is read
-- **THEN** it becomes one Biceps movement with rounds 4 and sets per round 4
-
-#### Scenario: Different targets
-
-- **GIVEN** a stored circuit with two adjacent Biceps rows with different targets
-- **WHEN** it is read
-- **THEN** both movements remain
 
 ### Requirement: Steppers use their whole surface and repeat while held
 

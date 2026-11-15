@@ -114,7 +114,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: Chest record
+        text: Session 1 record
       timeoutMs: 6000
   - wait: 800
   # Clean up: delete the session this fragment created.

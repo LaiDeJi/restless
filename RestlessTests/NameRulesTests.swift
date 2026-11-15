@@ -28,8 +28,8 @@ func longNameIsCapped() {
 
 @Test("Surrounding spaces are trimmed")
 func namesAreTrimmed() {
-    #expect(NameRules.session("  Chest  ") == "Chest")
-    #expect(NameRules.block("  Chest  ") == "Chest")
+    #expect(NameRules.session("  Push  ") == "Push")
+    #expect(NameRules.block("  Push  ") == "Push")
     #expect(NameRules.movement("  Curl  ") == "Curl")
 }
 

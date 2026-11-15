@@ -17,10 +17,10 @@ private let curlNames: [UUID: String] = [
 
 private func fourByFour() -> WorkoutPreset {
     WorkoutPreset(
-        name: "Chest",
+        name: "Push",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Push",
                 rounds: 4,
                 setsPerRound: 4,
                 setRest: 60,
@@ -87,7 +87,7 @@ func blockTransitionCopy() {
         name: "Pair",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Push",
                 rounds: 1,
                 setsPerRound: 1,
                 setRest: 60,
@@ -107,7 +107,7 @@ func blockTransitionCopy() {
     let names = [benchID: "Bench press", armID: "Curl"]
     let alert = CompletionAlertCopy.restFinished(ready(preset, doneSets: 1), movementNames: names)
     #expect(alert.title == "ROUND REST OVER")
-    #expect(alert.body == "AFTER CHEST · NEXT ARMS")
+    #expect(alert.body == "AFTER PUSH · NEXT ARMS")
 }
 
 @Test("A finished timed set names the rest that follows")

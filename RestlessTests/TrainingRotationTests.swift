@@ -54,75 +54,75 @@ private func store(
 
 @Test("Four consecutive days take the order at gap zero")
 func fourDaysAtGapZero() {
-    let plan = rotation(order("Chest", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 9))
+    let plan = rotation(order("Push", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 9))
 
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Legs")
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 12))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 12))?.name == "Push")
 }
 
 @Test("A gap of one follows the whole round")
 func gapOneFollowsTheRound() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let plan = rotation(sessions, anchor: TestCalendar.day(2026, 11, 9), restDaysBetween: 1)
     let boundary = TestCalendar.day(2026, 11, 9)
 
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Legs")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 12)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Arms")
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 11), boundary: boundary).session?.name == "Legs")
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 12), boundary: boundary) == .rest)
-    #expect(plan.mark(for: TestCalendar.day(2026, 11, 13), boundary: boundary).session?.name == "Chest")
+    #expect(plan.mark(for: TestCalendar.day(2026, 11, 13), boundary: boundary).session?.name == "Push")
 }
 
 @Test("Two sessions with a gap of two take two rest days")
 func twoSessionsTakeTwoRestDays() {
     let plan = rotation(
-        order("Chest", "Arms"),
+        order("Push", "Arms"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 2
     )
 
     #expect(plan.roundIndex(for: TestCalendar.day(2026, 11, 9)) == 0)
     #expect(plan.dayInRound(for: TestCalendar.day(2026, 11, 9)) == 0)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11)) == nil)
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 12)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Push")
     #expect(plan.slotNumber(for: TestCalendar.day(2026, 11, 13)) == 2)
 }
 
 @Test("One session with a gap of one rests between repeats")
 func oneSessionTakesTheGap() {
     let plan = rotation(
-        order("Chest"),
+        order("Push"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 1
     )
 
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 9))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Push")
 }
 
 @Test("A single session repeats on every slot")
 func oneSessionRepeats() {
-    let plan = rotation(order("Chest"), anchor: TestCalendar.day(2026, 11, 9))
+    let plan = rotation(order("Push"), anchor: TestCalendar.day(2026, 11, 9))
 
     for offset in 0..<7 {
         let day = calendar.date(byAdding: .day, value: offset, to: TestCalendar.day(2026, 11, 9))!
-        #expect(plan.plan(for: day)?.name == "Chest")
+        #expect(plan.plan(for: day)?.name == "Push")
     }
 }
 
 @Test("A closed slot drops its session and the next open day carries on")
 func closedSlotDropsItsSession() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let plan = rotation(
         sessions,
         anchor: TestCalendar.day(2026, 11, 9),
@@ -132,8 +132,8 @@ func closedSlotDropsItsSession() {
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11)) == nil)
     // The closed slot consumed Legs, so the next open day takes the following
-    // session (Chest) rather than pausing the order.
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 12))?.name == "Chest")
+    // session (Push) rather than pausing the order.
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 12))?.name == "Push")
     #expect(plan.mark(
         for: TestCalendar.day(2026, 11, 11),
         boundary: TestCalendar.day(2026, 11, 9)
@@ -142,7 +142,7 @@ func closedSlotDropsItsSession() {
 
 @Test("A closed session day keeps its place in the round")
 func closedSessionDayKeepsItsPlace() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let plan = rotation(
         sessions,
         anchor: TestCalendar.day(2026, 11, 9),
@@ -153,7 +153,7 @@ func closedSessionDayKeepsItsPlace() {
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 10)) == nil)
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Legs")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 12)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Push")
     #expect(plan.mark(
         for: TestCalendar.day(2026, 11, 10),
         boundary: TestCalendar.day(2026, 11, 9)
@@ -162,7 +162,7 @@ func closedSessionDayKeepsItsPlace() {
 
 @Test("A weekday closure closes every week")
 func weekdayClosureRecurs() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let plan = rotation(
         sessions,
         anchor: TestCalendar.day(2026, 11, 9),
@@ -181,7 +181,7 @@ func weekdayClosureRecurs() {
 func markPrecedence() {
     let skipExceptionDay = TestCalendar.day(2026, 11, 10)
     let plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 1,
         exceptions: [dated(skipExceptionDay, skipExceptionDay, "Trip")],
@@ -193,15 +193,15 @@ func markPrecedence() {
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 11), boundary: boundary).session?.name == "Legs")
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 12), boundary: boundary) == .rest)
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 14), boundary: boundary) == .skipped)
-    #expect(plan.mark(for: TestCalendar.day(2026, 11, 9), boundary: boundary).session?.name == "Chest")
-    #expect(plan.mark(for: TestCalendar.day(2026, 11, 13), boundary: boundary).session?.name == "Chest")
+    #expect(plan.mark(for: TestCalendar.day(2026, 11, 9), boundary: boundary).session?.name == "Push")
+    #expect(plan.mark(for: TestCalendar.day(2026, 11, 13), boundary: boundary).session?.name == "Push")
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 8), boundary: boundary) == .none)
 }
 
 @Test("No plan or rest word is drawn before the boundary")
 func noPlanOrRestBeforeBoundary() {
     let plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 1,
         exceptions: [dated(TestCalendar.day(2026, 11, 4), TestCalendar.day(2026, 11, 4), "Closed")]
@@ -214,14 +214,14 @@ func noPlanOrRestBeforeBoundary() {
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 12), boundary: boundary) == .none)
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 16), boundary: boundary) == .rest)
     #expect(plan.mark(for: TestCalendar.day(2026, 11, 14), boundary: boundary).session?.name == "Arms")
-    #expect(plan.mark(for: boundary, boundary: boundary).session?.name == "Chest")
+    #expect(plan.mark(for: boundary, boundary: boundary).session?.name == "Push")
 }
 
 @Test("A skipped slot is not the boundary")
 func skippedSlotIsNotTheBoundary() {
     let today = TestCalendar.day(2026, 11, 9)
     let plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: today,
         skips: [today]
     )
@@ -233,7 +233,7 @@ func skippedSlotIsNotTheBoundary() {
 @Test("A recorded slot is not the boundary")
 func recordedSlotIsNotTheBoundary() {
     let today = TestCalendar.day(2026, 11, 9)
-    let plan = rotation(order("Chest", "Arms", "Legs"), anchor: today)
+    let plan = rotation(order("Push", "Arms", "Legs"), anchor: today)
 
     #expect(plan.nextUnstartedDay(
         today: today,
@@ -250,7 +250,7 @@ func recordedSlotIsNotTheBoundary() {
 @Test("A new round starts on a rest day")
 func newRoundOnRestDay() {
     var plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 1
     )
@@ -260,7 +260,7 @@ func newRoundOnRestDay() {
     let started = plan.startNewRound(on: restDay, today: restDay)
     #expect(started)
     #expect(plan.settings.rotationAnchor == restDay)
-    #expect(plan.plan(for: restDay)?.name == "Chest")
+    #expect(plan.plan(for: restDay)?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Legs")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 15)) == nil)
@@ -269,7 +269,7 @@ func newRoundOnRestDay() {
 @Test("A new round re-phases a planned day")
 func newRoundRePhases() {
     var plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 11),
         restDaysBetween: 1
     )
@@ -278,7 +278,7 @@ func newRoundRePhases() {
 
     let started = plan.startNewRound(on: thursday, today: thursday)
     #expect(started)
-    #expect(plan.plan(for: thursday)?.name == "Chest")
+    #expect(plan.plan(for: thursday)?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Arms")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 15))?.name == "Legs")
 }
@@ -286,7 +286,7 @@ func newRoundRePhases() {
 @Test("A closed or past date refuses a new round")
 func newRoundRefused() {
     var plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 11),
         exceptions: [dated(TestCalendar.day(2026, 11, 15), TestCalendar.day(2026, 11, 15), "Closed")]
     )
@@ -303,7 +303,7 @@ func newRoundRefused() {
 func newRoundClearsMarks() {
     let changeDay = TestCalendar.day(2026, 11, 13)
     var plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 11),
         restDaysBetween: 1,
         skips: [TestCalendar.day(2026, 11, 11)],
@@ -321,14 +321,14 @@ func newRoundClearsMarks() {
 
 @Test("Skipping keeps the next session")
 func skipKeepsNextSession() {
-    var plan = rotation(order("Chest", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 11))
+    var plan = rotation(order("Push", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 11))
     let skippedDay = TestCalendar.day(2026, 11, 12)
 
     #expect(plan.plan(for: skippedDay)?.name == "Arms")
     plan.skip(skippedDay)
     #expect(plan.plan(for: skippedDay) == nil)
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Legs")
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Push")
 
     plan.unskip(skippedDay)
     #expect(plan.plan(for: skippedDay)?.name == "Arms")
@@ -337,7 +337,7 @@ func skipKeepsNextSession() {
 @Test("A skipped session day keeps its place in the round")
 func skippedSessionDayKeepsItsPlace() {
     var plan = rotation(
-        order("Chest", "Arms", "Legs"),
+        order("Push", "Arms", "Legs"),
         anchor: TestCalendar.day(2026, 11, 9),
         restDaysBetween: 1
     )
@@ -348,7 +348,7 @@ func skippedSessionDayKeepsItsPlace() {
     #expect(plan.plan(for: tuesday) == nil)
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 11))?.name == "Legs")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 12)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Push")
 
     plan.unskip(tuesday)
     #expect(plan.plan(for: tuesday)?.name == "Arms")
@@ -356,7 +356,7 @@ func skippedSessionDayKeepsItsPlace() {
 
 @Test("A skip persists across a store round trip")
 func skipPersists() throws {
-    var plan = rotation(order("Chest", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 11))
+    var plan = rotation(order("Push", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 11))
     let skippedDay = TestCalendar.day(2026, 11, 12)
     plan.skip(skippedDay)
 
@@ -375,7 +375,7 @@ func skipPersists() throws {
 
 @Test("A date change replaces only that date")
 func changeReplacesOnlyTheDate() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let saturday = TestCalendar.day(2026, 11, 14)
     let sunday = TestCalendar.day(2026, 11, 15)
     var settings = CalendarSettings(restDaysBetween: 2, calendar: calendar)
@@ -384,12 +384,12 @@ func changeReplacesOnlyTheDate() {
     let plan = TrainingRotation(settings: settings, sessions: sessions, calendar: calendar)
 
     #expect(plan.scheduledPlan(for: saturday)?.name == "Arms")
-    #expect(plan.plan(for: saturday)?.name == "Chest")
+    #expect(plan.plan(for: saturday)?.name == "Push")
     #expect(plan.isChanged(saturday))
     // The changed day still consumed Arms, so Sunday keeps the schedule's Legs.
     #expect(plan.plan(for: sunday)?.name == "Legs")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 16)) == nil)
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 18))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 18))?.name == "Push")
 
     var cleared = settings
     cleared.clearDayChange(day: saturday, calendar: calendar)
@@ -400,7 +400,7 @@ func changeReplacesOnlyTheDate() {
 
 @Test("A deleted preset falls back to the schedule")
 func deletedPresetFallsBack() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let saturday = TestCalendar.day(2026, 11, 14)
     var settings = CalendarSettings(restDaysBetween: 2, calendar: calendar)
     settings.setRotationAnchor(TestCalendar.day(2026, 11, 13), calendar: calendar)
@@ -413,13 +413,13 @@ func deletedPresetFallsBack() {
 
 @Test("A new round clears a date change")
 func newRoundClearsChange() {
-    let sessions = order("Chest", "Arms", "Legs")
+    let sessions = order("Push", "Arms", "Legs")
     let changedDay = TestCalendar.day(2026, 11, 14)
     var settings = CalendarSettings(calendar: calendar)
     settings.setRotationAnchor(TestCalendar.day(2026, 11, 12), calendar: calendar)
     settings.setDayChange(day: changedDay, presetID: sessions[0].id, calendar: calendar)
     var plan = TrainingRotation(settings: settings, sessions: sessions, calendar: calendar)
-    #expect(plan.plan(for: changedDay)?.name == "Chest")
+    #expect(plan.plan(for: changedDay)?.name == "Push")
 
     let started = plan.startNewRound(on: TestCalendar.day(2026, 11, 12), today: TestCalendar.day(2026, 11, 12))
     #expect(started)
@@ -431,12 +431,12 @@ func newRoundClearsChange() {
 
 @Test("A reorder restarts at the next unstarted slot")
 func reorderRestartsSequence() {
-    var plan = rotation(order("Chest", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 9))
+    var plan = rotation(order("Push", "Arms", "Legs"), anchor: TestCalendar.day(2026, 11, 9))
     let today = TestCalendar.day(2026, 11, 12)
 
     plan.restartRotation(today: today, recordedDays: [today])
     #expect(plan.settings.rotationAnchor == TestCalendar.day(2026, 11, 13))
-    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Chest")
+    #expect(plan.plan(for: TestCalendar.day(2026, 11, 13))?.name == "Push")
     #expect(plan.plan(for: TestCalendar.day(2026, 11, 14))?.name == "Arms")
 }
 

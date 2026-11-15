@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Mirrors a multi-part session on the Lock Screen and Dynamic Island, showing the active part, the next rest, and controls that stay in step with the in-app session.
+Mirrors a session's blocks on the Lock Screen and Dynamic Island, showing the active block, the next rest, and controls that stay in step with the in-app session.
 
 ## Requirements
 

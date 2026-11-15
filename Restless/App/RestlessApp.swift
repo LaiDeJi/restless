@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import SwiftUI
 
@@ -10,11 +11,7 @@ struct RestlessApp: App {
 
     init() {
         do {
-            let container = try ModelContainer(
-                for: PresetRecord.self,
-                MovementRecord.self,
-                WorkoutRecord.self
-            )
+            let container = try Self.makeContainer()
             self.container = container
             // The same main context the views query, so a record saved by the
             // engine appears in the calendar without a relaunch.
@@ -43,5 +40,23 @@ struct RestlessApp: App {
                 .environment(calendarSettings)
         }
         .modelContainer(container)
+    }
+
+    /// The current store, created in a new file after the previous one is
+    /// removed. Dropping a stored property needs a store that never had it, so
+    /// the old `default.store` and its SQLite companions are deleted before the
+    /// container opens. Removal is best effort: a failure leaves an orphan
+    /// file, which is harmless.
+    private static func makeContainer() throws -> ModelContainer {
+        let support = URL.applicationSupportDirectory
+        for name in ["default.store", "default.store-wal", "default.store-shm"] {
+            try? FileManager.default.removeItem(at: support.appending(path: name))
+        }
+        return try ModelContainer(
+            for: PresetRecord.self,
+            MovementRecord.self,
+            WorkoutRecord.self,
+            configurations: ModelConfiguration(url: support.appending(path: "restless-v2.store"))
+        )
     }
 }

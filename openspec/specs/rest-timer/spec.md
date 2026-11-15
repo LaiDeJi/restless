@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Runs a session plan as a deadline-based sequence of untimed sets across ordered parts, choosing the correct rest after every set and presenting part, round, and set progress on the timer.
+Runs a session plan as a deadline-based sequence of sets across ordered blocks of movements, choosing the correct rest after every set and presenting block, round, and set progress on the timer.
 
 ## Requirements
 
@@ -86,11 +86,11 @@ After the last set of a block's last round, the next rest SHALL be that block's 
 
 ### Requirement: Final set ends the session
 
-After the last set of the last part, no rest SHALL follow. The session SHALL enter the done state with completed sets equal to total sets.
+After the last set of the last block, no rest SHALL follow. The session SHALL enter the done state with completed sets equal to total sets.
 
 #### Scenario: Completing the session
 
-- **GIVEN** the last set of the last part is ready
+- **GIVEN** the last set of the last block is ready
 - **WHEN** the user marks it done
 - **THEN** the session is done, no countdown starts, and completed sets equal total sets
 

@@ -36,10 +36,10 @@ private final class FakeScheduler: CountdownAlertScheduler {
 
 private func preset() -> WorkoutPreset {
     WorkoutPreset(
-        name: "Chest",
+        name: "Push",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Push",
                 rounds: 4,
                 setsPerRound: 4,
                 setRest: 60,

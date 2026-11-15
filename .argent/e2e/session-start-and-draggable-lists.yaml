@@ -176,5 +176,5 @@ steps:
     args:
       condition: exists
       selector:
-        text: Chest
+        text: Session 1
       timeoutMs: 4000

@@ -13,7 +13,7 @@ private func memoryContainer() throws -> ModelContainer {
 private func filled(_ draft: WorkoutPreset) -> WorkoutPreset {
     var copy = draft
     copy.blocks[0].movements = [
-        BlockMovement(movementId: Movement.chestID, endCondition: .manual, target: nil)
+        BlockMovement(movementId: Movement.seededID, endCondition: .manual, target: nil)
     ]
     return copy
 }
@@ -21,7 +21,7 @@ private func filled(_ draft: WorkoutPreset) -> WorkoutPreset {
 @MainActor
 @Test("A new session draft copies the active block's schedule and no movements")
 func newSessionDraftCopiesScheduleOnly() throws {
-    let active = WorkoutPreset.chest
+    let active = WorkoutPreset.seeded
     let draft = NewSessionDraft.make(from: active)
 
     #expect(draft.id != active.id)
@@ -57,7 +57,7 @@ func newSessionDraftHasNoRecordSideEffect() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
 
-    _ = NewSessionDraft.make(from: .chest)
+    _ = NewSessionDraft.make(from: .seeded)
 
     #expect(try context.fetch(FetchDescriptor<PresetRecord>()).isEmpty)
 }
@@ -67,7 +67,7 @@ func newSessionDraftHasNoRecordSideEffect() throws {
 func emptyDraftIsRefused() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    let draft = NewSessionDraft.make(from: .chest)
+    let draft = NewSessionDraft.make(from: .seeded)
 
     let record = SessionDraftCommit.save(draft, usedNames: [], in: context)
 
@@ -80,14 +80,14 @@ func emptyDraftIsRefused() throws {
 func draftCommitInsertsOneSession() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    var draft = filled(NewSessionDraft.make(from: .chest))
+    var draft = filled(NewSessionDraft.make(from: .seeded))
     draft.name = "Legs"
     draft.blocks[0].rounds = 3
     draft.blocks[0].setsPerRound = 5
     draft.blocks[0].setRest = 45
     draft.blocks[0].roundRest = 90
 
-    let record = try #require(SessionDraftCommit.save(draft, usedNames: ["Chest"], in: context))
+    let record = try #require(SessionDraftCommit.save(draft, usedNames: ["Push"], in: context))
     let records = try context.fetch(FetchDescriptor<PresetRecord>())
 
     #expect(records.count == 1)
@@ -103,7 +103,7 @@ func draftCommitInsertsOneSession() throws {
 func draftCommitResolvesUniqueDefaultName() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    let draft = filled(NewSessionDraft.make(from: .chest))
+    let draft = filled(NewSessionDraft.make(from: .seeded))
 
     let record = try #require(SessionDraftCommit.save(
         draft,
@@ -119,7 +119,7 @@ func draftCommitResolvesUniqueDefaultName() throws {
 func draftCommitKeepsTypedName() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
-    var draft = filled(NewSessionDraft.make(from: .chest))
+    var draft = filled(NewSessionDraft.make(from: .seeded))
     draft.name = "Push Day"
 
     let record = try #require(SessionDraftCommit.save(draft, usedNames: ["Push Day"], in: context))
@@ -133,7 +133,7 @@ func discardedDraftLeavesNoRecord() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
 
-    let draft = filled(NewSessionDraft.make(from: .chest))
+    let draft = filled(NewSessionDraft.make(from: .seeded))
     #expect(draft.name == "New session")
     #expect(try context.fetch(FetchDescriptor<PresetRecord>()).isEmpty)
 }
@@ -146,7 +146,7 @@ func draftCommitDoesNotActivate() throws {
     let previous = ActivePresetStore.id
     defer { ActivePresetStore.id = previous }
 
-    let draft = filled(NewSessionDraft.make(from: .chest))
+    let draft = filled(NewSessionDraft.make(from: .seeded))
     let record = try #require(SessionDraftCommit.save(draft, usedNames: [], in: context))
 
     #expect(ActivePresetStore.id == previous)
@@ -159,7 +159,7 @@ func draftStoreFlushesWithoutPersisting() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
     let store = SessionDraftStore(
-        session: NewSessionDraft.make(from: .chest),
+        session: NewSessionDraft.make(from: .seeded),
         delay: .seconds(10)
     )
 

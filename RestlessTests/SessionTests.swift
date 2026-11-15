@@ -82,11 +82,11 @@ private let zeroRest = WorkoutPreset(
     blocks: [
         block(rounds: 1, setsPerRound: 3, setRest: 0, roundRest: 120, movements: [
             BlockMovement(movementId: benchID, endCondition: .manual)
-        ], name: "Chest")
+        ], name: "Push")
     ]
 )
 
-private func ready(_ preset: WorkoutPreset = .chest) -> SessionSnapshot {
+private func ready(_ preset: WorkoutPreset = .seeded) -> SessionSnapshot {
     var snapshot = SessionSnapshot.initial(preset, now: start)
     snapshot.startSession()
     return snapshot
@@ -135,7 +135,7 @@ func startSessionTransition() {
 
 @Test("Set done and a second start are ignored in the gate")
 func gateGuards() {
-    var snapshot = SessionSnapshot.initial(.chest, now: start)
+    var snapshot = SessionSnapshot.initial(.seeded, now: start)
     SessionTransitions.apply(.setDone, to: &snapshot, now: start)
 
     #expect(snapshot.phase == .notStarted)
@@ -150,7 +150,7 @@ func gateGuards() {
 
 @Test("Set done starts set rest with a deadline")
 func setDoneStartsSetRest() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
 
     #expect(snapshot.doneSets == 1)
@@ -163,7 +163,7 @@ func setDoneStartsSetRest() {
 
 @Test("Tapping set done twice consumes one set")
 func setDoneIsIdempotent() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
     snapshot.setDone(now: start)
 
@@ -172,7 +172,7 @@ func setDoneIsIdempotent() {
 
 @Test("Pausing freezes the remaining time and resuming moves the deadline")
 func pauseAndResume() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
 
     snapshot.pause(now: start.addingTimeInterval(10))
@@ -188,7 +188,7 @@ func pauseAndResume() {
 
 @Test("Skipping a rest keeps the completed set and returns to ready")
 func skipRest() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
     snapshot.skipRest()
 
@@ -200,7 +200,7 @@ func skipRest() {
 
 @Test("A rest that reaches its deadline ends itself")
 func restEndsAtDeadline() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
 
     let changed = snapshot.reconcile(now: start.addingTimeInterval(60))
@@ -255,7 +255,7 @@ func blockTransition() {
 
 @Test("The final set of the last block ends the session with no rest")
 func finalSetEndsSession() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     runToDone(&snapshot)
 
     #expect(snapshot.phase == .done)
@@ -345,7 +345,7 @@ func doneSummary() {
 
 @Test("A one-block session keeps the familiar rest copy")
 func oneBlockCopy() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     #expect(snapshot.subtitle == "AFTER THIS SET")
 
     snapshot.setDone(now: start)
@@ -370,7 +370,7 @@ func movementSwitchFallback() {
 
 @Test("Progress runs from zero to one across a rest")
 func progress() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
 
     #expect(snapshot.progress(at: start) == 0)
@@ -380,7 +380,7 @@ func progress() {
 
 @Test("Replacing the preset resets the session to the gate")
 func replacePreset() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
 
     snapshot.replacePreset(twoBlocks, now: start)
@@ -467,9 +467,9 @@ func startSetOnlyForTimed() {
     manualSnapshot.startSet(now: start)
     #expect(manualSnapshot.phase == .ready)
 
-    var chestSnapshot = ready(.chest)
-    chestSnapshot.startSet(now: start)
-    #expect(chestSnapshot.phase == .ready)
+    var seededSnapshot = ready(.seeded)
+    seededSnapshot.startSet(now: start)
+    #expect(seededSnapshot.phase == .ready)
 }
 
 @Test("Starting a timed set twice does not restart its deadline")
@@ -483,7 +483,7 @@ func startTwice() {
 
 @Test("Set done during a rest is ignored")
 func setDoneDuringRestIgnored() {
-    var snapshot = ready(.chest)
+    var snapshot = ready(.seeded)
     snapshot.setDone(now: start)
     snapshot.setDone(now: start)
 

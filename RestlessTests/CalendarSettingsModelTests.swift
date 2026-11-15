@@ -102,7 +102,7 @@ func newRoundClearsMarksAndSaves() throws {
     let model = makeModel(defaults: defaults)
     let dates = days()
     let preset = UUID()
-    let sessions = [RotationSession(id: preset, name: "Chest")]
+    let sessions = [RotationSession(id: preset, name: "Push")]
 
     model.initializeRotation(today: dates.today)
     model.skip(dates.tomorrow, sessions: sessions)
@@ -145,7 +145,7 @@ func skipAndUnskipPersist() throws {
     defer { defaults.removePersistentDomain(forName: suite) }
     let model = makeModel(defaults: defaults)
     let dates = days()
-    let sessions = [RotationSession(id: UUID(), name: "Chest")]
+    let sessions = [RotationSession(id: UUID(), name: "Push")]
 
     model.initializeRotation(today: dates.today)
     model.skip(dates.tomorrow, sessions: sessions)

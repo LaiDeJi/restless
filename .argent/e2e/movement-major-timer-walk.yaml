@@ -96,13 +96,13 @@ steps:
     args:
       condition: visible
       selector:
-        text: 1 MOVEMENT · 2 ROUNDS · 2 SETS EACH · 4 SETS · 4:00 REST
+        text: 0 MOVEMENTS · 2 ROUNDS · 2 SETS EACH · 0 SETS · 0:00 REST
       timeoutMs: 4000
   # Two named movements through the add-movement sheet.
   - tool: gesture-tap
     args:
       x: 0.5
-      y: 0.8005
+      y: 0.8435
     delayMs: 600
   - tool: await-ui-element
     args:
@@ -137,23 +137,6 @@ steps:
       x: 0.848
       y: 0.11
     delayMs: 600
-  - tool: await-ui-element
-    args:
-      condition: visible
-      selector:
-        text: 3 MOVEMENTS · 2 ROUNDS · 2 SETS EACH · 12 SETS · 16:00 REST
-      timeoutMs: 5000
-  # The copied Chest movement goes, leaving Biceps then Triceps.
-  - tool: gesture-tap
-    args:
-      x: 0.8905
-      y: 0.656
-    delayMs: 300
-  - tool: gesture-tap
-    args:
-      x: 0.8905
-      y: 0.656
-    delayMs: 500
   - tool: await-ui-element
     args:
       condition: visible

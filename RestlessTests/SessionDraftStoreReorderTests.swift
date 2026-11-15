@@ -51,7 +51,7 @@ func reorderSavedMovementsCommitsOnce() async throws {
     let first = UUID()
     let second = UUID()
     let third = UUID()
-    let block = reorderBlock("Chest", movementIDs: [first, second, third])
+    let block = reorderBlock("Push", movementIDs: [first, second, third])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [block]),
         delay: .milliseconds(60)
@@ -74,7 +74,7 @@ func reorderSavedMovementsCommitsOnce() async throws {
 @MainActor
 @Test("A staged movement reorder stays in the staged block and never commits")
 func reorderStagedMovements() async throws {
-    let previous = reorderBlock("Chest", movementIDs: [UUID()])
+    let previous = reorderBlock("Push", movementIDs: [UUID()])
     let store = SessionDraftStore(
         session: WorkoutPreset(name: "One", blocks: [previous]),
         delay: .milliseconds(60)
@@ -130,11 +130,11 @@ func reorderRejectsNonPermutation() {
 @MainActor
 @Test("An edit waiting when a drag begins is saved once at endDrag")
 func pendingEditWaitsForEndDrag() async throws {
-    let store = SessionDraftStore(session: .chest, delay: .milliseconds(60))
+    let store = SessionDraftStore(session: .seeded, delay: .milliseconds(60))
     var commits = 0
     store.commit = { _ in commits += 1 }
 
-    store.edit { $0.name = "Chest Day" }
+    store.edit { $0.name = "Push Day" }
     store.beginDrag()
 
     try await Task.sleep(for: .milliseconds(220))

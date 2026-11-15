@@ -91,7 +91,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: Start Chest?
+        text: Start Session 1?
       timeoutMs: 5000
   - wait: 800
   # Cancel leaves the sheet, the set, and the plan untouched.
@@ -102,7 +102,7 @@ steps:
     args:
       condition: hidden
       selector:
-        text: Start Chest?
+        text: Start Session 1?
       timeoutMs: 5000
   - wait: 800
   - tool: await-ui-element

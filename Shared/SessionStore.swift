@@ -3,26 +3,17 @@ import Foundation
 /// One storage location shared by the app and the widget extension.
 enum SessionStore {
     static let appGroup = "group.com.whc.restless"
-    private static let key = "restless.session.v5"
-    private static let legacyKeys = [
-        "restless.session.v4",
-        "restless.session.v3",
-        "restless.session.v2",
-        "restless.session.v1"
-    ]
+    private static let key = "restless.session.v6"
+    /// A snapshot written by the build whose store this one replaces. It cannot
+    /// be resumed, because the session it names is gone.
+    private static let legacyKey = "restless.session.v5"
 
     private static var defaults: UserDefaults {
         UserDefaults(suiteName: appGroup) ?? .standard
     }
 
     static func load() -> SessionSnapshot? {
-        // A v4 snapshot counted completed sets under the round-major order, so
-        // the same count points at a different set now. It, like the v3
-        // kind/count plan, the v2 part plan and the v1 single-part shape, cannot
-        // be read as a running session; start ready at the active session.
-        for legacy in legacyKeys {
-            defaults.removeObject(forKey: legacy)
-        }
+        defaults.removeObject(forKey: legacyKey)
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(SessionSnapshot.self, from: data)
     }

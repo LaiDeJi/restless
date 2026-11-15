@@ -8,7 +8,7 @@ Ranks every piece of text in Restless into one type hierarchy and makes it follo
 
 ### Requirement: Text follows the system text size
 
-All user-facing text on the timer, sessions list, session editor, part editor, CALENDAR grid and settings, day sheet, and Lock Screen SHALL grow and shrink with the system text size. At the default text size no text SHALL render below 11 pt. A grid session code SHALL truncate rather than shrink below that floor, and the day sheet SHALL show the full session name. The Dynamic Island SHALL keep fixed sizes because it does not follow the system text size.
+All user-facing text on the timer, sessions list, session editor, block editor, CALENDAR grid and settings, day sheet, and Lock Screen SHALL grow and shrink with the system text size. At the default text size no text SHALL render below 11 pt. A grid session code SHALL truncate rather than shrink below that floor, and the day sheet SHALL show the full session name. The Dynamic Island SHALL keep fixed sizes because it does not follow the system text size.
 
 #### Scenario: Larger Text reaches every screen
 
@@ -42,13 +42,13 @@ Each screen SHALL rank its text in four tiers: title, section, content and meta.
 
 - **GIVEN** the SESSIONS tab is open
 - **WHEN** the header and a session card are shown
-- **THEN** SESSIONS is larger than the WORKOUTS eyebrow, and the session name is larger than its parts/sets/rest summary
+- **THEN** SESSIONS is larger than the WORKOUTS eyebrow, and the session name is larger than its blocks/sets/rest summary
 
 #### Scenario: Editor ranks its text
 
 - **GIVEN** a session editor is open
-- **WHEN** a part row is shown
-- **THEN** the part name is larger than its rounds/sets/rest line, and the editable session name is larger than the section headings
+- **WHEN** a block row is shown
+- **THEN** the block name is larger than its rounds/sets/rest line, and the editable session name is larger than the section headings
 
 #### Scenario: Timer ranks its text
 
@@ -104,7 +104,7 @@ At accessibility text sizes the timer SHALL keep all text readable without trunc
 
 - **GIVEN** an accessibility text size
 - **WHEN** a session is resting
-- **THEN** the part, round and set text is fully visible, wrapping as needed, and the actions are reachable by scrolling
+- **THEN** the block, round and set text is fully visible, wrapping as needed, and the actions are reachable by scrolling
 
 #### Scenario: Header keeps name and action
 

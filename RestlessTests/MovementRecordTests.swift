@@ -11,8 +11,8 @@ private func memoryContainer() throws -> ModelContainer {
 }
 
 @MainActor
-@Test("Seeding creates the Chest movement once")
-func seedCreatesChest() throws {
+@Test("Seeding creates the seeded movement once")
+func seedCreatesSeeded() throws {
     let container = try memoryContainer()
     let context = ModelContext(container)
 
@@ -22,8 +22,8 @@ func seedCreatesChest() throws {
     #expect(first.count == 1)
     #expect(second.count == 1)
     #expect(MovementRepository.fetchAll(context).count == 1)
-    #expect(first[0].id == Movement.chestID)
-    #expect(first[0].name == "Chest")
+    #expect(first[0].id == Movement.seededID)
+    #expect(first[0].name == "Movement 1")
 }
 
 @MainActor
@@ -49,15 +49,15 @@ func deleteUsedMovementIsRefused() throws {
     MovementRepository.seedIfNeeded(in: context)
 
     let preset = WorkoutPreset(
-        name: "Chest",
+        name: "Push",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Push",
                 rounds: 1,
                 setsPerRound: 3,
                 setRest: 60,
                 roundRest: 120,
-                movements: [BlockMovement(movementId: Movement.chestID, endCondition: .manual)]
+                movements: [BlockMovement(movementId: Movement.seededID, endCondition: .manual)]
             )
         ]
     )
@@ -65,10 +65,10 @@ func deleteUsedMovementIsRefused() throws {
     context.insert(record)
     try context.save()
 
-    #expect(throws: MovementDeleteError.inUse(["Chest"])) {
-        try MovementRepository.delete(Movement.chestID, in: context)
+    #expect(throws: MovementDeleteError.inUse(["Push"])) {
+        try MovementRepository.delete(Movement.seededID, in: context)
     }
-    #expect(MovementRepository.find(Movement.chestID, in: context) != nil)
+    #expect(MovementRepository.find(Movement.seededID, in: context) != nil)
 }
 
 @MainActor
@@ -82,31 +82,6 @@ func deleteUnusedMovement() throws {
 
     #expect(MovementRepository.find(movement.id, in: context) == nil)
     #expect(MovementRepository.fetchAll(context).isEmpty)
-}
-
-@MainActor
-@Test("Migrated parts get library entries and a usage check")
-func ensureLibraryForMigratedParts() throws {
-    let container = try memoryContainer()
-    let context = ModelContext(container)
-    let biceps = WorkoutPart(name: "Biceps", rounds: 3, setsPerRound: 3, setRest: 60, roundRest: 120)
-    let record = PresetRecord(.chest)
-    record.name = "Arms"
-    record.blocksData = nil
-    record.partsData = try JSONEncoder().encode([biceps])
-    context.insert(record)
-    try context.save()
-
-    MovementRepository.ensureLibrary(for: [record], in: context)
-    try context.save()
-
-    let movementRecord = try #require(MovementRepository.find(biceps.id, in: context))
-    let movement = movementRecord.movement
-    #expect(movement.name == "Biceps")
-    #expect(MovementRepository.usage(biceps.id, in: context) == ["Arms"])
-    #expect(throws: MovementDeleteError.inUse(["Arms"])) {
-        try MovementRepository.delete(biceps.id, in: context)
-    }
 }
 
 @MainActor
@@ -130,29 +105,4 @@ func addOrReuseMovement() throws {
 
     #expect(MovementRepository.addOrReuse(name: "   ", in: context) == nil)
     #expect(MovementRepository.fetchAll(context).count == 2)
-}
-
-@MainActor
-@Test("A legacy store with profile columns still opens name-only")
-func legacyProfileColumnsAreDormant() throws {
-    let container = try memoryContainer()
-    let context = ModelContext(container)
-    let legacy = MovementRecord(Movement(name: "Curl"))
-    legacy.axisRaw = "Y"
-    legacy.rise = 33
-    legacy.fall = 27
-    legacy.minPeriod = 0.9
-    legacy.group = "Biceps"
-    context.insert(legacy)
-    try context.save()
-
-    let opened = try #require(MovementRepository.find(legacy.id, in: context))
-    #expect(opened.movement.name == "Curl")
-    #expect(opened.axisRaw == "Y")
-
-    let renamed = MovementRepository.rename(legacy.id, to: "Hammer curl", in: context)
-    #expect(renamed?.name == "Hammer curl")
-    // Legacy columns are never rewritten.
-    #expect(opened.axisRaw == "Y")
-    #expect(opened.rise == 33)
 }

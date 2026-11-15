@@ -17,28 +17,27 @@ struct WorkoutPreset: Codable, Hashable, Identifiable, Sendable {
         case id, name, blocks
     }
 
-    /// Reads the current block shape, migrating a plan written before blocks
-    /// carried `rounds` and `setsPerRound`.
+    /// Reads the stored block shape. Missing blocks fall back to one block.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Untitled"
-        let stored = try container.decodeIfPresent([StoredBlock].self, forKey: .blocks) ?? []
-        let migrated = stored.flatMap { $0.migratedBlocks() }
-        blocks = migrated.isEmpty ? [.fallback] : migrated
+        let decoded = try container.decodeIfPresent([WorkoutBlock].self, forKey: .blocks) ?? []
+        blocks = decoded.isEmpty ? [.fallback] : decoded
     }
 
-    static let chest = WorkoutPreset(
-        name: "Chest",
+    /// The neutral first-run fixture: one session, one block, one movement.
+    static let seeded = WorkoutPreset(
+        name: "Session 1",
         blocks: [
             WorkoutBlock(
-                name: "Chest",
+                name: "Block 1",
                 rounds: 1,
                 setsPerRound: 9,
                 setRest: 60,
                 roundRest: 120,
                 movements: [
-                    BlockMovement(movementId: Movement.chestID, endCondition: .manual, target: nil)
+                    BlockMovement(movementId: Movement.seededID, endCondition: .manual, target: nil)
                 ]
             )
         ]
@@ -309,75 +308,6 @@ struct RestOption: Hashable, Sendable {
 
     var accent: RestAccent { transition.isSetAccent ? .set : .round }
     var isZero: Bool { duration <= 0 }
-}
-
-// MARK: - Legacy part bridge
-
-/// The part shape the first version of the app used. It remains only for
-/// reading `partsData` written by that version. New code uses `WorkoutBlock`.
-struct WorkoutPart: Codable, Hashable, Identifiable, Sendable {
-    var id: UUID
-    var name: String
-    var rounds: Int
-    var setsPerRound: Int
-    var setRest: Int
-    var roundRest: Int
-
-    init(
-        id: UUID = UUID(),
-        name: String,
-        rounds: Int,
-        setsPerRound: Int,
-        setRest: Int,
-        roundRest: Int
-    ) {
-        self.id = id
-        self.name = name
-        self.rounds = rounds
-        self.setsPerRound = setsPerRound
-        self.setRest = setRest
-        self.roundRest = roundRest
-    }
-
-    var totalSets: Int { safeProduct(rounds, setsPerRound) }
-    var totalRest: Int { totalRest(hasNextPart: false) }
-
-    func totalRest(hasNextPart: Bool) -> Int {
-        let setRests = safeProduct(safeProduct(rounds, max(0, setsPerRound - 1)), setRest)
-        let roundRests = max(0, rounds - 1) + (hasNextPart ? 1 : 0)
-        return safeSum(setRests, safeProduct(roundRests, roundRest))
-    }
-
-    func clamped() -> WorkoutPart {
-        var copy = self
-        copy.name = WorkoutPreset.clampedName(name, fallback: "Untitled block")
-        copy.rounds = max(rounds, 1)
-        copy.setsPerRound = max(setsPerRound, 1)
-        copy.setRest = WorkoutPreset.clampedRest(setRest)
-        copy.roundRest = WorkoutPreset.clampedRest(roundRest)
-        return copy
-    }
-}
-
-extension WorkoutBlock {
-    init(legacyPart part: WorkoutPart) {
-        self.init(
-            id: part.id,
-            name: part.name,
-            rounds: max(part.rounds, 1),
-            setsPerRound: max(part.setsPerRound, 1),
-            setRest: part.setRest,
-            roundRest: part.roundRest,
-            movements: [
-                BlockMovement(
-                    id: part.id,
-                    movementId: part.id,
-                    endCondition: .manual,
-                    target: nil
-                )
-            ]
-        )
-    }
 }
 
 // MARK: - Display
