@@ -275,6 +275,10 @@ app, so every change to it needs the screen locked with a rest or set running.
 - Lock the simulator with `l` in the Simulator menu:
   `osascript -e 'tell application "Simulator" to activate' -e 'delay 0.5' -e 'tell application "System Events" to keystroke "l" using command down'`.
   The Argent power button does not lock it.
+- To expand the Dynamic Island, background the app first (Argent `button`
+  `home`); a long press while the app is foreground does nothing. Then
+  `gesture-custom` with Down on the pill centre, Up after ~900 ms. Tapping the
+  expanded island opens the app.
 - Change text size with `xcrun simctl ui <udid> content_size accessibility-extra-extra-extra-large`
   and reset with `content_size large`. Check both, because the cap has to hold
   at the largest system size.
