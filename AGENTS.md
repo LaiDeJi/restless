@@ -42,6 +42,15 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
   "$TMPDIR/restless-device-dd/Build/Products/Debug-iphoneos/Restless.app"
 ```
 
+The iPhone install alone does not restore the watch half. Install the watch app from the same build after it, then relaunch the phone:
+
+```bash
+xcrun devicectl device install app --device 00008301-988218883E08402E \
+  "$TMPDIR/restless-device-dd/Build/Products/Debug-watchos/RestlessWatch.app"
+```
+
+Skip this and every publish fails with `Watch app is not installed`, and the wrist keeps showing its last payload.
+
 ## Rules
 
 1. `Shared/` stays pure: Foundation, ActivityKit and OSLog only, and SwiftUI only in `Shared/Theme.swift`. `SharedPurityTests` checks SwiftUI and SwiftData imports.
@@ -66,7 +75,8 @@ xcrun devicectl device install app --device 00008130-001A05810190001C \
 - Prototype changes: `python3 tools/prototype-check.py [driver.js]` serves the prototype on an ephemeral localhost port and prints the DOM after 6 s of virtual time; `--budget N` (ms) changes the wait. A driver can seed `localStorage` and click before the dump. `tools/prototype-driver-calendar.js` asserts the calendar grid, day sheets, settings and the reorder boundary.
 - Completion alert on a physical iPhone: complete a set, press Home while the rest runs, wait out the rest, then pull Notification Center from the top edge and tap the RESTLESS cell. Then check for new `Restless-*.ips` crash reports.
 - If `xcodebuild test` says the test runner hung before establishing connection, do not retry unchanged. Terminate the app, shut down extra booted simulators and rerun. After a second hang, reboot the destination or use another simulator.
-- The physical watch drops its CoreDevice tunnel as soon as it sleeps. Keep it on the wrist or awake for `devicectl` installs, launches and screenshots; an `unavailable` or tunnel error is the watch, not provisioning.
+- The physical watch drops its CoreDevice tunnel as soon as it sleeps. Keep it on the wrist or awake for `devicectl` installs, launches and screenshots; an `unavailable` or tunnel error is the watch, not provisioning. `devicectl device capture screenshot --device 00008301-988218883E08402E --destination /tmp/watch.png` reads the wrist screen.
+- Watch bridge log: `devicectl device copy from --device 00008130-001A05810190001C --domain-type appDataContainer --domain-identifier com.whc.restless --source Documents/watch-bridge.log --destination /tmp/watch-bridge.log`. A working bridge prints `published phase=… installed=true`; `publish failed: Watch app is not installed.` means the watch half needs the install in Commands.
 - Before debugging widget content, check which bundle owns the screen with `xcrun simctl listapps <udid>`. An older `Rounds` (`com.whc.rounds`) install can own the Dynamic Island.
 - For a Lock Screen or Dynamic Island change, follow the skill's "Verifying a panel change" section.
 
