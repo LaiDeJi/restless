@@ -132,8 +132,8 @@ Rest copy states what finished:
 
 - A set rest: `AFTER SET n`.
 - A round rest between rounds of one movement: `AFTER ROUND n`, counting that movement's rounds.
-- A movement switch: `AFTER BENCH PRESS · NEXT INCLINE PRESS` (the block's round rest).
-- A block transition: `AFTER CHEST · NEXT ARMS` (the block's round rest).
+- A movement switch: `NEXT · INCLINE PRESS` (the block's round rest).
+- A block transition: `NEXT · ARMS` (the block's round rest).
 - A zero set rest starts no rest at all; the next set is ready immediately. The ready screen shows `NO REST` / `NEXT`, not a `0:00` countdown.
 - The final set of the final block has no rest, straight to done.
 
@@ -248,12 +248,12 @@ Island content by state:
 | not started | no activity | no activity | no activity |
 | ready | active movement short label | next rest kind and duration, or `READY` | `BENCH PRESS · ROUND 2 OF 4 · SET 3 OF 4`; `NO REST AFTER` on the final set |
 | performing | active movement short label | work countdown | `REST 1:00 AFTER` / `NEXT SET IMMEDIATELY` / `NO REST AFTER` |
-| resting / paused | next movement short label | remaining time, progress bar | `AFTER SET 2` / `AFTER ROUND 3` / `AFTER CURL · NEXT PUSHDOWN` / `AFTER CHEST · NEXT ARMS`, plus pause/resume and skip |
+| resting / paused | next movement short label | remaining time, progress bar | `AFTER SET 2` / `AFTER ROUND 3` / `NEXT · PUSHDOWN` / `NEXT · ARMS`, plus pause/resume and skip |
 | done | `DONE` | total sets completed | total rest, blocks, movements |
 
 A movement switch is a round rest: the kicker reads `ROUND REST`, the copy names the finished movement and the next, and the accent is the round-rest amber. `SET REST` never appears at a switch.
 
-- Expanded: session name small, active block, active movement prominent, `ROUND r OF R` and `SET s OF S` (each hidden at a count of 1), timer trailing, controls at the bottom. During a rest one full-width line above the progress bar carries the rest context (`AFTER SET 2`, `AFTER ROUND 3`, `AFTER BICEPS · NEXT TRICEPS`). The compact leading region gets a 3-character movement label (`BEN`), or `DONE`; compact trailing is the countdown, `READY`, or `DONE`. The full block and movement names live in the expanded and Lock Screen views.
+- Expanded: session name small, active block, active movement prominent, `ROUND r OF R` and `SET s OF S` (each hidden at a count of 1), timer trailing, controls at the bottom. During a rest one full-width line above the progress bar carries the rest context (`AFTER SET 2`, `AFTER ROUND 3`, `NEXT · TRICEPS`). The compact leading region gets a 3-character movement label (`BEN`), or `DONE`; compact trailing is the countdown, `READY`, or `DONE`. The full block and movement names live in the expanded and Lock Screen views.
 - Controls are `Link`s to `restless://set-done`, `restless://start-set`, `restless://pause`, `restless://resume`, `restless://skip`, and `restless://restart`. The app applies the matching action in `onOpenURL` through `SessionTransitions.apply`. Set done during a rest is ignored; start set applies only to a ready timed set.
 - Accent follows the rest or work kind, not the screen: set rest `#C8FF4D`, round rest and movement or block transition `#FFB84D`, work countdown `#C8FF4D` (it is not a rest), done `#C8FF4D`.
 
@@ -262,7 +262,7 @@ A movement switch is a round rest: the kicker reads `ROUND REST`, the copy names
 The Lock Screen and Notification Center panel fits 160 points, padding included, at every supported text size. It is built from three rows:
 
 1. Header: the session name in `micro` above the movement name in `rowTitle` (one line), with the countdown trailing at 26 pt, scaled and capped at 32 pt.
-2. State: one row pairing the phase kicker in its accent with one context string. Ready uses the upcoming rest kicker plus `SET s OF S`, or `ROUND r OF R` when sets per round is 1, or `AFTER THIS SET` when neither applies. Resting and paused use the kicker plus the rest context (`AFTER SET 5`, `AFTER ROUND 3`, `AFTER CURL · NEXT PUSHDOWN`, `AFTER CHEST · NEXT ARMS`). Performing uses `WORK` plus the following rest (`REST 1:00 AFTER`). Done uses the completed-set kicker plus the session totals.
+2. State: one row pairing the phase kicker in its accent with one context string. Ready uses the upcoming rest kicker plus `SET s OF S`, or `ROUND r OF R` when sets per round is 1, or `AFTER THIS SET` when neither applies. Resting and paused use the kicker plus the rest context (`AFTER SET 5`, `AFTER ROUND 3`, `NEXT · PUSHDOWN`, `NEXT · ARMS`). Performing uses `WORK` plus the following rest (`REST 1:00 AFTER`). Done uses the completed-set kicker plus the session totals.
 3. The progress bar during a rest or a timed set, then the same action links the island offers for that state.
 
 There is no separate block-position row and no separate rest-context row. Every row is `lineLimit(1)` with a small `minimumScaleFactor`; padding is 14 pt and vertical spacing 8 pt. Dynamic Type is capped at `.xxLarge`, the largest size at which the whole panel fits; larger system sizes render at the cap. The panel must fit by layout, never by relying on the system's 160-point truncation. It shows `SESSION COMPLETE` with the completed-set total in done. The expanded and compact islands keep their fixed sizes and four-part leading region.
@@ -371,7 +371,7 @@ A missing or unreadable stored plan falls back to the seeded `Chest` block. A bl
 
 ## Copy
 
-Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `AFTER BENCH PRESS · NEXT INCLINE PRESS`, `AFTER CHEST · NEXT ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `Restart this session?`, `Restart Session`, `Cancel`, `SET REST OVER`, `ROUND REST OVER`, `WORK SET OVER`, `SESSION COMPLETE`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `HOLD`.
+Keep the prototype's words. Timer and island: `START SESSION`, `SET DONE`, `START`, `WORK`, `PAUSE`, `RESUME`, `SKIP REST`, `START AGAIN`, `READY`, `DONE`, `SESSION COMPLETE`, `SET REST`, `ROUND REST`, `PAUSED`, `NO REST`, `NEXT`, `NEXT SET IMMEDIATELY`, `AFTER THIS SET`, `AFTER SET n`, `AFTER ROUND n`, `NEXT · INCLINE PRESS`, `NEXT · ARMS`, `LAST SET`, `FINISH`, `NO REST AFTER`, `Finish session`, `Restart this session?`, `Restart Session`, `Cancel`, `SET REST OVER`, `ROUND REST OVER`, `WORK SET OVER`, `SESSION COMPLETE`, `UP NEXT`, `SETS IN THIS BLOCK`, `SETS`, `HOLD`.
 
 Blocks and movements: `BLOCKS`, `ROUNDS`, `SETS PER ROUND`, `SETS EACH`, `MOVEMENTS`, `END CONDITION`, `TARGET`, `TIME`, `MANUAL`, `DELETE MOVEMENT`, `USED BY CHEST · REMOVE IT FROM THE PLAN FIRST`. Block rows and summaries are numeric: `2 MOVEMENTS · 2 ROUNDS · 1 SET EACH · 4 SETS`, `1 MOVEMENT · 4 ROUNDS · 4 SETS EACH · 16 SETS`. The app never assigns a straight, superset, or circuit label; a user may still type one as a block name.
 
@@ -389,7 +389,7 @@ The timer's last-set primary action is `SET DONE`, not `FINISH SESSION`; the isl
 
 - `rest(after:)` for every position in 4 × 4 (one movement), 2 movements × 3 rounds × 2 sets, 2 movements × 2 rounds × 1 set, a one-round block with N sets, and N rounds × 1 set — the degenerate shapes are where the round-rest branch usually breaks.
 - A 4 × 4 block: 16 sets and 1080 s at 60/120 (12 set rests + 3 round rests); set rest after sets 1–3, round rest after set 4.
-- A 2 × 3 × 2 block (two movements, three rounds, two sets each, 60/120): 12 sets and 960 s (6 set rests + 5 round rests); sets 1–6 all belong to the first movement and set 6 is a round rest named `AFTER BICEPS · NEXT TRICEPS`; set 7 is the second movement's round 1 set 1.
+- A 2 × 3 × 2 block (two movements, three rounds, two sets each, 60/120): 12 sets and 960 s (6 set rests + 5 round rests); sets 1–6 all belong to the first movement and set 6 is a round rest named `NEXT · TRICEPS`; set 7 is the second movement's round 1 set 1.
 - A 2 × 2 × 1 block at 30/120: 4 sets and 360 s (0 set rests, 3 round rests); every rest is a round rest.
 - A 1 × 3 block at 60/0: 3 sets and 120 s of set rest, no round rest.
 - A movement switch is a round rest over the block's round rest and names both movements; a round rest between rounds of one movement is `AFTER ROUND n`; a block transition names both blocks and gets the block's round rest; the final set has no rest.

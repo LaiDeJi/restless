@@ -222,7 +222,7 @@ func movementTransition() {
     #expect(snapshot.restTransition == .movement)
     #expect(snapshot.restContext { id in
         id == curlID ? "Curl" : "Pushdown"
-    } == "AFTER CURL · NEXT PUSHDOWN")
+    } == "NEXT · PUSHDOWN")
 }
 
 @Test("A round rest follows a movement's earlier round")
@@ -250,7 +250,7 @@ func blockTransition() {
     #expect(snapshot.duration == 120)
     #expect(snapshot.restTransition == .block)
     #expect(snapshot.isBlockTransition)
-    #expect(snapshot.subtitle == "AFTER BICEPS · NEXT TRICEPS")
+    #expect(snapshot.subtitle == "NEXT · TRICEPS")
 }
 
 @Test("The final set of the last block ends the session with no rest")
@@ -365,7 +365,7 @@ func movementSwitchFallback() {
     completeSets(1, in: &snapshot)
     snapshot.setDone(now: start)
 
-    #expect(snapshot.restContext == "AFTER ARMS · NEXT MOVEMENT")
+    #expect(snapshot.restContext == "NEXT · MOVEMENT")
 }
 
 @Test("Progress runs from zero to one across a rest")

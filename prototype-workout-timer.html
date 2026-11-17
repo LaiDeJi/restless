@@ -3110,10 +3110,10 @@
     if (rest.transition === "set") return "AFTER SET " + p.set;
     if (rest.transition === "round") return "AFTER ROUND " + p.round;
     if (rest.transition === "movement") {
-      return "AFTER " + movementName(rest.from).toUpperCase() + " · NEXT " + movementName(rest.to).toUpperCase();
+      return "NEXT · " + movementName(rest.to).toUpperCase();
     }
     if (rest.transition === "block") {
-      return "AFTER " + rest.fromBlock.name.toUpperCase() + " · NEXT " + rest.toBlock.name.toUpperCase();
+      return "NEXT · " + rest.toBlock.name.toUpperCase();
     }
     return "";
   }

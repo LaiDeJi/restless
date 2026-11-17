@@ -118,8 +118,8 @@ private func positionLabel(_ context: ActivityViewContext<RestlessActivityAttrib
     return snapshot.roundSetCopy.text
 }
 
-/// The expanded island's rest line: what just finished, shown full width above
-/// the progress bar. A movement switch reads `AFTER BICEPS · NEXT TRICEPS`
+/// The expanded island's rest line: the rest context, shown full width above
+/// the progress bar. A movement switch reads `NEXT · TRICEPS`
 /// under the round-rest kicker. Nil outside a rest.
 private func restLine(_ context: ActivityViewContext<RestlessActivityAttributes>) -> String? {
     let snapshot = context.attributes.snapshot(context.state)
@@ -128,7 +128,8 @@ private func restLine(_ context: ActivityViewContext<RestlessActivityAttributes>
     return copy.isEmpty ? nil : copy
 }
 
-/// The rest subtitle names the finished movement or block and what follows.
+/// The rest subtitle names what the rest leads into: the finished set or
+/// round, or the next movement or block on a transition.
 /// `SessionSnapshot` has no library, so this copy resolves the names here.
 private func restCopy(_ context: ActivityViewContext<RestlessActivityAttributes>) -> String {
     let snapshot = context.attributes.snapshot(context.state)

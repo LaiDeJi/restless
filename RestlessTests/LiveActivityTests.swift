@@ -75,7 +75,7 @@ func movementSwitchOnIsland() {
 
     #expect(rebuilt.kicker == "ROUND REST")
     #expect(rebuilt.isRoundAccent)
-    #expect(rebuilt.restContext { attributes.movementName($0) } == "AFTER BICEPS · NEXT TRICEPS")
+    #expect(rebuilt.restContext { attributes.movementName($0) } == "NEXT · TRICEPS")
     #expect(rebuilt.position.movementIndex == 1)
     #expect(rebuilt.position.round == 1)
 }

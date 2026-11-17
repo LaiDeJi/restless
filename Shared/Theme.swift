@@ -102,7 +102,8 @@ extension SessionSnapshot {
     var isBlockTransition: Bool { restTransition == .block }
 
     /// What the rest just completed was attached to. `movementName` resolves the
-    /// library names for a movement switch; without it the copy names the block.
+    /// library names for a movement switch; without it the copy falls back to
+    /// naming the next movement generically.
     func restContext(movementName: ((UUID) -> String)? = nil) -> String {
         guard let transition = restTransition else { return "" }
         let finished = preset.position(at: max(0, doneSets - 1))
@@ -115,7 +116,7 @@ extension SessionSnapshot {
             guard preset.blocks.indices.contains(finished.blockIndex) else { return "" }
             let block = preset.blocks[finished.blockIndex]
             guard let movementName else {
-                return "AFTER \(finished.blockName.uppercased()) · NEXT MOVEMENT"
+                return "NEXT · MOVEMENT"
             }
             let finishedName = movementName(finished.movementId).uppercased()
             let nextIndex = finished.movementIndex + 1
@@ -123,11 +124,11 @@ extension SessionSnapshot {
                 return "AFTER \(finishedName)"
             }
             let nextName = movementName(block.movements[nextIndex].movementId).uppercased()
-            return "AFTER \(finishedName) · NEXT \(nextName)"
+            return "NEXT · \(nextName)"
         case .block:
             let nextIndex = finished.blockIndex + 1
             guard preset.blocks.indices.contains(nextIndex) else { return "" }
-            return "AFTER \(finished.blockName.uppercased()) · NEXT \(preset.blocks[nextIndex].name.uppercased())"
+            return "NEXT · \(preset.blocks[nextIndex].name.uppercased())"
         }
     }
 

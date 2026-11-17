@@ -432,7 +432,7 @@ steps:
     args:
       condition: visible
       selector:
-        text: AFTER BICEPS · NEXT TRICEPS
+        text: NEXT · TRICEPS
       timeoutMs: 4000
   - tool: await-ui-element
     args:
