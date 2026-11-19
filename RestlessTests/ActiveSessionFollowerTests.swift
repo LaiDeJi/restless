@@ -128,19 +128,64 @@ func manualPickHoldsForTheDay() throws {
     #expect(fixture.storage.marks(dayOne, calendar: calendar))
 }
 
+/// A session left mid-workout: the gate snapshot carries a controlled
+/// `startedAt`, then one set is performed at a fixture instant. The rest has
+/// long expired by the real arrival clock, so the engine reconciles to the gate
+/// with its completed set, which is the stale state the follower must judge.
 @MainActor
-@Test("A session with a completed set is not replaced")
-func completedSetIsNotReplaced() throws {
+private func partialSession(_ preset: WorkoutPreset, started: Date) -> SessionEngine {
+    let gate = SessionSnapshot.initial(preset, now: started)
+    SessionStore.save(gate)
+    let engine = SessionEngine(preset: preset)
+    engine.perform(.startSession, at: started, id: nil)
+    engine.perform(.setDone, at: started, id: nil)
+    return engine
+}
+
+@MainActor
+@Test("A partial session started on an earlier day yields to today's plan")
+func stalePartialSessionYieldsToTodaysPlan() throws {
     SessionStore.clear()
     let fixture = try FollowerFixture()
     defer { fixture.cleanUp() }
 
     fixture.calendarSettings.initializeRotation(today: dayOne)
     fixture.storage.activate(id: fixture.push.id, on: dayOne)
-    let engine = SessionEngine(preset: fixture.push)
-    engine.perform(.startSession)
-    engine.perform(.setDone)
+    let engine = partialSession(fixture.push, started: dayOne)
+    #expect(engine.snapshot.startedAt == dayOne)
     #expect(engine.snapshot.doneSets == 1)
+    #expect(engine.snapshot.phase == .ready)
+
+    let decision = ActiveSessionFollower.follow(
+        today: dayTwo,
+        calendar: calendar,
+        context: fixture.context,
+        calendarSettings: fixture.calendarSettings,
+        engine: engine,
+        storage: fixture.storage
+    )
+
+    #expect(decision == .switchTo(RotationSession(id: fixture.arms.id, name: fixture.arms.name)))
+    #expect(engine.snapshot.preset.id == fixture.arms.id)
+    #expect(engine.snapshot.phase == .notStarted)
+    #expect(engine.snapshot.doneSets == 0)
+    #expect(fixture.storage.id == fixture.arms.id)
+    #expect(fixture.storage.marks(dayTwo, calendar: calendar))
+}
+
+@MainActor
+@Test("A partial session started today is not replaced")
+func todaysPartialSessionIsNotReplaced() throws {
+    SessionStore.clear()
+    let fixture = try FollowerFixture()
+    defer { fixture.cleanUp() }
+
+    fixture.calendarSettings.initializeRotation(today: dayOne)
+    fixture.storage.activate(id: fixture.push.id, on: dayOne)
+    let engine = partialSession(fixture.push, started: dayTwo)
+    #expect(engine.snapshot.startedAt == dayTwo)
+    #expect(engine.snapshot.doneSets == 1)
+    #expect(engine.snapshot.phase == .ready)
 
     let decision = ActiveSessionFollower.follow(
         today: dayTwo,
@@ -154,7 +199,7 @@ func completedSetIsNotReplaced() throws {
     #expect(decision == .keep)
     #expect(engine.snapshot.preset.id == fixture.push.id)
     #expect(engine.snapshot.doneSets == 1)
-    #expect(engine.snapshot.phase == .resting)
+    #expect(engine.snapshot.phase == .ready)
     #expect(fixture.storage.id == fixture.push.id)
     #expect(fixture.storage.marks(dayOne, calendar: calendar))
 }

@@ -28,22 +28,30 @@ private let legs = preset("Legs")
 
 private var armsPlan: RotationSession { RotationSession(id: arms.id, name: arms.name) }
 
-private func atGate(_ session: WorkoutPreset) -> SessionSnapshot {
-    .initial(session, now: today)
+private func atGate(_ session: WorkoutPreset, started: Date = today) -> SessionSnapshot {
+    .initial(session, now: started)
 }
 
-private func withProgress(_ session: WorkoutPreset) -> SessionSnapshot {
-    var snapshot = atGate(session)
+private func withProgress(_ session: WorkoutPreset, started: Date = today) -> SessionSnapshot {
+    var snapshot = atGate(session, started: started)
     snapshot.startSession()
-    snapshot.setDone(now: today)
+    snapshot.setDone(now: started)
     return snapshot
 }
 
-private func done(_ session: WorkoutPreset) -> SessionSnapshot {
-    var snapshot = atGate(session)
+/// A session left mid-workout: progress is kept, but the rest ran out while
+/// the app was away, so it sits at the gate.
+private func withProgressAtGate(_ session: WorkoutPreset, started: Date) -> SessionSnapshot {
+    var snapshot = withProgress(session, started: started)
+    snapshot.finishRest()
+    return snapshot
+}
+
+private func done(_ session: WorkoutPreset, started: Date = today) -> SessionSnapshot {
+    var snapshot = atGate(session, started: started)
     snapshot.startSession()
     while snapshot.phase != .done {
-        if snapshot.phase == .ready { snapshot.setDone(now: today) }
+        if snapshot.phase == .ready { snapshot.setDone(now: started) }
         if snapshot.phase == .resting { snapshot.finishRest() }
     }
     return snapshot
@@ -75,6 +83,58 @@ func staleDayAtGateSwitches() {
     )
 
     #expect(decision == .switchTo(armsPlan))
+}
+
+@Test("A stale partial session at the gate yields to today's plan")
+func stalePartialSessionAtGateSwitches() {
+    let snapshot = withProgressAtGate(push, started: yesterday)
+    #expect(snapshot.phase == .ready)
+    #expect(snapshot.doneSets == 1)
+
+    let decision = decide(
+        active: push,
+        activeDay: yesterday,
+        plan: armsPlan,
+        snapshot: snapshot
+    )
+
+    #expect(decision == .switchTo(armsPlan))
+}
+
+@Test("Progress from today at the gate keeps the session")
+func todayProgressAtGateIsProtected() {
+    let decision = decide(
+        active: push,
+        activeDay: yesterday,
+        plan: armsPlan,
+        snapshot: withProgressAtGate(push, started: today)
+    )
+
+    #expect(decision == .keep)
+}
+
+@Test("The same plan with a stale partial session starts fresh")
+func samePlanWithStalePartialSessionStartsFresh() {
+    let decision = decide(
+        active: push,
+        activeDay: yesterday,
+        plan: RotationSession(id: push.id, name: push.name),
+        snapshot: withProgressAtGate(push, started: yesterday)
+    )
+
+    #expect(decision == .switchTo(RotationSession(id: push.id, name: push.name)))
+}
+
+@Test("The same plan with progress from today keeps the session")
+func samePlanWithTodayProgressKeeps() {
+    let decision = decide(
+        active: push,
+        activeDay: yesterday,
+        plan: RotationSession(id: push.id, name: push.name),
+        snapshot: withProgressAtGate(push, started: today)
+    )
+
+    #expect(decision == .keep)
 }
 
 @Test("The same plan with a stale day only records the day")
@@ -141,6 +201,43 @@ func pausedSessionIsProtected() {
     )
 
     #expect(decision == .keep)
+}
+
+@Test("A performing, resting or paused session from an earlier day is never replaced")
+func earlierDayRunningSessionIsProtected() {
+    let resting = withProgress(push, started: yesterday)
+    #expect(resting.phase == .resting)
+
+    var paused = resting
+    paused.pause(now: yesterday.addingTimeInterval(30))
+    #expect(paused.phase == .paused)
+
+    var performing = resting
+    performing.phase = .performing
+    performing.setDuration = 60
+    performing.setDeadline = yesterday.addingTimeInterval(60)
+
+    for snapshot in [resting, paused, performing] {
+        let decision = decide(
+            active: push,
+            activeDay: yesterday,
+            plan: armsPlan,
+            snapshot: snapshot
+        )
+        #expect(decision == .keep, "\(snapshot.phase) from an earlier day must be kept")
+    }
+}
+
+@Test("A done session from an earlier day yields to today's plan")
+func earlierDayDoneSessionSwitches() {
+    let decision = decide(
+        active: legs,
+        activeDay: yesterday,
+        plan: armsPlan,
+        snapshot: done(legs, started: yesterday)
+    )
+
+    #expect(decision == .switchTo(armsPlan))
 }
 
 @Test("A done session yields to the new day's plan")

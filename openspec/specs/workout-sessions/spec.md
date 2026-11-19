@@ -1106,3 +1106,25 @@ The active session SHALL follow the session the calendar plans for today. On lau
 - **GIVEN** Chest active at the start gate today, tomorrow planned as Arms, and the app left open
 - **WHEN** the local day changes to tomorrow
 - **THEN** Arms becomes active at its start gate without a relaunch
+
+### Requirement: A stale gate session yields to the plan
+
+A session left at the start gate with completed sets from an earlier local day SHALL NOT keep the active slot: on launch, foreground, and a local day change the app SHALL activate today's plan at its start gate instead, and the stale run SHALL keep its history record. A gate session whose completed sets are from today SHALL be kept.
+
+#### Scenario: A stale partial session yields to the new day
+
+- **GIVEN** yesterday's session at the gate with some sets done and today planned as Arms
+- **WHEN** the app opens or returns to the foreground today
+- **THEN** Arms becomes active at its start gate and yesterday's partial run keeps its record
+
+#### Scenario: A stale partial session that is today's plan starts fresh
+
+- **GIVEN** the order holds only Chest, yesterday's Chest sits at the gate with some sets done, and today is planned as Chest
+- **WHEN** the app opens today
+- **THEN** Chest is active at its start gate with zero completed sets and yesterday's partial run keeps its record
+
+#### Scenario: Progress from today keeps the session
+
+- **GIVEN** today planned as Arms and a Legs session at the gate with sets completed today
+- **WHEN** the app returns to the foreground today
+- **THEN** Legs stays active at the gate with its completed sets, and no set is lost or skipped

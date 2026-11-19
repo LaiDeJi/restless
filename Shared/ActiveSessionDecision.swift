@@ -36,23 +36,37 @@ extension ActiveSessionDecision {
             return .keep
         }
 
-        // A performing, resting or paused session, or any session with
-        // completed sets, is never replaced.
-        guard isReplaceable(snapshot) else { return .keep }
+        // A performing, resting or paused session is never replaced. Progress
+        // from today is kept too; only a session left at the gate on an
+        // earlier local day yields to today's plan.
+        guard isReplaceable(snapshot, today: today, calendar: calendar) else { return .keep }
 
         guard activeID == plan.id else { return .switchTo(plan) }
 
         // The same plan is already at the gate: only the day marker is stale.
-        // A done session starts fresh, even when the rotation holds one session.
-        return snapshot.phase == .done ? .switchTo(plan) : .recordDay
+        // A run with completed sets here is stale too (today's progress was
+        // kept above), so it starts fresh, as a done session does — even when
+        // the rotation holds one session.
+        if snapshot.phase == .done || snapshot.doneSets > 0 {
+            return .switchTo(plan)
+        }
+        return .recordDay
     }
 
-    /// The gate and a ready session with no completed sets can be replaced; a
-    /// finished session yields to the new day; everything running is protected.
-    private static func isReplaceable(_ snapshot: SessionSnapshot) -> Bool {
+    /// The gate and a ready session with no completed sets can be replaced, as
+    /// can one whose progress is from an earlier local day; a finished session
+    /// yields to the new day; everything running is protected.
+    private static func isReplaceable(
+        _ snapshot: SessionSnapshot,
+        today: Date,
+        calendar: Calendar
+    ) -> Bool {
         switch snapshot.phase {
         case .notStarted, .ready:
-            return snapshot.doneSets == 0
+            let hasProgress = snapshot.doneSets > 0
+            guard hasProgress else { return true }
+            let startDay = calendar.startOfDay(for: snapshot.startedAt)
+            return startDay < calendar.startOfDay(for: today)
         case .done:
             return true
         case .performing, .resting, .paused:
